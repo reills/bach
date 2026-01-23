@@ -1,0 +1,8 @@
+{
+  "baseScore": "base.musicxml",
+  "snippets": [
+    "measure-001.xml",
+    "measure-002.xml",
+    "measure-003.xml"
+  ]
+}

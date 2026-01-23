@@ -1,0 +1,45 @@
+#data and processing
+tobis_xml
+processed
+cleanup_tobis_dirs.py
+complete-works.html
+link_files.py
+scrape.py
+works.csv
+#roundtrip_compare.py
+#extract_works.py
+#kern_to_musicxml.py
+
+#data sources
+music_locations.txt
+to use.txt
+
+# python / tooling
+.venv/
+.pytest_cache/
+__pycache__/
+*.py[cod]
+.DS_Store
+.idea/
+.vscode/
+
+# logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# frontend build artifacts
+/frontend/node_modules/
+/frontend/dist/
+/frontend/dist-ssr/
+/frontend/*.local
+ 
+.venv/
+.pytest_cache/
+__pycache__/
+*.py[cod]
+.DS_Store
