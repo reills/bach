@@ -1,0 +1,13 @@
+﻿{
+    "baseScore":  "BWV_0772.xml",
+    "snippets":  [
+                     "measure-001.xml",
+                     "measure-002.xml",
+                     "measure-003.xml",
+                     "measure-004.xml",
+                     "measure-005.xml",
+                     "measure-006.xml",
+                     "measure-007.xml",
+                     "measure-008.xml"
+                 ]
+}
