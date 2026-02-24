@@ -7,3 +7,4 @@
 - 2026-02-24: Updated loop to use `--full-auto` on newer Codex CLI builds where explicit approval flags are unavailable.
 - 2026-02-24: Completed Stage-1 ExecPlan item 1 by defining versioned `EventSpec`/`DescriptorSpec` in `src/tokens/schema.py` (`remi_tab_v1`, `tpq=24`) and added `tests/test_schema.py`.
 - 2026-02-24: Completed Stage-1 ExecPlan item 2 by adding `src/tokens/intervals.py` (melodic/harmonic helpers with QA vs production behavior), wiring repairs into `eventize_musicxml`, updating harmonic validation to shared math helpers, and adding `tests/test_intervals.py`; verify run: `53 passed, 1 skipped`.
+- 2026-02-24: Completed Stage-1 ExecPlan item 3 by adding `src/tokens/tokenizer.py` (voice-event parsing/serialization, stream canonicalization helpers), wiring `eventize_musicxml` pitched-onset emission through tokenizer serialization for canonical ordering, and adding `tests/test_tokenizer.py`; verify run: `59 passed, 1 skipped`.

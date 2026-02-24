@@ -11,7 +11,7 @@
 ## Checklist (one item per loop)
 - [x] Define EventSpec + DescriptorSpec in `src/tokens/schema.py` with version `remi_tab_v1` and `tpq=24`.
 - [x] Implement interval math helpers (melodic + harmonic ref) with QA vs production behavior.
-- [ ] Implement event parsing/serialization in `src/tokens/tokenizer.py` with canonical ordering.
+- [x] Implement event parsing/serialization in `src/tokens/tokenizer.py` with canonical ordering.
 - [ ] Add round-trip tests for pitch reconstruction and `HARM_*` consistency.
 - [ ] Implement `scripts/make_dataset.py` basic pipeline (parse, normalize, collapse doublings, track assignment, tokenize, stats).
 - [ ] Produce dataset artifacts in `data/processed/` and document counts in `stats.json`.

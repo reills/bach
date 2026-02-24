@@ -12,9 +12,9 @@ from src.tokens.intervals import (
     IntervalRepairStats,
     compute_reference_pitch,
     compute_melodic_interval,
-    format_signed_interval,
     harmonic_tokens_for_pitch,
 )
+from src.tokens.tokenizer import VoiceEvent, serialize_voice_event
 
 DEFAULT_MAX_VOICES = 8
 DEFAULT_MAX_OCTAVES_PER_PITCH_CLASS = 3
@@ -584,15 +584,12 @@ def eventize_musicxml(
                         tokens.append(f"ABS_VOICE_{v}_{ev.pitch}")
                     prev_pitch[v] = ev.pitch
 
-                tokens.append(f"VOICE_{v}")
-                tokens.append(f"DUR_{ev.duration_tick}")
                 base_pitch = prev_pitch[v] if prev_pitch[v] is not None else ev.pitch
                 mel_int = compute_melodic_interval(
                     ev.pitch,
                     base_pitch,
                     qa_mode=True,
                 )
-                tokens.append(f"MEL_INT12_{format_signed_interval(mel_int)}")
 
                 harm_oct_tok, harm_cls_tok = harmonic_tokens_for_pitch(
                     ev.pitch,
@@ -600,8 +597,21 @@ def eventize_musicxml(
                     qa_mode=qa_mode,
                     stats=interval_repairs,
                 )
-                tokens.append(harm_oct_tok)
-                tokens.append(harm_cls_tok)
+                harm_oct = None if harm_oct_tok.endswith("_NA") else int(harm_oct_tok.rsplit("_", 1)[1])
+                harm_class = (
+                    None if harm_cls_tok.endswith("_NA") else int(harm_cls_tok.rsplit("_", 1)[1])
+                )
+                tokens.extend(
+                    serialize_voice_event(
+                        VoiceEvent(
+                            voice=v,
+                            duration_ticks=ev.duration_tick,
+                            mel_int=mel_int,
+                            harm_oct=harm_oct,
+                            harm_class=harm_class,
+                        )
+                    )
+                )
 
                 prev_pitch[v] = ev.pitch
                 active_until[v] = t + ev.duration_tick
