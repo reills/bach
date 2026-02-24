@@ -84,23 +84,29 @@ const ScoreViewer = ({
     }
 
     const settings = {
-      layout: {
-        staveProfile:
-          (alphaTab as any).StaveProfile?.Score ??
-          (alphaTab as any).LayoutStaveProfile?.Score ??
-          0,
-      },
       core: {
         includeNoteBounds: true,
         fontDirectory: '/font/',
       },
-      player: {
-        enablePlayer: true,
-      },
       display: {
+        layoutMode:
+          (alphaTab as any).LayoutMode?.Parchment ??
+          (alphaTab as any).LayoutMode?.Page ??
+          0,
+        barsPerRow: 4,
+        stretchForce: 0.6,
+        justifyLastSystem: false,
+        padding: [36, 8, 64, 24],
+        staveProfile:
+          (alphaTab as any).StaveProfile?.ScoreTab ??
+          (alphaTab as any).LayoutStaveProfile?.ScoreTab ??
+          0,
         resources: {
           copyrightFont: '11px Arial',
         },
+      },
+      player: {
+        enablePlayer: true,
       },
     };
 
@@ -144,16 +150,24 @@ const ScoreViewer = ({
   return (
     <div className="score-viewer">
       <div className="score-viewer__header">
-        <span className="score-viewer__label">Score + Tab</span>
+        <span className="score-viewer__label">
+          <span className="score-viewer__label-icon">🎼</span>
+          Score + Tab
+        </span>
         {highlightMeasureId ? (
-          <span className="score-viewer__highlight">
-            Draft focus: {highlightMeasureId}
+          <span className="score-viewer__badge">
+            <span>✏️</span>
+            Draft: {highlightMeasureId}
           </span>
         ) : null}
       </div>
       {!scoreXml ? (
         <div className="score-viewer__empty">
-          Load a score to start rendering.
+          <span className="score-viewer__empty-icon">🎸</span>
+          <span className="score-viewer__empty-title">No score loaded</span>
+          <span className="score-viewer__empty-subtitle">
+            Generate a new composition or load test data to get started.
+          </span>
         </div>
       ) : null}
       <div className="score-viewer__canvas" ref={containerRef} />

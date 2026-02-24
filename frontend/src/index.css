@@ -84,22 +84,45 @@ select,
 input {
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 0.65rem 0.8rem;
+  border-radius: 8px;
+  padding: 0.55rem 0.75rem;
   color: var(--bg-ink);
   outline: none;
-  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+  font-size: 0.85rem;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+
+textarea:hover,
+select:hover,
+input:hover {
+  border-color: rgba(43, 122, 120, 0.4);
 }
 
 textarea:focus,
 select:focus,
 input:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 4px var(--ring);
+  box-shadow: 0 0 0 3px var(--ring);
+  background: #fff;
 }
 
 textarea {
   resize: vertical;
+  min-height: 60px;
+}
+
+select {
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%235a645d' d='M6 8L2 4h8z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  padding-right: 2rem;
+}
+
+::placeholder {
+  color: var(--muted);
+  opacity: 0.7;
 }
 
 ol {

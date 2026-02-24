@@ -586,208 +586,264 @@ const App = () => {
     [statusTone],
   );
 
+  const workflowStep = useMemo(() => {
+    if (!state.scoreId) return 0;
+    if (!state.selectedMeasureId) return 1;
+    if (!state.draftId) return 2;
+    return 3;
+  }, [state.scoreId, state.selectedMeasureId, state.draftId]);
+
   return (
     <div className="app">
       <header className="app__header">
         <div className="brand">
-          <span className="brand__title">Bach Gen</span>
-          <span className="brand__tag">Inpainted guitar counterpoint</span>
+          <span className="brand__icon">🎸</span>
+          <div className="brand__text">
+            <span className="brand__title">Bach Gen</span>
+            <span className="brand__tag">AI-powered guitar counterpoint</span>
+          </div>
         </div>
         <div className="status">
-          <span className={statusClass}>{statusMessage}</span>
+          <span className={statusClass}>
+            <span className="status-pill__icon" />
+            {statusMessage}
+          </span>
           <span className="status__meta">
-            Source: {dataSource} · API:{' '}
-            {import.meta.env.VITE_API_BASE_URL ?? 'same-origin'}
+            {dataSource === 'local' ? 'Local mode' : 'API mode'}
           </span>
         </div>
       </header>
 
       <main className="app__main">
         <section className="panel panel--controls">
-          <div className="panel__title">Compose</div>
-          <div className="control-card">
-            <label className="field">
-              <span>Data source</span>
-              <select
-                value={dataSource}
-                onChange={(event) =>
-                  setDataSource(event.target.value as DataSource)
-                }
-              >
-                <option value="api">Backend API</option>
-                <option value="local">Local test-data</option>
-              </select>
-            </label>
-            {dataSource === 'api' ? (
-            <label className="field">
-              <span>Prompt</span>
-              <textarea
-                value={prompt}
-                onChange={(event) => setPrompt(event.target.value)}
-                placeholder="Describe the mood, tempo, or constraints."
-                rows={3}
-              />
-            </label>
-            ) : (
-              <div className="helper-text">
-                Load `/public/test-data/manifest.json` to mock inpaint drafts
-                without the backend.
-              </div>
-            )}
-            {dataSource === 'local' ? (
-              <div className="info-grid">
-                <div>
-                  <span className="info-label">Base file</span>
-                  <span className="info-value">
-                    {localManifest?.baseScore ?? 'manifest missing'}
-                  </span>
+          {/* Source Selection */}
+          <div className="panel__section">
+            <div className="panel__title">
+              <span className="panel__title-icon">⚡</span>
+              Get Started
+            </div>
+            <div className="control-card">
+              <label className="field">
+                <span>Data source</span>
+                <select
+                  value={dataSource}
+                  onChange={(event) =>
+                    setDataSource(event.target.value as DataSource)
+                  }
+                >
+                  <option value="api">Backend API</option>
+                  <option value="local">Local test-data</option>
+                </select>
+              </label>
+              {dataSource === 'api' ? (
+                <label className="field">
+                  <span>Prompt (optional)</span>
+                  <textarea
+                    value={prompt}
+                    onChange={(event) => setPrompt(event.target.value)}
+                    placeholder="e.g., Baroque style, minor key, moderate tempo..."
+                    rows={2}
+                  />
+                </label>
+              ) : (
+                <div className="helper-text">
+                  Uses local MusicXML files for testing without a backend.
                 </div>
-                <div>
-                  <span className="info-label">Snippets</span>
-                  <span className="info-value">
-                    {localManifest?.snippets.length ?? 0}
-                  </span>
+              )}
+              {dataSource === 'local' && localManifest ? (
+                <div className="info-grid">
+                  <div className="info-item">
+                    <span className="info-label">Base file</span>
+                    <span className="info-value">{localManifest.baseScore}</span>
+                  </div>
+                  <div className="info-item">
+                    <span className="info-label">Snippets</span>
+                    <span className="info-value">{localManifest.snippets.length}</span>
+                  </div>
                 </div>
+              ) : null}
+              <div className="button-row">
+                <button
+                  className="btn btn--primary"
+                  onClick={dataSource === 'local' ? handleLoadLocal : handleCompose}
+                  disabled={busy}
+                >
+                  <span className="btn__icon">{dataSource === 'local' ? '📂' : '✨'}</span>
+                  {dataSource === 'local' ? 'Load Test Data' : 'Generate Score'}
+                </button>
+                <button className="btn btn--ghost" onClick={handleLoadDemo}>
+                  <span className="btn__icon">🎵</span>
+                  Demo
+                </button>
               </div>
-            ) : null}
-            <div className="button-row">
-              <button
-                className="btn btn--primary"
-                onClick={dataSource === 'local' ? handleLoadLocal : handleCompose}
-                disabled={busy}
-              >
-                {dataSource === 'local' ? 'Load test-data' : 'Compose'}
-              </button>
-              <button className="btn btn--ghost" onClick={handleLoadDemo}>
-                Load demo
-              </button>
             </div>
           </div>
 
-          <div className="panel__title">Inpaint Draft</div>
-          <div className="control-card">
-            <div className="info-grid">
-              <div>
-                <span className="info-label">Selected measure</span>
-                <span className="info-value">
-                  {state.selectedMeasureId ?? 'none'}
-                </span>
-              </div>
-              <div>
-                <span className="info-label">Bar index</span>
-                <span className="info-value">
-                  {state.selectedBarIndex ?? '--'}
-                </span>
-              </div>
+          {/* Inpaint Section */}
+          <div className="panel__section">
+            <div className="panel__title">
+              <span className="panel__title-icon">🎨</span>
+              Inpaint Measure
             </div>
+            <div className="control-card">
+              {state.selectedMeasureId ? (
+                <div className="selection-badge">
+                  <span>📍</span>
+                  Bar {state.selectedBarIndex !== null ? state.selectedBarIndex + 1 : '?'}
+                  {' · '}
+                  <span style={{ opacity: 0.7 }}>{state.selectedMeasureId}</span>
+                </div>
+              ) : (
+                <div className="helper-text">
+                  👆 Click a measure in the score to select it for inpainting.
+                </div>
+              )}
 
-            <div className="toggle-grid">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={constraints.keepHarmony}
-                  onChange={(event) =>
-                    setConstraints((prev) => ({
-                      ...prev,
-                      keepHarmony: event.target.checked,
-                    }))
-                  }
-                />
-                Keep harmony
-              </label>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={constraints.keepRhythm}
-                  onChange={(event) =>
-                    setConstraints((prev) => ({
-                      ...prev,
-                      keepRhythm: event.target.checked,
-                    }))
-                  }
-                />
-                Keep rhythm
-              </label>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={constraints.keepSoprano}
-                  onChange={(event) =>
-                    setConstraints((prev) => ({
-                      ...prev,
-                      keepSoprano: event.target.checked,
-                    }))
-                  }
-                />
-                Keep soprano
-              </label>
-            </div>
+              <div className="toggle-grid">
+                <label className={`toggle-chip ${constraints.keepHarmony ? 'toggle-chip--active' : ''}`}>
+                  <span className="toggle-chip__check">{constraints.keepHarmony ? '✓' : ''}</span>
+                  <input
+                    type="checkbox"
+                    checked={constraints.keepHarmony}
+                    onChange={(event) =>
+                      setConstraints((prev) => ({
+                        ...prev,
+                        keepHarmony: event.target.checked,
+                      }))
+                    }
+                  />
+                  Harmony
+                </label>
+                <label className={`toggle-chip ${constraints.keepRhythm ? 'toggle-chip--active' : ''}`}>
+                  <span className="toggle-chip__check">{constraints.keepRhythm ? '✓' : ''}</span>
+                  <input
+                    type="checkbox"
+                    checked={constraints.keepRhythm}
+                    onChange={(event) =>
+                      setConstraints((prev) => ({
+                        ...prev,
+                        keepRhythm: event.target.checked,
+                      }))
+                    }
+                  />
+                  Rhythm
+                </label>
+                <label className={`toggle-chip ${constraints.keepSoprano ? 'toggle-chip--active' : ''}`}>
+                  <span className="toggle-chip__check">{constraints.keepSoprano ? '✓' : ''}</span>
+                  <input
+                    type="checkbox"
+                    checked={constraints.keepSoprano}
+                    onChange={(event) =>
+                      setConstraints((prev) => ({
+                        ...prev,
+                        keepSoprano: event.target.checked,
+                      }))
+                    }
+                  />
+                  Soprano
+                </label>
+              </div>
 
-            <label className="field">
-              <span>Mode</span>
-              <select
-                value={mode}
-                onChange={(event) =>
-                  setMode(event.target.value as 'window' | 'repair')
-                }
-              >
-                <option value="window">Window</option>
-                <option value="repair">Repair</option>
-              </select>
-            </label>
+              <label className="field">
+                <span>Mode</span>
+                <select
+                  value={mode}
+                  onChange={(event) =>
+                    setMode(event.target.value as 'window' | 'repair')
+                  }
+                >
+                  <option value="window">Window (regenerate)</option>
+                  <option value="repair">Repair (fix issues)</option>
+                </select>
+              </label>
 
-            <div className="button-row">
               <button
                 className="btn btn--primary"
                 onClick={handleInpaintPreview}
-                disabled={busy || !state.scoreId}
+                disabled={busy || !state.scoreId || !state.selectedMeasureId}
+                style={{ width: '100%' }}
               >
-                Inpaint preview
+                <span className="btn__icon">🔄</span>
+                Generate Preview
               </button>
-              <button
-                className="btn btn--ghost"
-                onClick={handleCommitDraft}
-                disabled={busy || !state.draftId}
-              >
-                Commit
-              </button>
-              <button
-                className="btn btn--ghost"
-                onClick={handleDiscardDraft}
-                disabled={busy || !state.draftId}
-              >
-                Discard
-              </button>
+
+              {state.draftId && (
+                <div className="draft-indicator">
+                  <span className="draft-indicator__icon">📝</span>
+                  <span className="draft-indicator__text">Draft ready for review</span>
+                  <div className="draft-indicator__actions">
+                    <button
+                      className="btn btn--small btn--primary"
+                      onClick={handleCommitDraft}
+                      disabled={busy}
+                    >
+                      ✓ Keep
+                    </button>
+                    <button
+                      className="btn btn--small btn--ghost"
+                      onClick={handleDiscardDraft}
+                      disabled={busy}
+                    >
+                      ✕ Discard
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
-          <div className="panel__title">Playback + Export</div>
-          <div className="control-card">
-            <div className="button-row">
-              <button className="btn" onClick={handlePlay}>
-                Play
-              </button>
-              <button className="btn" onClick={handlePause}>
-                Pause
-              </button>
-              <button className="btn" onClick={handleStop}>
-                Stop
-              </button>
+          {/* Playback & Export */}
+          <div className="panel__section">
+            <div className="panel__title">
+              <span className="panel__title-icon">🎧</span>
+              Playback & Export
             </div>
-            <div className="button-row">
-              <button className="btn btn--ghost" onClick={handleExportXml}>
-                Export MusicXML
-              </button>
-              <button
-                className="btn btn--ghost"
-                onClick={handleExportMidi}
-                disabled={!state.midi}
-              >
-                Export MIDI
-              </button>
-            </div>
-            <div className="helper-text">
-              AlphaTab player is browser-only. Load a score before playback.
+            <div className="control-card">
+              <div className="playback-bar">
+                <div className="playback-bar__controls">
+                  <button
+                    className="btn btn--icon-only"
+                    onClick={handlePlay}
+                    disabled={!renderXml}
+                    title="Play"
+                  >
+                    ▶
+                  </button>
+                  <button
+                    className="btn btn--icon-only"
+                    onClick={handlePause}
+                    disabled={!renderXml}
+                    title="Pause"
+                  >
+                    ⏸
+                  </button>
+                  <button
+                    className="btn btn--icon-only"
+                    onClick={handleStop}
+                    disabled={!renderXml}
+                    title="Stop"
+                  >
+                    ⏹
+                  </button>
+                </div>
+                <div className="playback-bar__divider" />
+                <div className="playback-bar__exports">
+                  <button
+                    className="btn btn--ghost"
+                    onClick={handleExportXml}
+                    disabled={!renderXml}
+                  >
+                    📄 XML
+                  </button>
+                  <button
+                    className="btn btn--ghost"
+                    onClick={handleExportMidi}
+                    disabled={!state.midi}
+                  >
+                    🎹 MIDI
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </section>
@@ -803,61 +859,85 @@ const App = () => {
         </section>
 
         <aside className="panel panel--meta">
-          <div className="panel__title">Session</div>
-          <div className="meta-card">
-            <div>
-              <span className="info-label">Score ID</span>
-              <span className="info-value">{state.scoreId ?? 'none'}</span>
+          {/* Workflow Stepper */}
+          <div className="panel__section">
+            <div className="panel__title">
+              <span className="panel__title-icon">📋</span>
+              Workflow
             </div>
-            <div>
-              <span className="info-label">Revision</span>
-              <span className="info-value">
-                {state.revision ?? 'unassigned'}
-              </span>
-            </div>
-            <div>
-              <span className="info-label">Draft ID</span>
-              <span className="info-value">{state.draftId ?? 'none'}</span>
-            </div>
-            <div>
-              <span className="info-label">Measure map</span>
-              <span className="info-value">
-                {measureCount ? `${measureCount} measures` : 'missing'}
-              </span>
-            </div>
-            <div>
-              <span className="info-label">Event map</span>
-              <span className="info-value">
-                {eventMapCount ? `${eventMapCount} hits` : 'missing'}
-              </span>
-            </div>
-            <div>
-              <span className="info-label">Last event</span>
-              <span className="info-value">{state.lastEventId ?? '--'}</span>
-            </div>
-          </div>
-
-          <div className="panel__title">Draft locks</div>
-          <div className="meta-card">
-            <div>
-              <span className="info-label">Locked events</span>
-              <span className="info-value">
-                {state.lockedEventIds?.length ?? 0}
-              </span>
-            </div>
-            <div className="helper-text">
-              Carry-in notes should appear here once the API responds.
+            <div className="workflow-stepper">
+              <div className={`workflow-step ${workflowStep > 0 ? 'workflow-step--complete' : ''} ${workflowStep === 0 ? 'workflow-step--active' : ''}`}>
+                <div className="workflow-step__number">{workflowStep > 0 ? '✓' : '1'}</div>
+                <div className="workflow-step__content">
+                  <div className="workflow-step__label">Load or compose a score</div>
+                </div>
+              </div>
+              <div className={`workflow-step ${workflowStep > 1 ? 'workflow-step--complete' : ''} ${workflowStep === 1 ? 'workflow-step--active' : ''}`}>
+                <div className="workflow-step__number">{workflowStep > 1 ? '✓' : '2'}</div>
+                <div className="workflow-step__content">
+                  <div className="workflow-step__label">Click a measure to select</div>
+                </div>
+              </div>
+              <div className={`workflow-step ${workflowStep > 2 ? 'workflow-step--complete' : ''} ${workflowStep === 2 ? 'workflow-step--active' : ''}`}>
+                <div className="workflow-step__number">{workflowStep > 2 ? '✓' : '3'}</div>
+                <div className="workflow-step__content">
+                  <div className="workflow-step__label">Generate an inpaint preview</div>
+                </div>
+              </div>
+              <div className={`workflow-step ${workflowStep === 3 ? 'workflow-step--active' : ''}`}>
+                <div className="workflow-step__number">4</div>
+                <div className="workflow-step__content">
+                  <div className="workflow-step__label">Keep or discard changes</div>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="panel__title">Workflow</div>
-          <div className="meta-card">
-            <ol>
-              <li>Compose or load a score.</li>
-              <li>Click a measure in the viewer.</li>
-              <li>Preview an inpaint draft.</li>
-              <li>Commit or discard.</li>
-            </ol>
+          {/* Session Info */}
+          <div className="panel__section">
+            <div className="panel__title">
+              <span className="panel__title-icon">💾</span>
+              Session
+            </div>
+            <div className="meta-card">
+              <div className="info-grid">
+                <div className="info-item">
+                  <span className="info-label">Score</span>
+                  <span className={`info-value ${state.scoreId ? '' : 'info-value--muted'}`}>
+                    {state.scoreId ? (state.scoreId.length > 12 ? state.scoreId.slice(0, 12) + '…' : state.scoreId) : 'None'}
+                  </span>
+                </div>
+                <div className="info-item">
+                  <span className="info-label">Revision</span>
+                  <span className={`info-value ${state.revision !== null ? 'info-value--highlight' : 'info-value--muted'}`}>
+                    {state.revision !== null ? `v${state.revision}` : '—'}
+                  </span>
+                </div>
+                <div className="info-item">
+                  <span className="info-label">Measures</span>
+                  <span className="info-value">
+                    {measureCount || '—'}
+                  </span>
+                </div>
+                <div className="info-item">
+                  <span className="info-label">Events</span>
+                  <span className="info-value">
+                    {eventMapCount || '—'}
+                  </span>
+                </div>
+              </div>
+              {state.draftId && (
+                <>
+                  <div className="divider" />
+                  <div className="info-item">
+                    <span className="info-label">Active Draft</span>
+                    <span className="info-value info-value--highlight">
+                      {state.draftId.length > 16 ? state.draftId.slice(0, 16) + '…' : state.draftId}
+                    </span>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </aside>
       </main>

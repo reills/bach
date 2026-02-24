@@ -1,4 +1,11 @@
-#data and processing
+# data corpora and generated outputs
+/data/tobis_xml/
+/data/processed/
+/data/imslp_pdfs/
+/data/imslp_musicxml/
+*.omr
+
+# legacy local data files at repo root
 tobis_xml
 processed
 cleanup_tobis_dirs.py
@@ -6,19 +13,28 @@ complete-works.html
 link_files.py
 scrape.py
 works.csv
-#roundtrip_compare.py
-#extract_works.py
-#kern_to_musicxml.py
 
-#data sources
+# local notes / sources
 music_locations.txt
 to use.txt
+
+# data-testing: keep scripts/docs, ignore generated artifacts and secrets
+/data-testing/*
+!/data-testing/*.py
+!/data-testing/*.md
+/data-testing/cookies*.txt
+/data-testing/*.csv
+/data-testing/*.json
 
 # python / tooling
 .venv/
 .pytest_cache/
 __pycache__/
 *.py[cod]
+.mypy_cache/
+.ruff_cache/
+
+# editor / OS
 .DS_Store
 .idea/
 .vscode/
@@ -37,9 +53,3 @@ lerna-debug.log*
 /frontend/dist/
 /frontend/dist-ssr/
 /frontend/*.local
- 
-.venv/
-.pytest_cache/
-__pycache__/
-*.py[cod]
-.DS_Store
