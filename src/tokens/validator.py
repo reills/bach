@@ -1,5 +1,7 @@
 from typing import List, Optional, Tuple
 
+from src.tokens.intervals import compute_reference_pitch, harmonic_tokens_for_pitch
+
 
 def _infer_num_voices(tokens: List[str]) -> int:
     max_idx = -1
@@ -194,7 +196,7 @@ def validate_harm_tokens(tokens: List[str], tpq: int = 24) -> List[str]:
                 if active_until[v] > abs_t and prev_pitch[v] is not None:
                     active_pitches.append(prev_pitch[v])
             active_pitches.extend(onsets_at_t.values())
-            ref_pitch = min(active_pitches) if active_pitches else None
+            ref_pitch = compute_reference_pitch(active_pitches)
 
             idx += 1
             while idx < n:
@@ -282,32 +284,21 @@ def validate_harm_tokens(tokens: List[str], tpq: int = 24) -> List[str]:
                     prev_pitch[v_idx] = pitch
                     active_until[v_idx] = abs_t + dur
 
-                    if ref_pitch is None:
-                        if harm_oct_tok != "HARM_OCT_NA" or harm_cls_tok != "HARM_CLASS_NA":
-                            errors.append(
-                                f"Mismatch at {idx} (Voice {v_idx}, POS {pos_tick}): "
-                                f"Expected NA/NA (no ref), got {harm_oct_tok}/{harm_cls_tok}"
-                            )
-                    else:
-                        diff = pitch - ref_pitch
-                        expected_oct, expected_cls = divmod(diff, 12)
-
-                        got_oct_str = harm_oct_tok.replace("HARM_OCT_", "")
-                        got_cls_str = harm_cls_tok.replace("HARM_CLASS_", "")
-                        if got_oct_str == "NA":
-                            errors.append(
-                                f"Mismatch at {idx} (Voice {v_idx}, POS {pos_tick}): "
-                                f"Expected {expected_oct}/{expected_cls}, got NA"
-                            )
-                        else:
-                            got_oct = int(got_oct_str)
-                            got_cls = int(got_cls_str)
-                            if got_oct != expected_oct or got_cls != expected_cls:
-                                errors.append(
-                                    f"Mismatch at {idx} (Voice {v_idx}, POS {pos_tick}): "
-                                    f"Pitch {pitch} (Ref {ref_pitch}). Expected HARM "
-                                    f"{expected_oct}/{expected_cls}, got {got_oct}/{got_cls}"
-                                )
+                    expected_harm_oct, expected_harm_cls = harmonic_tokens_for_pitch(
+                        pitch,
+                        ref_pitch,
+                        qa_mode=False,
+                    )
+                    if (
+                        harm_oct_tok != expected_harm_oct
+                        or harm_cls_tok != expected_harm_cls
+                    ):
+                        errors.append(
+                            f"Mismatch at {idx} (Voice {v_idx}, POS {pos_tick}): "
+                            f"Pitch {pitch} (Ref {ref_pitch}). Expected "
+                            f"{expected_harm_oct}/{expected_harm_cls}, got "
+                            f"{harm_oct_tok}/{harm_cls_tok}"
+                        )
 
                     idx = next_idx + 3
                     continue

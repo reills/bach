@@ -8,6 +8,14 @@ from typing import Dict, List, Optional, Tuple, Union
 import music21
 from music21.musicxml.xmlToM21 import MusicXMLWarning
 
+from src.tokens.intervals import (
+    IntervalRepairStats,
+    compute_reference_pitch,
+    compute_melodic_interval,
+    format_signed_interval,
+    harmonic_tokens_for_pitch,
+)
+
 DEFAULT_MAX_VOICES = 8
 DEFAULT_MAX_OCTAVES_PER_PITCH_CLASS = 3
 _NORMAL_NOTES_FRACTION_RE = re.compile(
@@ -32,14 +40,6 @@ class ScoreMeta:
 
 def ql_to_ticks(ql: float, tpq: int) -> int:
     return int(round(ql * tpq))
-
-
-def format_signed_int(value: int) -> str:
-    if value > 0:
-        return f"+{value}"
-    if value < 0:
-        return str(value)
-    return "0"
 
 
 def _normalize_part_name(name: object) -> str:
@@ -421,6 +421,7 @@ def eventize_musicxml(
     max_voices: int = DEFAULT_MAX_VOICES,
     voice_mode: str = "auto",
     max_octaves_per_pitch_class: int = DEFAULT_MAX_OCTAVES_PER_PITCH_CLASS,
+    qa_mode: bool = False,
 ) -> Tuple[List[str], ScoreMeta]:
     warnings_list: List[warnings.WarningMessage]
     try:
@@ -514,6 +515,7 @@ def eventize_musicxml(
     prev_pitch: List[Optional[int]] = [None] * voice_count
     active_until: List[int] = [0] * voice_count
     last_end: List[Optional[int]] = [None] * voice_count
+    interval_repairs = IntervalRepairStats()
 
     for bar_idx in range(num_bars):
         bar_start = bar_idx * bar_len_ticks
@@ -550,7 +552,7 @@ def eventize_musicxml(
             for ev in events_at_t.values():
                 if ev.pitch is not None:
                     active_pitches.append(ev.pitch)
-            ref_pitch = min(active_pitches) if active_pitches else None
+            ref_pitch = compute_reference_pitch(active_pitches)
 
             for v in range(voice_count):
                 ev = events_at_t.get(v)
@@ -564,6 +566,18 @@ def eventize_musicxml(
                     anchor_needed = True
                 elif anchor_large_leaps and abs(ev.pitch - prev_pitch[v]) > mel_range:
                     anchor_needed = True
+                elif prev_pitch[v] is not None:
+                    try:
+                        compute_melodic_interval(
+                            ev.pitch,
+                            prev_pitch[v],
+                            qa_mode=True,
+                        )
+                    except ValueError:
+                        if qa_mode:
+                            raise
+                        interval_repairs.mel_clamped += 1
+                        anchor_needed = True
 
                 if anchor_needed:
                     if not (bar_anchor_emitted[v] and t == bar_start):
@@ -573,21 +587,33 @@ def eventize_musicxml(
                 tokens.append(f"VOICE_{v}")
                 tokens.append(f"DUR_{ev.duration_tick}")
                 base_pitch = prev_pitch[v] if prev_pitch[v] is not None else ev.pitch
-                mel_int = ev.pitch - base_pitch
-                tokens.append(f"MEL_INT12_{format_signed_int(mel_int)}")
+                mel_int = compute_melodic_interval(
+                    ev.pitch,
+                    base_pitch,
+                    qa_mode=True,
+                )
+                tokens.append(f"MEL_INT12_{format_signed_interval(mel_int)}")
 
-                if ref_pitch is None:
-                    tokens.append("HARM_OCT_NA")
-                    tokens.append("HARM_CLASS_NA")
-                else:
-                    diff = ev.pitch - ref_pitch
-                    octv, klass = divmod(diff, 12)
-                    tokens.append(f"HARM_OCT_{octv}")
-                    tokens.append(f"HARM_CLASS_{klass}")
+                harm_oct_tok, harm_cls_tok = harmonic_tokens_for_pitch(
+                    ev.pitch,
+                    ref_pitch,
+                    qa_mode=qa_mode,
+                    stats=interval_repairs,
+                )
+                tokens.append(harm_oct_tok)
+                tokens.append(harm_cls_tok)
 
                 prev_pitch[v] = ev.pitch
                 active_until[v] = t + ev.duration_tick
                 last_end[v] = t + ev.duration_tick
+
+    if not qa_mode and (
+        interval_repairs.mel_clamped > 0 or interval_repairs.harm_oct_clamped > 0
+    ):
+        mapping_note = (
+            f"{mapping_note}; interval_repairs=mel:{interval_repairs.mel_clamped},"
+            f"harm_oct:{interval_repairs.harm_oct_clamped}"
+        )
 
     meta = ScoreMeta(
         time_sig_token=time_sig_token,
