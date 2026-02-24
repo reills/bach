@@ -1,0 +1,3845 @@
+OpenAI Codex v0.104.0 (research preview)
+--------
+workdir: /home/stephen-reilly/dev/bach_gen
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: high
+reasoning summaries: auto
+session id: 019c8f51-1361-7750-9234-78edcdc55386
+--------
+user
+You are working in this repo.
+
+Read:
+- AGENTS.md
+- SPEC.md
+- TODO.md
+- PROGRESS.md
+- docs/exec/EXECPLAN_stage1.md
+- docs/skills/python-test-env/SKILL.md
+- .codex/loop_runs/20260224_030212/context_1.md (current context snapshot)
+
+Before coding, run:
+- bash docs/skills/python-test-env/scripts/run_tests.sh --check
+
+Do the next unchecked item in docs/exec/EXECPLAN_stage1.md.
+Keep TODO.md in sync.
+Run the verify command mentioned in AGENTS.md (or reuse the failing one from the context).
+Update TODO.md (check completed items) and append notes to PROGRESS.md.
+
+Your final message MUST be valid JSON matching loop_output.schema.json.
+If you made no progress, set progress_made=false and explain why in summary.
+
+mcp: chrome-devtools starting
+mcp: chrome-devtools ready
+mcp startup: ready: chrome-devtools
+codex
+{"done":false,"progress_made":true,"summary":"I’m starting by reading the required project docs and context snapshot, then I’ll run the pre-check test command before selecting and implementing the next unchecked Stage 1 exec-plan item.","tests_ran":false,"tests_status":"not_run","next_step":"Open AGENTS.md, SPEC.md, TODO.md, PROGRESS.md, EXECPLAN_stage1.md, python-test-env skill doc, and the latest context snapshot; then run run_tests.sh --check.","stop_reason":""}
+
+thinking
+**Deciding parallel file reads**
+codex
+{"done":false,"progress_made":true,"summary":"Reading all required docs and the current loop context now, in parallel where possible, to identify the next unchecked execution-plan item.","tests_ran":false,"tests_status":"not_run","next_step":"Inspect required files content and locate the first unchecked task in docs/exec/EXECPLAN_stage1.md.","stop_reason":""}
+exec
+/bin/bash -lc "sed -n '1,260p' PROGRESS.md" in /home/stephen-reilly/dev/bach_genexec
+/bin/bash -lc "sed -n '1,220p' AGENTS.md" in /home/stephen-reilly/dev/bach_genexec
+/bin/bash -lc "sed -n '1,260p' SPEC.md" in /home/stephen-reilly/dev/bach_genexec
+/bin/bash -lc "sed -n '1,260p' TODO.md" in /home/stephen-reilly/dev/bach_gen succeeded in 51ms:
+# PROGRESS
+
+- 2026-02-24: Initialized AGENTS.md, SPEC.md, TODO.md, and PROGRESS.md for Stage-1 loop setup.
+- 2026-02-24: Added ExecPlan, Codex loop script, config, and schema for structured loop output.
+- 2026-02-24: Added python-test-env skill and test helper script; loop now defaults to conda env `bach` and includes environment precheck in prompt.
+- 2026-02-24: Fixed loop compatibility with installed Codex CLI (removed hard dependency on `-a`, added auto-detect for approval flags, and fail-fast on CLI usage errors).
+- 2026-02-24: Updated loop to use `--full-auto` on newer Codex CLI builds where explicit approval flags are unavailable.
+ succeeded in 51ms:
+# AGENTS.md — bach-gen
+
+## How to run
+- Preferred runtime: `conda run -n bach python`
+- Optional venv fallback: `python -m venv .venv && source .venv/bin/activate`
+- Environment/test helper: `bash docs/skills/python-test-env/scripts/run_tests.sh --check`
+- Tests: `bash docs/skills/python-test-env/scripts/run_tests.sh`
+
+## Rules
+- Do one task per run.
+- Prefer small diffs; don't refactor unrelated code.
+- Always run tests for touched areas (use `bash docs/skills/python-test-env/scripts/run_tests.sh`).
+- Don't weaken or remove tests to make them pass.
+- If you add a new feature without tests, add tests in the same run.
+- Do not hard-code tests; test real behavior.
+- If tests fail, find and fix the underlying code issue before proceeding.
+- Update `TODO.md` when items are completed.
+- Append a short entry to `PROGRESS.md` for each change set.
+- Don't add heavy deps without asking.
+ succeeded in 51ms:
+# SPEC — Stage-1 Tokenizer & Dataset (Condensed)
+
+## Goal
+Implement the Stage-1 symbolic event stream and dataset builder for Bach-style polyphony on a fixed 24 TPQ grid.
+
+## Core Rules
+- TPQ is fixed at 24.
+- Events are sparse: emit `POS_t` only where at least one voice event starts.
+- Per-voice continuity is tracked across barlines by `prev_pitch` and `active_until`.
+- Absolute pitch truth is `ABS_VOICE_*` + `MEL_INT12_*`.
+- `HARM_*` tokens are derived from the lowest active reference pitch at time t.
+
+## Event Schema (v1)
+Structural:
+- `BAR`, `TIME_SIG_*`, `KEY_*`, `TEMPO_*`, `POS_*`
+
+Voice events:
+- `VOICE_{0..K-1}`, `DUR_{ticks}`, optional `REST_{ticks}`
+
+Anchors:
+ succeeded in 51ms:
+# TODO
+
+## Milestone: Stage-1 Tokenizer & Dataset
+- [ ] Implement `src/tokens/schema.py` (EventSpec + DescriptorSpec, versioned)
+- [ ] Implement tokenizer interval math + round-trip tests
+- [ ] Implement `scripts/make_dataset.py` basic pipeline
+- [ ] Produce `data/processed/{events.parquet,barplans.parquet,stats.json}`
+- [ ] CI: `pytest -q` passes
+
+thinking
+**Planning parallel document reads**
+exec
+/bin/bash -lc "sed -n '1,320p' docs/exec/EXECPLAN_stage1.md" in /home/stephen-reilly/dev/bach_genexec
+/bin/bash -lc "sed -n '1,320p' docs/skills/python-test-env/SKILL.md" in /home/stephen-reilly/dev/bach_genexec
+/bin/bash -lc "sed -n '1,360p' .codex/loop_runs/20260224_030212/context_1.md" in /home/stephen-reilly/dev/bach_gen succeeded in 51ms:
+# ExecPlan — Stage-1 Tokenizer & Dataset
+
+## Rules
+- One task per run.
+- Run `bash docs/skills/python-test-env/scripts/run_tests.sh` and do not weaken tests.
+- If you add a new feature without tests, add tests in the same run.
+- Do not hard-code tests; test real behavior.
+- If tests fail, fix the underlying code issue before proceeding.
+- Update `TODO.md` and append to `PROGRESS.md`.
+
+## Checklist (one item per loop)
+- [ ] Define EventSpec + DescriptorSpec in `src/tokens/schema.py` with version `remi_tab_v1` and `tpq=24`.
+- [ ] Implement interval math helpers (melodic + harmonic ref) with QA vs production behavior.
+- [ ] Implement event parsing/serialization in `src/tokens/tokenizer.py` with canonical ordering.
+- [ ] Add round-trip tests for pitch reconstruction and `HARM_*` consistency.
+- [ ] Implement `scripts/make_dataset.py` basic pipeline (parse, normalize, collapse doublings, track assignment, tokenize, stats).
+- [ ] Produce dataset artifacts in `data/processed/` and document counts in `stats.json`.
+- [ ] Verify `bash docs/skills/python-test-env/scripts/run_tests.sh` passes.
+ succeeded in 50ms:
+---
+name: python-test-env
+description: Ensure deterministic Python test execution in this repo by selecting a valid runtime (`conda` env `bach` first, then `.venv`) and running pytest with dependency checks. Use when preparing to run tests, when a loop run needs a stable verify command, or when failures may be caused by environment mismatch.
+---
+
+# Python Test Env
+
+## Workflow
+
+1. Run `bash docs/skills/python-test-env/scripts/run_tests.sh --check`.
+2. If check passes, use the printed verify command for all test runs.
+3. If check fails, fix environment selection first before code changes.
+4. Run `bash docs/skills/python-test-env/scripts/run_tests.sh` to execute tests.
+
+## Environment Selection Rules
+
+- Prefer `conda` env `bach` when available.
+- Fall back to `.venv` only if `.venv/bin/python` is executable.
+- Reject broken `.venv` layouts (for example zero-byte `python` launcher files).
+- Verify imports: `pytest`, `torch`, `music21`, `pandas`, `pyarrow`.
+ succeeded in 51ms:
+# Context (iter 1) — 2026-02-24T03:02:12-08:00
+
+## Git status
+## codex-loop-20260224-030212
+?? .codex/
+?? AGENTS.md
+?? PROGRESS.md
+?? SPEC.md
+?? TODO.md
+?? docs/
+?? loop_output.schema.json
+?? scripts/ralph_codex.sh
+
+## Diffstat
+
+## Verify (may fail)
+...............s...........................                              [100%]
+42 passed, 1 skipped in 47.56s
+
+
+thinking
+**Running precheck after commentary update**
+codex
+{"done":false,"progress_made":true,"summary":"I’ve identified the Stage-1 checklist and context; next I’m running the required environment precheck command before any code changes.","tests_ran":false,"tests_status":"not_run","next_step":"Run bash docs/skills/python-test-env/scripts/run_tests.sh --check and capture the selected verify command.","stop_reason":""}
+exec
+/bin/bash -lc 'bash docs/skills/python-test-env/scripts/run_tests.sh --check' in /home/stephen-reilly/dev/bach_gen succeeded in 1.77s:
+Environment check passed.
+Using verify command: CONDA_NO_PLUGINS=true conda run -n bach python -m pytest -q
+
+thinking
+**Preparing EventSpec design**
+codex
+{"done":false,"progress_made":true,"summary":"Precheck passed; I’m now inspecting existing `src/tokens` code and tests so I can implement only the next unchecked checklist item (`schema.py`) with a small diff.","tests_ran":true,"tests_status":"pass","next_step":"Read src/tokens files and test suite references to design/add EventSpec + DescriptorSpec in schema.py.","stop_reason":""}
+
+thinking
+**Preparing file inspection**
+exec
+/bin/bash -lc 'rg --files' in /home/stephen-reilly/dev/bach_genexec
+/bin/bash -lc 'rg -n "EventSpec|DescriptorSpec|schema|tokenizer|remi_tab_v1|tpq" src tests' in /home/stephen-reilly/dev/bach_gen succeeded in 50ms:
+frontend-readme.md
+loop_output.schema.json
+TODO.md
+AGENTS.md
+docs/exec/EXECPLAN_stage1.md
+PROGRESS.md
+SPEC.md
+README.md
+docs/skills/python-test-env/SKILL.md
+src/__init__.py
+frontend/tsconfig.node.json
+frontend/index.html
+docs/skills/python-test-env/scripts/run_tests.sh
+tests/test_descriptors.py
+tests/test_tokens.py
+tests/test_model_integration.py
+src/tokens/__init__.py
+scripts/build_vocab.py
+scripts/ralph_codex.sh
+docs/skills/python-test-env/agents/openai.yaml
+ succeeded in 51ms:
+tests/test_tokens.py:202:    Integration test for the tokenizer pipeline across different styles.
+tests/test_descriptors.py:86:    plan, _ = compute_bar_plan(tokens, bar_index=0, tpq=24)
+tests/test_descriptors.py:108:    plan, _ = compute_bar_plan(tokens, bar_index=0, tpq=24)
+tests/test_descriptors.py:131:    _, state = compute_bar_plan(bar1, bar_index=0, running_state=state, tpq=4)
+tests/test_descriptors.py:132:    plan2, _ = compute_bar_plan(bar2, bar_index=1, running_state=state, tpq=4)
+tests/test_descriptors.py:138:    plan, _ = compute_bar_plan(tokens, bar_index=0, tpq=24)
+tests/test_descriptors.py:152:    plan, _ = compute_bar_plan(tokens, bar_index=0, tpq=24)
+tests/test_descriptors.py:169:    _, state = compute_bar_plan(bar1, bar_index=0, running_state=state, tpq=4)
+tests/test_descriptors.py:170:    plan2, _ = compute_bar_plan(bar2, bar_index=1, running_state=state, tpq=4)
+tests/test_descriptors.py:176:        compute_bar_plan(["BAR", "KEY_C"], bar_index=0, tpq=24)
+tests/test_descriptors.py:181:        compute_bar_plan(["BAR", "TIME_SIG_4_4"], bar_index=0, tpq=24)
+tests/test_descriptors.py:192:        compute_bar_plan(tokens, bar_index=0, tpq=24)
+src/tokens/validator.py:35:def validate_harm_tokens(tokens: List[str], tpq: int = 24) -> List[str]:
+src/tokens/validator.py:43:    bar_len_ticks = tpq * 4
+src/tokens/validator.py:66:            bar_len_ticks = int(round((num * (4.0 / denom)) * tpq))
+src/tokens/eventizer.py:33:def ql_to_ticks(ql: float, tpq: int) -> int:
+src/tokens/eventizer.py:34:    return int(round(ql * tpq))
+src/tokens/eventizer.py:174:    score: music21.stream.Score, tpq: int, bar_len_ticks: int
+src/tokens/eventizer.py:176:    bar_len_ql = bar_len_ticks / tpq
+src/tokens/eventizer.py:202:    return ql_to_ticks(pickup_ql, tpq)
+
+thinking
+**Inspecting schema and tests**
+exec
+/bin/bash -lc "sed -n '1,260p' src/tokens/schema.py" in /home/stephen-reilly/dev/bach_genexec
+/bin/bash -lc "sed -n '1,320p' tests/test_descriptors.py" in /home/stephen-reilly/dev/bach_genexec
+/bin/bash -lc "sed -n '1,320p' tests/test_tokens.py" in /home/stephen-reilly/dev/bach_gen succeeded in 50ms:
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional
+
+@dataclass
+class EventSpec:
+    """
+    Defines the tokenization schema version and parameters.
+    """
+    version: str = "remi_tab_v1"
+    tpq: int = 24
+    # Dictionary of token types to their vocabulary lists (or descriptions)
+    tokens: Dict[str, List[str]] = field(default_factory=dict)
+
+@dataclass
+class DescriptorSpec:
+    """
+    Defines the available bar-level descriptors.
+    """
+    fields: List[str] = field(default_factory=lambda: [
+        "TIME_SIG",
+ succeeded in 51ms:
+import sys
+from pathlib import Path
+import pytest
+from music21 import corpus
+
+# Ensure src is in path if running from root
+sys.path.insert(0, str(Path(__file__).parents[1]))
+
+from src.tokens.eventizer import eventize_musicxml
+from src.tokens.roundtrip import tokens_to_midi
+from src.tokens.validator import validate_harm_tokens
+
+def _local_xml(path: Path) -> str:
+    if not path.exists():
+        pytest.skip(f"Local file {path} not found")
+    return str(path)
+
+@pytest.fixture
+def bwv66_xml(tmp_path):
+    """Creates a temporary MusicXML file for BWV 66.6."""
+ succeeded in 51ms:
+import sys
+from pathlib import Path
+
+import pytest
+
+sys.path.insert(0, str(Path(__file__).parents[1]))
+
+from src.dataio.descriptors import (
+    _classify_density,
+    _compute_pitch_range,
+    _extract_key,
+    _extract_time_sig,
+    compute_bar_plan,
+)
+
+
+def _voice_event(voice, duration, mel):
+    return [
+        f"VOICE_{voice}",
+        f"DUR_{duration}",
+
+thinking
+**Planning schema and usage inspection**
+exec
+/bin/bash -lc "sed -n '1,220p' src/tokens/__init__.py" in /home/stephen-reilly/dev/bach_genexec
+/bin/bash -lc "sed -n '1,280p' src/tokens/validator.py" in /home/stephen-reilly/dev/bach_genexec
+/bin/bash -lc "sed -n '1,320p' src/dataio/descriptors.py" in /home/stephen-reilly/dev/bach_gen succeeded in 50ms:
+
+ succeeded in 51ms:
+from typing import Any, Dict, List, Optional, Tuple
+
+from src.tokens.schema import BarPlan
+
+
+def _extract_time_sig(tokens: List[str], fallback: Optional[str]) -> str:
+    for tok in tokens:
+        if tok.startswith("TIME_SIG_"):
+            parts = tok.split("_")
+            if len(parts) != 4:
+                raise ValueError(f"bad TIME_SIG token: {tok}")
+            return f"{parts[2]}/{parts[3]}"
+    if fallback is not None:
+        return fallback
+    raise ValueError("missing TIME_SIG token and no fallback provided")
+
+
+def _extract_key(tokens: List[str], fallback: Optional[str]) -> str:
+    for tok in tokens:
+        if tok.startswith("KEY_"):
+ succeeded in 51ms:
+from typing import List, Optional, Tuple
+
+
+def _infer_num_voices(tokens: List[str]) -> int:
+    max_idx = -1
+    for tok in tokens:
+        if tok.startswith("VOICE_"):
+            try:
+                v = int(tok.split("_", 1)[1])
+            except ValueError:
+                continue
+            max_idx = max(max_idx, v)
+        elif tok.startswith("ABS_VOICE_"):
+            parts = tok.split("_")
+            if len(parts) == 4:
+                try:
+                    v = int(parts[2])
+                except ValueError:
+                    continue
+                max_idx = max(max_idx, v)
+
+thinking
+**Planning schema refinement and tests**
+exec
+/bin/bash -lc "rg -n \"EventSpec|DescriptorSpec|BarPlan\\(|density_bucket|to_token_string\\(\" src tests scripts" in /home/stephen-reilly/dev/bach_gen succeeded in 51ms:
+tests/test_model_integration.py:42:                "density_bucket": "DENSITY_LOW",
+tests/test_descriptors.py:87:    assert plan.density_bucket == "DENSITY_LOW"
+tests/test_descriptors.py:109:    assert plan.density_bucket == "DENSITY_MED"
+tests/test_descriptors.py:139:    assert plan.density_bucket == "DENSITY_LOW"
+tests/test_descriptors.py:209:        assert plan.density_bucket.startswith("DENSITY_")
+src/tokens/schema.py:5:class EventSpec:
+src/tokens/schema.py:15:class DescriptorSpec:
+src/tokens/schema.py:37:    density_bucket: str    # e.g., "DENSITY_LOW"
+src/tokens/schema.py:44:    def to_token_string(self) -> str:
+src/tokens/schema.py:52:            self.density_bucket
+src/dataio/dataset.py:59:    return BarPlan(**data)
+src/dataio/descriptors.py:282:    density_bucket = _classify_density(len(onset_pitches))
+src/dataio/descriptors.py:285:    plan = BarPlan(
+src/dataio/descriptors.py:289:        density_bucket=density_bucket,
+
+thinking
+**Noting unutilized EventSpec and next steps**
+exec
+/bin/bash -lc "sed -n '1,260p' tests/test_model_integration.py" in /home/stephen-reilly/dev/bach_gen succeeded in 51ms:
+import torch
+import pytest
+from pathlib import Path
+import json
+import pandas as pd
+from src.dataio.dataset import BarDataset
+from src.models.notelm.model import NoteLM, NoteLMConfig
+
+@pytest.fixture
+def mock_vocab(tmp_path):
+    vocab = {
+        "<pad>": 0,
+        "<bos>": 1,
+        "<eos>": 2,
+        "BAR": 3,
+        "TIME_SIG_4_4": 4,
+        "KEY_C": 5,
+        "POS_0": 6,
+        "VOICE_0": 7,
+        "DUR_24": 8,
+
+thinking
+**Inspecting schema and data model**
+exec
+/bin/bash -lc "sed -n '1,260p' src/dataio/dataset.py" in /home/stephen-reilly/dev/bach_gen succeeded in 51ms:
+import json
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Dict, List, Optional, Sequence, Tuple
+
+try:
+    import pandas as pd
+except ImportError as exc:  # pragma: no cover - import guard
+    raise RuntimeError(
+        "pandas is required to read datasets; install pandas and a parquet engine."
+    ) from exc
+
+try:
+    from torch.utils.data import Dataset
+except ImportError as exc:  # pragma: no cover - import guard
+    raise RuntimeError("torch is required to use BarDataset.") from exc
+
+from src.tokens.schema import BarPlan
+
+
+
+thinking
+**Defining versioned schema types**
+exec
+/bin/bash -lc "sed -n '1,320p' scripts/build_vocab.py" in /home/stephen-reilly/dev/bach_gen succeeded in 50ms:
+import argparse
+import json
+from collections import OrderedDict
+from pathlib import Path
+from typing import Iterable, List
+
+
+def _iter_tokens(values: Iterable[object]) -> Iterable[str]:
+    for value in values:
+        if isinstance(value, str):
+            for token in value.split():
+                if token:
+                    yield token
+        elif isinstance(value, (list, tuple)):
+            for token in value:
+                if token:
+                    yield str(token)
+
+
+def _load_token_column(events_path: Path, column: str) -> List[object]:
+
+thinking
+**Checking schema mentions**
+exec
+/bin/bash -lc "sed -n '1,260p' README.md" in /home/stephen-reilly/dev/bach_gen succeeded in 51ms:
+# Bach Guitar Generator — End-to-End Project Plan (with Token Factorization)
+
+## 1) North-Star Goal
+
+Generate new Bach-inspired pieces that are actually playable on classical guitar.
+
+**Output formats (pragmatic)**
+* v1 guarantees: ASCII tab + MIDI + MusicXML.
+* GPX/GP export is optional and tooling-dependent;  treat as a later milestone.
+
+The system favors ergonomics and musical plausibility with fast preview→refine loops.
+
+---
+
+## 2) System Overview
+
+### 2.1 Modules 
+
+* **Composer (NoteLM):** decoder-only Transformer that emits a beat-aware event stream enriched with chromatic semitone intervals.
+* **Guitar Tabber:** maps symbolic pitches to (string, fret) via constrained beam search; optional learned TabCostModel.
+
+thinking
+**Designing immutable event and descriptor schemas**
+codex
+{"done":false,"progress_made":true,"summary":"I found the first unchecked Stage-1 item and confirmed precheck is green. I’m now editing `src/tokens/schema.py` to define a stricter versioned EventSpec/DescriptorSpec for `remi_tab_v1` and `tpq=24`, then I’ll add focused schema tests and sync checklist/progress docs.","tests_ran":true,"tests_status":"pass","next_step":"Patch schema.py and add tests/test_schema.py; then update EXECPLAN/TODO/PROGRESS and run the repo verify command.","stop_reason":""}
+
+thinking
+**Planning full file replacement and updates**
+file update
+M /home/stephen-reilly/dev/bach_gen/src/tokens/schema.py
+@@ -3,2 +3,34 @@
+ 
++SCHEMA_VERSION = "remi_tab_v1"
++STAGE1_TPQ = 24
++
++
++def _default_event_tokens() -> Dict[str, List[str]]:
++    return {
++        "structural": [
++            "BAR",
++            "TIME_SIG_*",
++            "KEY_*",
++            "TEMPO_*",
++            "POS_*",
++        ],
++        "voice_events": [
++            "VOICE_{0..K-1}",
++            "DUR_{ticks}",
++            "REST_{ticks}",
++        ],
++        "anchors": [
++            "ABS_VOICE_{v}_{MIDI}",
++            "ABS_LOW_{MIDI}",
++            "ABS_HIGH_{MIDI}",
++        ],
++        "intervals": [
++            "MEL_INT12_{-24..+24}",
++            "HARM_OCT_{-2..4|NA}",
++            "HARM_CLASS_{0..11|NA}",
++        ],
++        "doubling": ["DUP_{1..N}"],
++    }
++
++
+ @dataclass
+@@ -6,9 +38,18 @@
+     """
+-    Defines the tokenization schema version and parameters.
++    Stage-1 event schema. This schema is versioned and fixed to TPQ=24.
+     """
+-    version: str = "remi_tab_v1"
+-    tpq: int = 24
+-    # Dictionary of token types to their vocabulary lists (or descriptions)
+-    tokens: Dict[str, List[str]] = field(default_factory=dict)
+ 
++    version: str = SCHEMA_VERSION
++    tpq: int = STAGE1_TPQ
++    tokens: Dict[str, List[str]] = field(default_factory=_default_event_tokens)
++
++    def __post_init__(self) -> None:
++        if self.version != SCHEMA_VERSION:
++            raise ValueError(
++                f"unsupported event schema version: {self.version!r}; expected {SCHEMA_VERSION!r}"
++            )
++        if self.tpq != STAGE1_TPQ:
++            raise ValueError(f"Stage-1 requires tpq={STAGE1_TPQ}, got {self.tpq}")
++
++
+ @dataclass
+@@ -16,13 +57,17 @@
+     """
+-    Defines the available bar-level descriptors.
++    Declares supported bar-level descriptor fields for Stage-1 data rows.
+     """
+-    fields: List[str] = field(default_factory=lambda: [
+-        "TIME_SIG",
+-        "KEY",
+-        "CHORD_FN", # Simplified to just 'CHORD' usually (Root+Quality)
+-        "DENSITY",  # Onsets per bar
+-        "CADENCE",  # Optional: PAC, IAC, Half
+-        "DIFFICULTY" # Optional: derived from intervals/speed
+-    ])
+ 
++    fields: List[str] = field(
++        default_factory=lambda: [
++            "TIME_SIG",
++            "KEY",
++            "CHORD_FN",
++            "DENSITY",
++            "CADENCE",
++            "DIFFICULTY",
++        ]
++    )
++
++
+ @dataclass
+@@ -30,12 +75,12 @@
+     """
+-    Container for the high-level descriptors of a single bar.
+-    These are used as conditions/labels for the model.
++    Container for high-level descriptors of a single bar.
+     """
++
+     bar_index: int
+-    time_sig: str          # e.g., "4/4"
+-    key: str               # e.g., "Cm"
+-    density_bucket: str    # e.g., "DENSITY_LOW"
+-    pitch_range: Optional[int] = None  # semitone span (max - min MIDI pitch)
+-    polyphony_max: Optional[int] = None  # max simultaneous onsets at any POS
+-    chord_token: Optional[str] = None # e.g., "C:min"
++    time_sig: str
++    key: str
++    density_bucket: str
++    pitch_range: Optional[int] = None
++    polyphony_max: Optional[int] = None
++    chord_token: Optional[str] = None
+     cadence_token: Optional[str] = None
+@@ -44,6 +89,2 @@
+     def to_token_string(self) -> str:
+-        """
+-        Returns a string of descriptor tokens to prepend to the bar.
+-        Example: "TIME_SIG_4_4 KEY_Cm DENSITY_LOW"
+-        """
+         toks = [
+@@ -51,3 +92,3 @@
+             f"KEY_{self.key}",
+-            self.density_bucket
++            self.density_bucket,
+         ]
+@@ -57,3 +98,2 @@
+             toks.append(self.cadence_token)
+-        # Note: DIFFICULTY is often a piece-level tag, but can be bar-level.
+         return " ".join(toks)
+apply_patch(auto_approved=true) exited 0 in 4ms:
+Success. Updated the following files:
+M src/tokens/schema.py
+file update:
+diff --git a/src/tokens/schema.py b/src/tokens/schema.py
+index db5c6ab4e9f1e4b6d11cc726d68cef74da294d17..771fcb91484a6e15426af933f0e60284bfca636b
+--- a/src/tokens/schema.py
++++ b/src/tokens/schema.py
+@@ -1,59 +1,99 @@
+ from dataclasses import dataclass, field
+ from typing import Dict, List, Optional
+ 
++SCHEMA_VERSION = "remi_tab_v1"
++STAGE1_TPQ = 24
++
++
++def _default_event_tokens() -> Dict[str, List[str]]:
++    return {
++        "structural": [
++            "BAR",
++            "TIME_SIG_*",
++            "KEY_*",
++            "TEMPO_*",
++            "POS_*",
++        ],
++        "voice_events": [
++            "VOICE_{0..K-1}",
++            "DUR_{ticks}",
++            "REST_{ticks}",
++        ],
++        "anchors": [
++            "ABS_VOICE_{v}_{MIDI}",
++            "ABS_LOW_{MIDI}",
++            "ABS_HIGH_{MIDI}",
++        ],
++        "intervals": [
++            "MEL_INT12_{-24..+24}",
++            "HARM_OCT_{-2..4|NA}",
++            "HARM_CLASS_{0..11|NA}",
++        ],
++        "doubling": ["DUP_{1..N}"],
++    }
++
++
+ @dataclass
+ class EventSpec:
+     """
+-    Defines the tokenization schema version and parameters.
++    Stage-1 event schema. This schema is versioned and fixed to TPQ=24.
+     """
+-    version: str = "remi_tab_v1"
+-    tpq: int = 24
+-    # Dictionary of token types to their vocabulary lists (or descriptions)
+-    tokens: Dict[str, List[str]] = field(default_factory=dict)
+ 
++    version: str = SCHEMA_VERSION
++    tpq: int = STAGE1_TPQ
++    tokens: Dict[str, List[str]] = field(default_factory=_default_event_tokens)
++
++    def __post_init__(self) -> None:
++        if self.version != SCHEMA_VERSION:
++            raise ValueError(
++                f"unsupported event schema version: {self.version!r}; expected {SCHEMA_VERSION!r}"
++            )
++        if self.tpq != STAGE1_TPQ:
++            raise ValueError(f"Stage-1 requires tpq={STAGE1_TPQ}, got {self.tpq}")
++
++
+ @dataclass
+ class DescriptorSpec:
+     """
+-    Defines the available bar-level descriptors.
++    Declares supported bar-level descriptor fields for Stage-1 data rows.
+     """
+-    fields: List[str] = field(default_factory=lambda: [
+-        "TIME_SIG",
+-        "KEY",
+-        "CHORD_FN", # Simplified to just 'CHORD' usually (Root+Quality)
+-        "DENSITY",  # Onsets per bar
+-        "CADENCE",  # Optional: PAC, IAC, Half
+-        "DIFFICULTY" # Optional: derived from intervals/speed
+-    ])
+ 
++    fields: List[str] = field(
++        default_factory=lambda: [
++            "TIME_SIG",
++            "KEY",
++            "CHORD_FN",
++            "DENSITY",
++            "CADENCE",
++            "DIFFICULTY",
++        ]
++    )
++
++
+ @dataclass
+ class BarPlan:
+     """
+-    Container for the high-level descriptors of a single bar.
+-    These are used as conditions/labels for the model.
++    Container for high-level descriptors of a single bar.
+     """
++
+     bar_index: int
+-    time_sig: str          # e.g., "4/4"
+-    key: str               # e.g., "Cm"
+-    density_bucket: str    # e.g., "DENSITY_LOW"
+-    pitch_range: Optional[int] = None  # semitone span (max - min MIDI pitch)
+-    polyphony_max: Optional[int] = None  # max simultaneous onsets at any POS
+-    chord_token: Optional[str] = None # e.g., "C:min"
++    time_sig: str
++    key: str
++    density_bucket: str
++    pitch_range: Optional[int] = None
++    polyphony_max: Optional[int] = None
++    chord_token: Optional[str] = None
+     cadence_token: Optional[str] = None
+     difficulty_token: Optional[str] = None
+ 
+     def to_token_string(self) -> str:
+-        """
+-        Returns a string of descriptor tokens to prepend to the bar.
+-        Example: "TIME_SIG_4_4 KEY_Cm DENSITY_LOW"
+-        """
+         toks = [
+             f"TIME_SIG_{self.time_sig.replace('/', '_')}",
+             f"KEY_{self.key}",
+-            self.density_bucket
++            self.density_bucket,
+         ]
+         if self.chord_token:
+             toks.append(self.chord_token)
+         if self.cadence_token:
+             toks.append(self.cadence_token)
+-        # Note: DIFFICULTY is often a piece-level tag, but can be bar-level.
+         return " ".join(toks)
+
+file update:
+diff --git a/src/tokens/schema.py b/src/tokens/schema.py
+index db5c6ab4e9f1e4b6d11cc726d68cef74da294d17..771fcb91484a6e15426af933f0e60284bfca636b
+--- a/src/tokens/schema.py
++++ b/src/tokens/schema.py
+@@ -1,59 +1,99 @@
+ from dataclasses import dataclass, field
+ from typing import Dict, List, Optional
+ 
++SCHEMA_VERSION = "remi_tab_v1"
++STAGE1_TPQ = 24
++
++
++def _default_event_tokens() -> Dict[str, List[str]]:
++    return {
++        "structural": [
++            "BAR",
++            "TIME_SIG_*",
++            "KEY_*",
++            "TEMPO_*",
++            "POS_*",
++        ],
++        "voice_events": [
++            "VOICE_{0..K-1}",
++            "DUR_{ticks}",
++            "REST_{ticks}",
++        ],
++        "anchors": [
++            "ABS_VOICE_{v}_{MIDI}",
++            "ABS_LOW_{MIDI}",
++            "ABS_HIGH_{MIDI}",
++        ],
++        "intervals": [
++            "MEL_INT12_{-24..+24}",
++            "HARM_OCT_{-2..4|NA}",
++            "HARM_CLASS_{0..11|NA}",
++        ],
++        "doubling": ["DUP_{1..N}"],
++    }
++
++
+ @dataclass
+ class EventSpec:
+     """
+-    Defines the tokenization schema version and parameters.
++    Stage-1 event schema. This schema is versioned and fixed to TPQ=24.
+     """
+-    version: str = "remi_tab_v1"
+-    tpq: int = 24
+-    # Dictionary of token types to their vocabulary lists (or descriptions)
+-    tokens: Dict[str, List[str]] = field(default_factory=dict)
+ 
++    version: str = SCHEMA_VERSION
++    tpq: int = STAGE1_TPQ
++    tokens: Dict[str, List[str]] = field(default_factory=_default_event_tokens)
++
++    def __post_init__(self) -> None:
++        if self.version != SCHEMA_VERSION:
++            raise ValueError(
++                f"unsupported event schema version: {self.version!r}; expected {SCHEMA_VERSION!r}"
++            )
++        if self.tpq != STAGE1_TPQ:
++            raise ValueError(f"Stage-1 requires tpq={STAGE1_TPQ}, got {self.tpq}")
++
++
+ @dataclass
+ class DescriptorSpec:
+     """
+-    Defines the available bar-level descriptors.
++    Declares supported bar-level descriptor fields for Stage-1 data rows.
+     """
+-    fields: List[str] = field(default_factory=lambda: [
+-        "TIME_SIG",
+-        "KEY",
+-        "CHORD_FN", # Simplified to just 'CHORD' usually (Root+Quality)
+-        "DENSITY",  # Onsets per bar
+-        "CADENCE",  # Optional: PAC, IAC, Half
+-        "DIFFICULTY" # Optional: derived from intervals/speed
+-    ])
+ 
++    fields: List[str] = field(
++        default_factory=lambda: [
++            "TIME_SIG",
++            "KEY",
++            "CHORD_FN",
++            "DENSITY",
++            "CADENCE",
++            "DIFFICULTY",
++        ]
++    )
++
++
+ @dataclass
+ class BarPlan:
+     """
+-    Container for the high-level descriptors of a single bar.
+-    These are used as conditions/labels for the model.
++    Container for high-level descriptors of a single bar.
+     """
++
+     bar_index: int
+-    time_sig: str          # e.g., "4/4"
+-    key: str               # e.g., "Cm"
+-    density_bucket: str    # e.g., "DENSITY_LOW"
+-    pitch_range: Optional[int] = None  # semitone span (max - min MIDI pitch)
+-    polyphony_max: Optional[int] = None  # max simultaneous onsets at any POS
+-    chord_token: Optional[str] = None # e.g., "C:min"
++    time_sig: str
++    key: str
++    density_bucket: str
++    pitch_range: Optional[int] = None
++    polyphony_max: Optional[int] = None
++    chord_token: Optional[str] = None
+     cadence_token: Optional[str] = None
+     difficulty_token: Optional[str] = None
+ 
+     def to_token_string(self) -> str:
+-        """
+-        Returns a string of descriptor tokens to prepend to the bar.
+-        Example: "TIME_SIG_4_4 KEY_Cm DENSITY_LOW"
+-        """
+         toks = [
+             f"TIME_SIG_{self.time_sig.replace('/', '_')}",
+             f"KEY_{self.key}",
+-            self.density_bucket
++            self.density_bucket,
+         ]
+         if self.chord_token:
+             toks.append(self.chord_token)
+         if self.cadence_token:
+             toks.append(self.cadence_token)
+-        # Note: DIFFICULTY is often a piece-level tag, but can be bar-level.
+         return " ".join(toks)
+
+
+thinking
+**Adding test file**
+codex
+{"done":false,"progress_made":true,"summary":"Schema definitions are now being patched in; next I’m adding focused tests for default values and Stage-1 constraints, then I’ll sync TODO/EXECPLAN/PROGRESS.","tests_ran":true,"tests_status":"pass","next_step":"Create tests/test_schema.py and update checklist docs.","stop_reason":""}
+
+thinking
+**Adding test file via patch**
+file update
+A /home/stephen-reilly/dev/bach_gen/tests/test_schema.py
+from pathlib import Path
+import sys
+
+import pytest
+
+sys.path.insert(0, str(Path(__file__).parents[1]))
+
+from src.tokens.schema import DescriptorSpec, EventSpec, SCHEMA_VERSION, STAGE1_TPQ
+
+
+def test_event_spec_defaults():
+    spec = EventSpec()
+    assert spec.version == SCHEMA_VERSION
+    assert spec.tpq == STAGE1_TPQ
+
+    assert set(spec.tokens) == {
+        "structural",
+        "voice_events",
+        "anchors",
+        "intervals",
+        "doubling",
+    }
+    assert "BAR" in spec.tokens["structural"]
+    assert "MEL_INT12_{-24..+24}" in spec.tokens["intervals"]
+
+
+def test_event_spec_enforces_stage1_constraints():
+    with pytest.raises(ValueError, match="unsupported event schema version"):
+        EventSpec(version="remi_tab_v2")
+
+    with pytest.raises(ValueError, match="requires tpq=24"):
+        EventSpec(tpq=12)
+
+
+def test_event_spec_tokens_not_shared_between_instances():
+    first = EventSpec()
+    second = EventSpec()
+    first.tokens["structural"].append("EXTRA_TOKEN")
+    assert "EXTRA_TOKEN" not in second.tokens["structural"]
+
+
+def test_descriptor_spec_defaults():
+    spec = DescriptorSpec()
+    assert spec.fields == [
+        "TIME_SIG",
+        "KEY",
+        "CHORD_FN",
+        "DENSITY",
+        "CADENCE",
+        "DIFFICULTY",
+    ]
+apply_patch(auto_approved=true) exited 0 in 12ms:
+Success. Updated the following files:
+A tests/test_schema.py
+file update:
+diff --git a/src/tokens/schema.py b/src/tokens/schema.py
+index db5c6ab4e9f1e4b6d11cc726d68cef74da294d17..771fcb91484a6e15426af933f0e60284bfca636b
+--- a/src/tokens/schema.py
++++ b/src/tokens/schema.py
+@@ -1,59 +1,99 @@
+ from dataclasses import dataclass, field
+ from typing import Dict, List, Optional
+ 
++SCHEMA_VERSION = "remi_tab_v1"
++STAGE1_TPQ = 24
++
++
++def _default_event_tokens() -> Dict[str, List[str]]:
++    return {
++        "structural": [
++            "BAR",
++            "TIME_SIG_*",
++            "KEY_*",
++            "TEMPO_*",
++            "POS_*",
++        ],
++        "voice_events": [
++            "VOICE_{0..K-1}",
++            "DUR_{ticks}",
++            "REST_{ticks}",
++        ],
++        "anchors": [
++            "ABS_VOICE_{v}_{MIDI}",
++            "ABS_LOW_{MIDI}",
++            "ABS_HIGH_{MIDI}",
++        ],
++        "intervals": [
++            "MEL_INT12_{-24..+24}",
++            "HARM_OCT_{-2..4|NA}",
++            "HARM_CLASS_{0..11|NA}",
++        ],
++        "doubling": ["DUP_{1..N}"],
++    }
++
++
+ @dataclass
+ class EventSpec:
+     """
+-    Defines the tokenization schema version and parameters.
++    Stage-1 event schema. This schema is versioned and fixed to TPQ=24.
+     """
+-    version: str = "remi_tab_v1"
+-    tpq: int = 24
+-    # Dictionary of token types to their vocabulary lists (or descriptions)
+-    tokens: Dict[str, List[str]] = field(default_factory=dict)
+ 
++    version: str = SCHEMA_VERSION
++    tpq: int = STAGE1_TPQ
++    tokens: Dict[str, List[str]] = field(default_factory=_default_event_tokens)
++
++    def __post_init__(self) -> None:
++        if self.version != SCHEMA_VERSION:
++            raise ValueError(
++                f"unsupported event schema version: {self.version!r}; expected {SCHEMA_VERSION!r}"
++            )
++        if self.tpq != STAGE1_TPQ:
++            raise ValueError(f"Stage-1 requires tpq={STAGE1_TPQ}, got {self.tpq}")
++
++
+ @dataclass
+ class DescriptorSpec:
+     """
+-    Defines the available bar-level descriptors.
++    Declares supported bar-level descriptor fields for Stage-1 data rows.
+     """
+-    fields: List[str] = field(default_factory=lambda: [
+-        "TIME_SIG",
+-        "KEY",
+-        "CHORD_FN", # Simplified to just 'CHORD' usually (Root+Quality)
+-        "DENSITY",  # Onsets per bar
+-        "CADENCE",  # Optional: PAC, IAC, Half
+-        "DIFFICULTY" # Optional: derived from intervals/speed
+-    ])
+ 
++    fields: List[str] = field(
++        default_factory=lambda: [
++            "TIME_SIG",
++            "KEY",
++            "CHORD_FN",
++            "DENSITY",
++            "CADENCE",
++            "DIFFICULTY",
++        ]
++    )
++
++
+ @dataclass
+ class BarPlan:
+     """
+-    Container for the high-level descriptors of a single bar.
+-    These are used as conditions/labels for the model.
++    Container for high-level descriptors of a single bar.
+     """
++
+     bar_index: int
+-    time_sig: str          # e.g., "4/4"
+-    key: str               # e.g., "Cm"
+-    density_bucket: str    # e.g., "DENSITY_LOW"
+-    pitch_range: Optional[int] = None  # semitone span (max - min MIDI pitch)
+-    polyphony_max: Optional[int] = None  # max simultaneous onsets at any POS
+-    chord_token: Optional[str] = None # e.g., "C:min"
++    time_sig: str
++    key: str
++    density_bucket: str
++    pitch_range: Optional[int] = None
++    polyphony_max: Optional[int] = None
++    chord_token: Optional[str] = None
+     cadence_token: Optional[str] = None
+     difficulty_token: Optional[str] = None
+ 
+     def to_token_string(self) -> str:
+-        """
+-        Returns a string of descriptor tokens to prepend to the bar.
+-        Example: "TIME_SIG_4_4 KEY_Cm DENSITY_LOW"
+-        """
+         toks = [
+             f"TIME_SIG_{self.time_sig.replace('/', '_')}",
+             f"KEY_{self.key}",
+-            self.density_bucket
++            self.density_bucket,
+         ]
+         if self.chord_token:
+             toks.append(self.chord_token)
+         if self.cadence_token:
+             toks.append(self.cadence_token)
+-        # Note: DIFFICULTY is often a piece-level tag, but can be bar-level.
+         return " ".join(toks)
+diff --git a/tests/test_schema.py b/tests/test_schema.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..7aa223d5c372bac21faea38483f35a4b38fe711f
+--- /dev/null
++++ b/tests/test_schema.py
+@@ -0,0 +1,51 @@
++from pathlib import Path
++import sys
++
++import pytest
++
++sys.path.insert(0, str(Path(__file__).parents[1]))
++
++from src.tokens.schema import DescriptorSpec, EventSpec, SCHEMA_VERSION, STAGE1_TPQ
++
++
++def test_event_spec_defaults():
++    spec = EventSpec()
++    assert spec.version == SCHEMA_VERSION
++    assert spec.tpq == STAGE1_TPQ
++
++    assert set(spec.tokens) == {
++        "structural",
++        "voice_events",
++        "anchors",
++        "intervals",
++        "doubling",
++    }
++    assert "BAR" in spec.tokens["structural"]
++    assert "MEL_INT12_{-24..+24}" in spec.tokens["intervals"]
++
++
++def test_event_spec_enforces_stage1_constraints():
++    with pytest.raises(ValueError, match="unsupported event schema version"):
++        EventSpec(version="remi_tab_v2")
++
++    with pytest.raises(ValueError, match="requires tpq=24"):
++        EventSpec(tpq=12)
++
++
++def test_event_spec_tokens_not_shared_between_instances():
++    first = EventSpec()
++    second = EventSpec()
++    first.tokens["structural"].append("EXTRA_TOKEN")
++    assert "EXTRA_TOKEN" not in second.tokens["structural"]
++
++
++def test_descriptor_spec_defaults():
++    spec = DescriptorSpec()
++    assert spec.fields == [
++        "TIME_SIG",
++        "KEY",
++        "CHORD_FN",
++        "DENSITY",
++        "CADENCE",
++        "DIFFICULTY",
++    ]
+
+file update:
+diff --git a/src/tokens/schema.py b/src/tokens/schema.py
+index db5c6ab4e9f1e4b6d11cc726d68cef74da294d17..771fcb91484a6e15426af933f0e60284bfca636b
+--- a/src/tokens/schema.py
++++ b/src/tokens/schema.py
+@@ -1,59 +1,99 @@
+ from dataclasses import dataclass, field
+ from typing import Dict, List, Optional
+ 
++SCHEMA_VERSION = "remi_tab_v1"
++STAGE1_TPQ = 24
++
++
++def _default_event_tokens() -> Dict[str, List[str]]:
++    return {
++        "structural": [
++            "BAR",
++            "TIME_SIG_*",
++            "KEY_*",
++            "TEMPO_*",
++            "POS_*",
++        ],
++        "voice_events": [
++            "VOICE_{0..K-1}",
++            "DUR_{ticks}",
++            "REST_{ticks}",
++        ],
++        "anchors": [
++            "ABS_VOICE_{v}_{MIDI}",
++            "ABS_LOW_{MIDI}",
++            "ABS_HIGH_{MIDI}",
++        ],
++        "intervals": [
++            "MEL_INT12_{-24..+24}",
++            "HARM_OCT_{-2..4|NA}",
++            "HARM_CLASS_{0..11|NA}",
++        ],
++        "doubling": ["DUP_{1..N}"],
++    }
++
++
+ @dataclass
+ class EventSpec:
+     """
+-    Defines the tokenization schema version and parameters.
++    Stage-1 event schema. This schema is versioned and fixed to TPQ=24.
+     """
+-    version: str = "remi_tab_v1"
+-    tpq: int = 24
+-    # Dictionary of token types to their vocabulary lists (or descriptions)
+-    tokens: Dict[str, List[str]] = field(default_factory=dict)
+ 
++    version: str = SCHEMA_VERSION
++    tpq: int = STAGE1_TPQ
++    tokens: Dict[str, List[str]] = field(default_factory=_default_event_tokens)
++
++    def __post_init__(self) -> None:
++        if self.version != SCHEMA_VERSION:
++            raise ValueError(
++                f"unsupported event schema version: {self.version!r}; expected {SCHEMA_VERSION!r}"
++            )
++        if self.tpq != STAGE1_TPQ:
++            raise ValueError(f"Stage-1 requires tpq={STAGE1_TPQ}, got {self.tpq}")
++
++
+ @dataclass
+ class DescriptorSpec:
+     """
+-    Defines the available bar-level descriptors.
++    Declares supported bar-level descriptor fields for Stage-1 data rows.
+     """
+-    fields: List[str] = field(default_factory=lambda: [
+-        "TIME_SIG",
+-        "KEY",
+-        "CHORD_FN", # Simplified to just 'CHORD' usually (Root+Quality)
+-        "DENSITY",  # Onsets per bar
+-        "CADENCE",  # Optional: PAC, IAC, Half
+-        "DIFFICULTY" # Optional: derived from intervals/speed
+-    ])
+ 
++    fields: List[str] = field(
++        default_factory=lambda: [
++            "TIME_SIG",
++            "KEY",
++            "CHORD_FN",
++            "DENSITY",
++            "CADENCE",
++            "DIFFICULTY",
++        ]
++    )
++
++
+ @dataclass
+ class BarPlan:
+     """
+-    Container for the high-level descriptors of a single bar.
+-    These are used as conditions/labels for the model.
++    Container for high-level descriptors of a single bar.
+     """
++
+     bar_index: int
+-    time_sig: str          # e.g., "4/4"
+-    key: str               # e.g., "Cm"
+-    density_bucket: str    # e.g., "DENSITY_LOW"
+-    pitch_range: Optional[int] = None  # semitone span (max - min MIDI pitch)
+-    polyphony_max: Optional[int] = None  # max simultaneous onsets at any POS
+-    chord_token: Optional[str] = None # e.g., "C:min"
++    time_sig: str
++    key: str
++    density_bucket: str
++    pitch_range: Optional[int] = None
++    polyphony_max: Optional[int] = None
++    chord_token: Optional[str] = None
+     cadence_token: Optional[str] = None
+     difficulty_token: Optional[str] = None
+ 
+     def to_token_string(self) -> str:
+-        """
+-        Returns a string of descriptor tokens to prepend to the bar.
+-        Example: "TIME_SIG_4_4 KEY_Cm DENSITY_LOW"
+-        """
+         toks = [
+             f"TIME_SIG_{self.time_sig.replace('/', '_')}",
+             f"KEY_{self.key}",
+-            self.density_bucket
++            self.density_bucket,
+         ]
+         if self.chord_token:
+             toks.append(self.chord_token)
+         if self.cadence_token:
+             toks.append(self.cadence_token)
+-        # Note: DIFFICULTY is often a piece-level tag, but can be bar-level.
+         return " ".join(toks)
+diff --git a/tests/test_schema.py b/tests/test_schema.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..7aa223d5c372bac21faea38483f35a4b38fe711f
+--- /dev/null
++++ b/tests/test_schema.py
+@@ -0,0 +1,51 @@
++from pathlib import Path
++import sys
++
++import pytest
++
++sys.path.insert(0, str(Path(__file__).parents[1]))
++
++from src.tokens.schema import DescriptorSpec, EventSpec, SCHEMA_VERSION, STAGE1_TPQ
++
++
++def test_event_spec_defaults():
++    spec = EventSpec()
++    assert spec.version == SCHEMA_VERSION
++    assert spec.tpq == STAGE1_TPQ
++
++    assert set(spec.tokens) == {
++        "structural",
++        "voice_events",
++        "anchors",
++        "intervals",
++        "doubling",
++    }
++    assert "BAR" in spec.tokens["structural"]
++    assert "MEL_INT12_{-24..+24}" in spec.tokens["intervals"]
++
++
++def test_event_spec_enforces_stage1_constraints():
++    with pytest.raises(ValueError, match="unsupported event schema version"):
++        EventSpec(version="remi_tab_v2")
++
++    with pytest.raises(ValueError, match="requires tpq=24"):
++        EventSpec(tpq=12)
++
++
++def test_event_spec_tokens_not_shared_between_instances():
++    first = EventSpec()
++    second = EventSpec()
++    first.tokens["structural"].append("EXTRA_TOKEN")
++    assert "EXTRA_TOKEN" not in second.tokens["structural"]
++
++
++def test_descriptor_spec_defaults():
++    spec = DescriptorSpec()
++    assert spec.fields == [
++        "TIME_SIG",
++        "KEY",
++        "CHORD_FN",
++        "DENSITY",
++        "CADENCE",
++        "DIFFICULTY",
++    ]
+
+
+thinking
+**Preparing multi-file patch application**
+file update
+M /home/stephen-reilly/dev/bach_gen/docs/exec/EXECPLAN_stage1.md
+@@ -11,3 +11,3 @@
+ ## Checklist (one item per loop)
+-- [ ] Define EventSpec + DescriptorSpec in `src/tokens/schema.py` with version `remi_tab_v1` and `tpq=24`.
++- [x] Define EventSpec + DescriptorSpec in `src/tokens/schema.py` with version `remi_tab_v1` and `tpq=24`.
+ - [ ] Implement interval math helpers (melodic + harmonic ref) with QA vs production behavior.
+apply_patch(auto_approved=true) exited 0 in 9ms:
+Success. Updated the following files:
+M docs/exec/EXECPLAN_stage1.md
+file update:
+diff --git a/docs/exec/EXECPLAN_stage1.md b/docs/exec/EXECPLAN_stage1.md
+index 4ce76e256e20ed838c3b0dd76cf2ef2289cf7232..ef0c66b4dbc93cb2d19b4491bc03f2277b2d8ab4
+--- a/docs/exec/EXECPLAN_stage1.md
++++ b/docs/exec/EXECPLAN_stage1.md
+@@ -9,7 +9,7 @@
+ - Update `TODO.md` and append to `PROGRESS.md`.
+ 
+ ## Checklist (one item per loop)
+-- [ ] Define EventSpec + DescriptorSpec in `src/tokens/schema.py` with version `remi_tab_v1` and `tpq=24`.
++- [x] Define EventSpec + DescriptorSpec in `src/tokens/schema.py` with version `remi_tab_v1` and `tpq=24`.
+ - [ ] Implement interval math helpers (melodic + harmonic ref) with QA vs production behavior.
+ - [ ] Implement event parsing/serialization in `src/tokens/tokenizer.py` with canonical ordering.
+ - [ ] Add round-trip tests for pitch reconstruction and `HARM_*` consistency.
+diff --git a/src/tokens/schema.py b/src/tokens/schema.py
+index db5c6ab4e9f1e4b6d11cc726d68cef74da294d17..771fcb91484a6e15426af933f0e60284bfca636b
+--- a/src/tokens/schema.py
++++ b/src/tokens/schema.py
+@@ -1,59 +1,99 @@
+ from dataclasses import dataclass, field
+ from typing import Dict, List, Optional
+ 
++SCHEMA_VERSION = "remi_tab_v1"
++STAGE1_TPQ = 24
++
++
++def _default_event_tokens() -> Dict[str, List[str]]:
++    return {
++        "structural": [
++            "BAR",
++            "TIME_SIG_*",
++            "KEY_*",
++            "TEMPO_*",
++            "POS_*",
++        ],
++        "voice_events": [
++            "VOICE_{0..K-1}",
++            "DUR_{ticks}",
++            "REST_{ticks}",
++        ],
++        "anchors": [
++            "ABS_VOICE_{v}_{MIDI}",
++            "ABS_LOW_{MIDI}",
++            "ABS_HIGH_{MIDI}",
++        ],
++        "intervals": [
++            "MEL_INT12_{-24..+24}",
++            "HARM_OCT_{-2..4|NA}",
++            "HARM_CLASS_{0..11|NA}",
++        ],
++        "doubling": ["DUP_{1..N}"],
++    }
++
++
+ @dataclass
+ class EventSpec:
+     """
+-    Defines the tokenization schema version and parameters.
++    Stage-1 event schema. This schema is versioned and fixed to TPQ=24.
+     """
+-    version: str = "remi_tab_v1"
+-    tpq: int = 24
+-    # Dictionary of token types to their vocabulary lists (or descriptions)
+-    tokens: Dict[str, List[str]] = field(default_factory=dict)
+ 
++    version: str = SCHEMA_VERSION
++    tpq: int = STAGE1_TPQ
++    tokens: Dict[str, List[str]] = field(default_factory=_default_event_tokens)
++
++    def __post_init__(self) -> None:
++        if self.version != SCHEMA_VERSION:
++            raise ValueError(
++                f"unsupported event schema version: {self.version!r}; expected {SCHEMA_VERSION!r}"
++            )
++        if self.tpq != STAGE1_TPQ:
++            raise ValueError(f"Stage-1 requires tpq={STAGE1_TPQ}, got {self.tpq}")
++
++
+ @dataclass
+ class DescriptorSpec:
+     """
+-    Defines the available bar-level descriptors.
++    Declares supported bar-level descriptor fields for Stage-1 data rows.
+     """
+-    fields: List[str] = field(default_factory=lambda: [
+-        "TIME_SIG",
+-        "KEY",
+-        "CHORD_FN", # Simplified to just 'CHORD' usually (Root+Quality)
+-        "DENSITY",  # Onsets per bar
+-        "CADENCE",  # Optional: PAC, IAC, Half
+-        "DIFFICULTY" # Optional: derived from intervals/speed
+-    ])
+ 
++    fields: List[str] = field(
++        default_factory=lambda: [
++            "TIME_SIG",
++            "KEY",
++            "CHORD_FN",
++            "DENSITY",
++            "CADENCE",
++            "DIFFICULTY",
++        ]
++    )
++
++
+ @dataclass
+ class BarPlan:
+     """
+-    Container for the high-level descriptors of a single bar.
+-    These are used as conditions/labels for the model.
++    Container for high-level descriptors of a single bar.
+     """
++
+     bar_index: int
+-    time_sig: str          # e.g., "4/4"
+-    key: str               # e.g., "Cm"
+-    density_bucket: str    # e.g., "DENSITY_LOW"
+-    pitch_range: Optional[int] = None  # semitone span (max - min MIDI pitch)
+-    polyphony_max: Optional[int] = None  # max simultaneous onsets at any POS
+-    chord_token: Optional[str] = None # e.g., "C:min"
++    time_sig: str
++    key: str
++    density_bucket: str
++    pitch_range: Optional[int] = None
++    polyphony_max: Optional[int] = None
++    chord_token: Optional[str] = None
+     cadence_token: Optional[str] = None
+     difficulty_token: Optional[str] = None
+ 
+     def to_token_string(self) -> str:
+-        """
+-        Returns a string of descriptor tokens to prepend to the bar.
+-        Example: "TIME_SIG_4_4 KEY_Cm DENSITY_LOW"
+-        """
+         toks = [
+             f"TIME_SIG_{self.time_sig.replace('/', '_')}",
+             f"KEY_{self.key}",
+-            self.density_bucket
++            self.density_bucket,
+         ]
+         if self.chord_token:
+             toks.append(self.chord_token)
+         if self.cadence_token:
+             toks.append(self.cadence_token)
+-        # Note: DIFFICULTY is often a piece-level tag, but can be bar-level.
+         return " ".join(toks)
+diff --git a/tests/test_schema.py b/tests/test_schema.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..7aa223d5c372bac21faea38483f35a4b38fe711f
+--- /dev/null
++++ b/tests/test_schema.py
+@@ -0,0 +1,51 @@
++from pathlib import Path
++import sys
++
++import pytest
++
++sys.path.insert(0, str(Path(__file__).parents[1]))
++
++from src.tokens.schema import DescriptorSpec, EventSpec, SCHEMA_VERSION, STAGE1_TPQ
++
++
++def test_event_spec_defaults():
++    spec = EventSpec()
++    assert spec.version == SCHEMA_VERSION
++    assert spec.tpq == STAGE1_TPQ
++
++    assert set(spec.tokens) == {
++        "structural",
++        "voice_events",
++        "anchors",
++        "intervals",
++        "doubling",
++    }
++    assert "BAR" in spec.tokens["structural"]
++    assert "MEL_INT12_{-24..+24}" in spec.tokens["intervals"]
++
++
++def test_event_spec_enforces_stage1_constraints():
++    with pytest.raises(ValueError, match="unsupported event schema version"):
++        EventSpec(version="remi_tab_v2")
++
++    with pytest.raises(ValueError, match="requires tpq=24"):
++        EventSpec(tpq=12)
++
++
++def test_event_spec_tokens_not_shared_between_instances():
++    first = EventSpec()
++    second = EventSpec()
++    first.tokens["structural"].append("EXTRA_TOKEN")
++    assert "EXTRA_TOKEN" not in second.tokens["structural"]
++
++
++def test_descriptor_spec_defaults():
++    spec = DescriptorSpec()
++    assert spec.fields == [
++        "TIME_SIG",
++        "KEY",
++        "CHORD_FN",
++        "DENSITY",
++        "CADENCE",
++        "DIFFICULTY",
++    ]
+
+file update:
+diff --git a/docs/exec/EXECPLAN_stage1.md b/docs/exec/EXECPLAN_stage1.md
+index 4ce76e256e20ed838c3b0dd76cf2ef2289cf7232..ef0c66b4dbc93cb2d19b4491bc03f2277b2d8ab4
+--- a/docs/exec/EXECPLAN_stage1.md
++++ b/docs/exec/EXECPLAN_stage1.md
+@@ -9,7 +9,7 @@
+ - Update `TODO.md` and append to `PROGRESS.md`.
+ 
+ ## Checklist (one item per loop)
+-- [ ] Define EventSpec + DescriptorSpec in `src/tokens/schema.py` with version `remi_tab_v1` and `tpq=24`.
++- [x] Define EventSpec + DescriptorSpec in `src/tokens/schema.py` with version `remi_tab_v1` and `tpq=24`.
+ - [ ] Implement interval math helpers (melodic + harmonic ref) with QA vs production behavior.
+ - [ ] Implement event parsing/serialization in `src/tokens/tokenizer.py` with canonical ordering.
+ - [ ] Add round-trip tests for pitch reconstruction and `HARM_*` consistency.
+diff --git a/src/tokens/schema.py b/src/tokens/schema.py
+index db5c6ab4e9f1e4b6d11cc726d68cef74da294d17..771fcb91484a6e15426af933f0e60284bfca636b
+--- a/src/tokens/schema.py
++++ b/src/tokens/schema.py
+@@ -1,59 +1,99 @@
+ from dataclasses import dataclass, field
+ from typing import Dict, List, Optional
+ 
++SCHEMA_VERSION = "remi_tab_v1"
++STAGE1_TPQ = 24
++
++
++def _default_event_tokens() -> Dict[str, List[str]]:
++    return {
++        "structural": [
++            "BAR",
++            "TIME_SIG_*",
++            "KEY_*",
++            "TEMPO_*",
++            "POS_*",
++        ],
++        "voice_events": [
++            "VOICE_{0..K-1}",
++            "DUR_{ticks}",
++            "REST_{ticks}",
++        ],
++        "anchors": [
++            "ABS_VOICE_{v}_{MIDI}",
++            "ABS_LOW_{MIDI}",
++            "ABS_HIGH_{MIDI}",
++        ],
++        "intervals": [
++            "MEL_INT12_{-24..+24}",
++            "HARM_OCT_{-2..4|NA}",
++            "HARM_CLASS_{0..11|NA}",
++        ],
++        "doubling": ["DUP_{1..N}"],
++    }
++
++
+ @dataclass
+ class EventSpec:
+     """
+-    Defines the tokenization schema version and parameters.
++    Stage-1 event schema. This schema is versioned and fixed to TPQ=24.
+     """
+-    version: str = "remi_tab_v1"
+-    tpq: int = 24
+-    # Dictionary of token types to their vocabulary lists (or descriptions)
+-    tokens: Dict[str, List[str]] = field(default_factory=dict)
+ 
++    version: str = SCHEMA_VERSION
++    tpq: int = STAGE1_TPQ
++    tokens: Dict[str, List[str]] = field(default_factory=_default_event_tokens)
++
++    def __post_init__(self) -> None:
++        if self.version != SCHEMA_VERSION:
++            raise ValueError(
++                f"unsupported event schema version: {self.version!r}; expected {SCHEMA_VERSION!r}"
++            )
++        if self.tpq != STAGE1_TPQ:
++            raise ValueError(f"Stage-1 requires tpq={STAGE1_TPQ}, got {self.tpq}")
++
++
+ @dataclass
+ class DescriptorSpec:
+     """
+-    Defines the available bar-level descriptors.
++    Declares supported bar-level descriptor fields for Stage-1 data rows.
+     """
+-    fields: List[str] = field(default_factory=lambda: [
+-        "TIME_SIG",
+-        "KEY",
+-        "CHORD_FN", # Simplified to just 'CHORD' usually (Root+Quality)
+-        "DENSITY",  # Onsets per bar
+-        "CADENCE",  # Optional: PAC, IAC, Half
+-        "DIFFICULTY" # Optional: derived from intervals/speed
+-    ])
+ 
++    fields: List[str] = field(
++        default_factory=lambda: [
++            "TIME_SIG",
++            "KEY",
++            "CHORD_FN",
++            "DENSITY",
++            "CADENCE",
++            "DIFFICULTY",
++        ]
++    )
++
++
+ @dataclass
+ class BarPlan:
+     """
+-    Container for the high-level descriptors of a single bar.
+-    These are used as conditions/labels for the model.
++    Container for high-level descriptors of a single bar.
+     """
++
+     bar_index: int
+-    time_sig: str          # e.g., "4/4"
+-    key: str               # e.g., "Cm"
+-    density_bucket: str    # e.g., "DENSITY_LOW"
+-    pitch_range: Optional[int] = None  # semitone span (max - min MIDI pitch)
+-    polyphony_max: Optional[int] = None  # max simultaneous onsets at any POS
+-    chord_token: Optional[str] = None # e.g., "C:min"
++    time_sig: str
++    key: str
++    density_bucket: str
++    pitch_range: Optional[int] = None
++    polyphony_max: Optional[int] = None
++    chord_token: Optional[str] = None
+     cadence_token: Optional[str] = None
+     difficulty_token: Optional[str] = None
+ 
+     def to_token_string(self) -> str:
+-        """
+-        Returns a string of descriptor tokens to prepend to the bar.
+-        Example: "TIME_SIG_4_4 KEY_Cm DENSITY_LOW"
+-        """
+         toks = [
+             f"TIME_SIG_{self.time_sig.replace('/', '_')}",
+             f"KEY_{self.key}",
+-            self.density_bucket
++            self.density_bucket,
+         ]
+         if self.chord_token:
+             toks.append(self.chord_token)
+         if self.cadence_token:
+             toks.append(self.cadence_token)
+-        # Note: DIFFICULTY is often a piece-level tag, but can be bar-level.
+         return " ".join(toks)
+diff --git a/tests/test_schema.py b/tests/test_schema.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..7aa223d5c372bac21faea38483f35a4b38fe711f
+--- /dev/null
++++ b/tests/test_schema.py
+@@ -0,0 +1,51 @@
++from pathlib import Path
++import sys
++
++import pytest
++
++sys.path.insert(0, str(Path(__file__).parents[1]))
++
++from src.tokens.schema import DescriptorSpec, EventSpec, SCHEMA_VERSION, STAGE1_TPQ
++
++
++def test_event_spec_defaults():
++    spec = EventSpec()
++    assert spec.version == SCHEMA_VERSION
++    assert spec.tpq == STAGE1_TPQ
++
++    assert set(spec.tokens) == {
++        "structural",
++        "voice_events",
++        "anchors",
++        "intervals",
++        "doubling",
++    }
++    assert "BAR" in spec.tokens["structural"]
++    assert "MEL_INT12_{-24..+24}" in spec.tokens["intervals"]
++
++
++def test_event_spec_enforces_stage1_constraints():
++    with pytest.raises(ValueError, match="unsupported event schema version"):
++        EventSpec(version="remi_tab_v2")
++
++    with pytest.raises(ValueError, match="requires tpq=24"):
++        EventSpec(tpq=12)
++
++
++def test_event_spec_tokens_not_shared_between_instances():
++    first = EventSpec()
++    second = EventSpec()
++    first.tokens["structural"].append("EXTRA_TOKEN")
++    assert "EXTRA_TOKEN" not in second.tokens["structural"]
++
++
++def test_descriptor_spec_defaults():
++    spec = DescriptorSpec()
++    assert spec.fields == [
++        "TIME_SIG",
++        "KEY",
++        "CHORD_FN",
++        "DENSITY",
++        "CADENCE",
++        "DIFFICULTY",
++    ]
+
+
+thinking
+**Updating TODO status**
+file update
+M /home/stephen-reilly/dev/bach_gen/TODO.md
+@@ -3,3 +3,3 @@
+ ## Milestone: Stage-1 Tokenizer & Dataset
+-- [ ] Implement `src/tokens/schema.py` (EventSpec + DescriptorSpec, versioned)
++- [x] Implement `src/tokens/schema.py` (EventSpec + DescriptorSpec, versioned)
+ - [ ] Implement tokenizer interval math + round-trip tests
+apply_patch(auto_approved=true) exited 0 in 22ms:
+Success. Updated the following files:
+M TODO.md
+file update:
+diff --git a/TODO.md b/TODO.md
+index 88c5bb578fc00626ba548f0e455746ed42d509a8..d4163ce110c4af257b2949658ec8cfa949f9f5af
+--- a/TODO.md
++++ b/TODO.md
+@@ -1,7 +1,7 @@
+ # TODO
+ 
+ ## Milestone: Stage-1 Tokenizer & Dataset
+-- [ ] Implement `src/tokens/schema.py` (EventSpec + DescriptorSpec, versioned)
++- [x] Implement `src/tokens/schema.py` (EventSpec + DescriptorSpec, versioned)
+ - [ ] Implement tokenizer interval math + round-trip tests
+ - [ ] Implement `scripts/make_dataset.py` basic pipeline
+ - [ ] Produce `data/processed/{events.parquet,barplans.parquet,stats.json}`
+diff --git a/docs/exec/EXECPLAN_stage1.md b/docs/exec/EXECPLAN_stage1.md
+index 4ce76e256e20ed838c3b0dd76cf2ef2289cf7232..ef0c66b4dbc93cb2d19b4491bc03f2277b2d8ab4
+--- a/docs/exec/EXECPLAN_stage1.md
++++ b/docs/exec/EXECPLAN_stage1.md
+@@ -9,7 +9,7 @@
+ - Update `TODO.md` and append to `PROGRESS.md`.
+ 
+ ## Checklist (one item per loop)
+-- [ ] Define EventSpec + DescriptorSpec in `src/tokens/schema.py` with version `remi_tab_v1` and `tpq=24`.
++- [x] Define EventSpec + DescriptorSpec in `src/tokens/schema.py` with version `remi_tab_v1` and `tpq=24`.
+ - [ ] Implement interval math helpers (melodic + harmonic ref) with QA vs production behavior.
+ - [ ] Implement event parsing/serialization in `src/tokens/tokenizer.py` with canonical ordering.
+ - [ ] Add round-trip tests for pitch reconstruction and `HARM_*` consistency.
+diff --git a/src/tokens/schema.py b/src/tokens/schema.py
+index db5c6ab4e9f1e4b6d11cc726d68cef74da294d17..771fcb91484a6e15426af933f0e60284bfca636b
+--- a/src/tokens/schema.py
++++ b/src/tokens/schema.py
+@@ -1,59 +1,99 @@
+ from dataclasses import dataclass, field
+ from typing import Dict, List, Optional
+ 
++SCHEMA_VERSION = "remi_tab_v1"
++STAGE1_TPQ = 24
++
++
++def _default_event_tokens() -> Dict[str, List[str]]:
++    return {
++        "structural": [
++            "BAR",
++            "TIME_SIG_*",
++            "KEY_*",
++            "TEMPO_*",
++            "POS_*",
++        ],
++        "voice_events": [
++            "VOICE_{0..K-1}",
++            "DUR_{ticks}",
++            "REST_{ticks}",
++        ],
++        "anchors": [
++            "ABS_VOICE_{v}_{MIDI}",
++            "ABS_LOW_{MIDI}",
++            "ABS_HIGH_{MIDI}",
++        ],
++        "intervals": [
++            "MEL_INT12_{-24..+24}",
++            "HARM_OCT_{-2..4|NA}",
++            "HARM_CLASS_{0..11|NA}",
++        ],
++        "doubling": ["DUP_{1..N}"],
++    }
++
++
+ @dataclass
+ class EventSpec:
+     """
+-    Defines the tokenization schema version and parameters.
++    Stage-1 event schema. This schema is versioned and fixed to TPQ=24.
+     """
+-    version: str = "remi_tab_v1"
+-    tpq: int = 24
+-    # Dictionary of token types to their vocabulary lists (or descriptions)
+-    tokens: Dict[str, List[str]] = field(default_factory=dict)
+ 
++    version: str = SCHEMA_VERSION
++    tpq: int = STAGE1_TPQ
++    tokens: Dict[str, List[str]] = field(default_factory=_default_event_tokens)
++
++    def __post_init__(self) -> None:
++        if self.version != SCHEMA_VERSION:
++            raise ValueError(
++                f"unsupported event schema version: {self.version!r}; expected {SCHEMA_VERSION!r}"
++            )
++        if self.tpq != STAGE1_TPQ:
++            raise ValueError(f"Stage-1 requires tpq={STAGE1_TPQ}, got {self.tpq}")
++
++
+ @dataclass
+ class DescriptorSpec:
+     """
+-    Defines the available bar-level descriptors.
++    Declares supported bar-level descriptor fields for Stage-1 data rows.
+     """
+-    fields: List[str] = field(default_factory=lambda: [
+-        "TIME_SIG",
+-        "KEY",
+-        "CHORD_FN", # Simplified to just 'CHORD' usually (Root+Quality)
+-        "DENSITY",  # Onsets per bar
+-        "CADENCE",  # Optional: PAC, IAC, Half
+-        "DIFFICULTY" # Optional: derived from intervals/speed
+-    ])
+ 
++    fields: List[str] = field(
++        default_factory=lambda: [
++            "TIME_SIG",
++            "KEY",
++            "CHORD_FN",
++            "DENSITY",
++            "CADENCE",
++            "DIFFICULTY",
++        ]
++    )
++
++
+ @dataclass
+ class BarPlan:
+     """
+-    Container for the high-level descriptors of a single bar.
+-    These are used as conditions/labels for the model.
++    Container for high-level descriptors of a single bar.
+     """
++
+     bar_index: int
+-    time_sig: str          # e.g., "4/4"
+-    key: str               # e.g., "Cm"
+-    density_bucket: str    # e.g., "DENSITY_LOW"
+-    pitch_range: Optional[int] = None  # semitone span (max - min MIDI pitch)
+-    polyphony_max: Optional[int] = None  # max simultaneous onsets at any POS
+-    chord_token: Optional[str] = None # e.g., "C:min"
++    time_sig: str
++    key: str
++    density_bucket: str
++    pitch_range: Optional[int] = None
++    polyphony_max: Optional[int] = None
++    chord_token: Optional[str] = None
+     cadence_token: Optional[str] = None
+     difficulty_token: Optional[str] = None
+ 
+     def to_token_string(self) -> str:
+-        """
+-        Returns a string of descriptor tokens to prepend to the bar.
+-        Example: "TIME_SIG_4_4 KEY_Cm DENSITY_LOW"
+-        """
+         toks = [
+             f"TIME_SIG_{self.time_sig.replace('/', '_')}",
+             f"KEY_{self.key}",
+-            self.density_bucket
++            self.density_bucket,
+         ]
+         if self.chord_token:
+             toks.append(self.chord_token)
+         if self.cadence_token:
+             toks.append(self.cadence_token)
+-        # Note: DIFFICULTY is often a piece-level tag, but can be bar-level.
+         return " ".join(toks)
+diff --git a/tests/test_schema.py b/tests/test_schema.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..7aa223d5c372bac21faea38483f35a4b38fe711f
+--- /dev/null
++++ b/tests/test_schema.py
+@@ -0,0 +1,51 @@
++from pathlib import Path
++import sys
++
++import pytest
++
++sys.path.insert(0, str(Path(__file__).parents[1]))
++
++from src.tokens.schema import DescriptorSpec, EventSpec, SCHEMA_VERSION, STAGE1_TPQ
++
++
++def test_event_spec_defaults():
++    spec = EventSpec()
++    assert spec.version == SCHEMA_VERSION
++    assert spec.tpq == STAGE1_TPQ
++
++    assert set(spec.tokens) == {
++        "structural",
++        "voice_events",
++        "anchors",
++        "intervals",
++        "doubling",
++    }
++    assert "BAR" in spec.tokens["structural"]
++    assert "MEL_INT12_{-24..+24}" in spec.tokens["intervals"]
++
++
++def test_event_spec_enforces_stage1_constraints():
++    with pytest.raises(ValueError, match="unsupported event schema version"):
++        EventSpec(version="remi_tab_v2")
++
++    with pytest.raises(ValueError, match="requires tpq=24"):
++        EventSpec(tpq=12)
++
++
++def test_event_spec_tokens_not_shared_between_instances():
++    first = EventSpec()
++    second = EventSpec()
++    first.tokens["structural"].append("EXTRA_TOKEN")
++    assert "EXTRA_TOKEN" not in second.tokens["structural"]
++
++
++def test_descriptor_spec_defaults():
++    spec = DescriptorSpec()
++    assert spec.fields == [
++        "TIME_SIG",
++        "KEY",
++        "CHORD_FN",
++        "DENSITY",
++        "CADENCE",
++        "DIFFICULTY",
++    ]
+
+file update:
+diff --git a/TODO.md b/TODO.md
+index 88c5bb578fc00626ba548f0e455746ed42d509a8..d4163ce110c4af257b2949658ec8cfa949f9f5af
+--- a/TODO.md
++++ b/TODO.md
+@@ -1,7 +1,7 @@
+ # TODO
+ 
+ ## Milestone: Stage-1 Tokenizer & Dataset
+-- [ ] Implement `src/tokens/schema.py` (EventSpec + DescriptorSpec, versioned)
++- [x] Implement `src/tokens/schema.py` (EventSpec + DescriptorSpec, versioned)
+ - [ ] Implement tokenizer interval math + round-trip tests
+ - [ ] Implement `scripts/make_dataset.py` basic pipeline
+ - [ ] Produce `data/processed/{events.parquet,barplans.parquet,stats.json}`
+diff --git a/docs/exec/EXECPLAN_stage1.md b/docs/exec/EXECPLAN_stage1.md
+index 4ce76e256e20ed838c3b0dd76cf2ef2289cf7232..ef0c66b4dbc93cb2d19b4491bc03f2277b2d8ab4
+--- a/docs/exec/EXECPLAN_stage1.md
++++ b/docs/exec/EXECPLAN_stage1.md
+@@ -9,7 +9,7 @@
+ - Update `TODO.md` and append to `PROGRESS.md`.
+ 
+ ## Checklist (one item per loop)
+-- [ ] Define EventSpec + DescriptorSpec in `src/tokens/schema.py` with version `remi_tab_v1` and `tpq=24`.
++- [x] Define EventSpec + DescriptorSpec in `src/tokens/schema.py` with version `remi_tab_v1` and `tpq=24`.
+ - [ ] Implement interval math helpers (melodic + harmonic ref) with QA vs production behavior.
+ - [ ] Implement event parsing/serialization in `src/tokens/tokenizer.py` with canonical ordering.
+ - [ ] Add round-trip tests for pitch reconstruction and `HARM_*` consistency.
+diff --git a/src/tokens/schema.py b/src/tokens/schema.py
+index db5c6ab4e9f1e4b6d11cc726d68cef74da294d17..771fcb91484a6e15426af933f0e60284bfca636b
+--- a/src/tokens/schema.py
++++ b/src/tokens/schema.py
+@@ -1,59 +1,99 @@
+ from dataclasses import dataclass, field
+ from typing import Dict, List, Optional
+ 
++SCHEMA_VERSION = "remi_tab_v1"
++STAGE1_TPQ = 24
++
++
++def _default_event_tokens() -> Dict[str, List[str]]:
++    return {
++        "structural": [
++            "BAR",
++            "TIME_SIG_*",
++            "KEY_*",
++            "TEMPO_*",
++            "POS_*",
++        ],
++        "voice_events": [
++            "VOICE_{0..K-1}",
++            "DUR_{ticks}",
++            "REST_{ticks}",
++        ],
++        "anchors": [
++            "ABS_VOICE_{v}_{MIDI}",
++            "ABS_LOW_{MIDI}",
++            "ABS_HIGH_{MIDI}",
++        ],
++        "intervals": [
++            "MEL_INT12_{-24..+24}",
++            "HARM_OCT_{-2..4|NA}",
++            "HARM_CLASS_{0..11|NA}",
++        ],
++        "doubling": ["DUP_{1..N}"],
++    }
++
++
+ @dataclass
+ class EventSpec:
+     """
+-    Defines the tokenization schema version and parameters.
++    Stage-1 event schema. This schema is versioned and fixed to TPQ=24.
+     """
+-    version: str = "remi_tab_v1"
+-    tpq: int = 24
+-    # Dictionary of token types to their vocabulary lists (or descriptions)
+-    tokens: Dict[str, List[str]] = field(default_factory=dict)
+ 
++    version: str = SCHEMA_VERSION
++    tpq: int = STAGE1_TPQ
++    tokens: Dict[str, List[str]] = field(default_factory=_default_event_tokens)
++
++    def __post_init__(self) -> None:
++        if self.version != SCHEMA_VERSION:
++            raise ValueError(
++                f"unsupported event schema version: {self.version!r}; expected {SCHEMA_VERSION!r}"
++            )
++        if self.tpq != STAGE1_TPQ:
++            raise ValueError(f"Stage-1 requires tpq={STAGE1_TPQ}, got {self.tpq}")
++
++
+ @dataclass
+ class DescriptorSpec:
+     """
+-    Defines the available bar-level descriptors.
++    Declares supported bar-level descriptor fields for Stage-1 data rows.
+     """
+-    fields: List[str] = field(default_factory=lambda: [
+-        "TIME_SIG",
+-        "KEY",
+-        "CHORD_FN", # Simplified to just 'CHORD' usually (Root+Quality)
+-        "DENSITY",  # Onsets per bar
+-        "CADENCE",  # Optional: PAC, IAC, Half
+-        "DIFFICULTY" # Optional: derived from intervals/speed
+-    ])
+ 
++    fields: List[str] = field(
++        default_factory=lambda: [
++            "TIME_SIG",
++            "KEY",
++            "CHORD_FN",
++            "DENSITY",
++            "CADENCE",
++            "DIFFICULTY",
++        ]
++    )
++
++
+ @dataclass
+ class BarPlan:
+     """
+-    Container for the high-level descriptors of a single bar.
+-    These are used as conditions/labels for the model.
++    Container for high-level descriptors of a single bar.
+     """
++
+     bar_index: int
+-    time_sig: str          # e.g., "4/4"
+-    key: str               # e.g., "Cm"
+-    density_bucket: str    # e.g., "DENSITY_LOW"
+-    pitch_range: Optional[int] = None  # semitone span (max - min MIDI pitch)
+-    polyphony_max: Optional[int] = None  # max simultaneous onsets at any POS
+-    chord_token: Optional[str] = None # e.g., "C:min"
++    time_sig: str
++    key: str
++    density_bucket: str
++    pitch_range: Optional[int] = None
++    polyphony_max: Optional[int] = None
++    chord_token: Optional[str] = None
+     cadence_token: Optional[str] = None
+     difficulty_token: Optional[str] = None
+ 
+     def to_token_string(self) -> str:
+-        """
+-        Returns a string of descriptor tokens to prepend to the bar.
+-        Example: "TIME_SIG_4_4 KEY_Cm DENSITY_LOW"
+-        """
+         toks = [
+             f"TIME_SIG_{self.time_sig.replace('/', '_')}",
+             f"KEY_{self.key}",
+-            self.density_bucket
++            self.density_bucket,
+         ]
+         if self.chord_token:
+             toks.append(self.chord_token)
+         if self.cadence_token:
+             toks.append(self.cadence_token)
+-        # Note: DIFFICULTY is often a piece-level tag, but can be bar-level.
+         return " ".join(toks)
+diff --git a/tests/test_schema.py b/tests/test_schema.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..7aa223d5c372bac21faea38483f35a4b38fe711f
+--- /dev/null
++++ b/tests/test_schema.py
+@@ -0,0 +1,51 @@
++from pathlib import Path
++import sys
++
++import pytest
++
++sys.path.insert(0, str(Path(__file__).parents[1]))
++
++from src.tokens.schema import DescriptorSpec, EventSpec, SCHEMA_VERSION, STAGE1_TPQ
++
++
++def test_event_spec_defaults():
++    spec = EventSpec()
++    assert spec.version == SCHEMA_VERSION
++    assert spec.tpq == STAGE1_TPQ
++
++    assert set(spec.tokens) == {
++        "structural",
++        "voice_events",
++        "anchors",
++        "intervals",
++        "doubling",
++    }
++    assert "BAR" in spec.tokens["structural"]
++    assert "MEL_INT12_{-24..+24}" in spec.tokens["intervals"]
++
++
++def test_event_spec_enforces_stage1_constraints():
++    with pytest.raises(ValueError, match="unsupported event schema version"):
++        EventSpec(version="remi_tab_v2")
++
++    with pytest.raises(ValueError, match="requires tpq=24"):
++        EventSpec(tpq=12)
++
++
++def test_event_spec_tokens_not_shared_between_instances():
++    first = EventSpec()
++    second = EventSpec()
++    first.tokens["structural"].append("EXTRA_TOKEN")
++    assert "EXTRA_TOKEN" not in second.tokens["structural"]
++
++
++def test_descriptor_spec_defaults():
++    spec = DescriptorSpec()
++    assert spec.fields == [
++        "TIME_SIG",
++        "KEY",
++        "CHORD_FN",
++        "DENSITY",
++        "CADENCE",
++        "DIFFICULTY",
++    ]
+
+
+thinking
+**Updating progress log**
+file update
+M /home/stephen-reilly/dev/bach_gen/PROGRESS.md
+@@ -7 +7,2 @@
+ - 2026-02-24: Updated loop to use `--full-auto` on newer Codex CLI builds where explicit approval flags are unavailable.
++- 2026-02-24: Completed Stage-1 ExecPlan item 1 by defining versioned `EventSpec`/`DescriptorSpec` in `src/tokens/schema.py` (`remi_tab_v1`, `tpq=24`) and added `tests/test_schema.py`.
+apply_patch(auto_approved=true) exited 0 in 23ms:
+Success. Updated the following files:
+M PROGRESS.md
+file update:
+diff --git a/PROGRESS.md b/PROGRESS.md
+index 4833a7122ceee94f3ed4a82b2a82d1f48360c51e..ca9b651f73a531ba694712b3fc92db19dc528baa
+--- a/PROGRESS.md
++++ b/PROGRESS.md
+@@ -5,3 +5,4 @@
+ - 2026-02-24: Added python-test-env skill and test helper script; loop now defaults to conda env `bach` and includes environment precheck in prompt.
+ - 2026-02-24: Fixed loop compatibility with installed Codex CLI (removed hard dependency on `-a`, added auto-detect for approval flags, and fail-fast on CLI usage errors).
+ - 2026-02-24: Updated loop to use `--full-auto` on newer Codex CLI builds where explicit approval flags are unavailable.
++- 2026-02-24: Completed Stage-1 ExecPlan item 1 by defining versioned `EventSpec`/`DescriptorSpec` in `src/tokens/schema.py` (`remi_tab_v1`, `tpq=24`) and added `tests/test_schema.py`.
+diff --git a/TODO.md b/TODO.md
+index 88c5bb578fc00626ba548f0e455746ed42d509a8..d4163ce110c4af257b2949658ec8cfa949f9f5af
+--- a/TODO.md
++++ b/TODO.md
+@@ -1,7 +1,7 @@
+ # TODO
+ 
+ ## Milestone: Stage-1 Tokenizer & Dataset
+-- [ ] Implement `src/tokens/schema.py` (EventSpec + DescriptorSpec, versioned)
++- [x] Implement `src/tokens/schema.py` (EventSpec + DescriptorSpec, versioned)
+ - [ ] Implement tokenizer interval math + round-trip tests
+ - [ ] Implement `scripts/make_dataset.py` basic pipeline
+ - [ ] Produce `data/processed/{events.parquet,barplans.parquet,stats.json}`
+diff --git a/docs/exec/EXECPLAN_stage1.md b/docs/exec/EXECPLAN_stage1.md
+index 4ce76e256e20ed838c3b0dd76cf2ef2289cf7232..ef0c66b4dbc93cb2d19b4491bc03f2277b2d8ab4
+--- a/docs/exec/EXECPLAN_stage1.md
++++ b/docs/exec/EXECPLAN_stage1.md
+@@ -9,7 +9,7 @@
+ - Update `TODO.md` and append to `PROGRESS.md`.
+ 
+ ## Checklist (one item per loop)
+-- [ ] Define EventSpec + DescriptorSpec in `src/tokens/schema.py` with version `remi_tab_v1` and `tpq=24`.
++- [x] Define EventSpec + DescriptorSpec in `src/tokens/schema.py` with version `remi_tab_v1` and `tpq=24`.
+ - [ ] Implement interval math helpers (melodic + harmonic ref) with QA vs production behavior.
+ - [ ] Implement event parsing/serialization in `src/tokens/tokenizer.py` with canonical ordering.
+ - [ ] Add round-trip tests for pitch reconstruction and `HARM_*` consistency.
+diff --git a/src/tokens/schema.py b/src/tokens/schema.py
+index db5c6ab4e9f1e4b6d11cc726d68cef74da294d17..771fcb91484a6e15426af933f0e60284bfca636b
+--- a/src/tokens/schema.py
++++ b/src/tokens/schema.py
+@@ -1,59 +1,99 @@
+ from dataclasses import dataclass, field
+ from typing import Dict, List, Optional
+ 
++SCHEMA_VERSION = "remi_tab_v1"
++STAGE1_TPQ = 24
++
++
++def _default_event_tokens() -> Dict[str, List[str]]:
++    return {
++        "structural": [
++            "BAR",
++            "TIME_SIG_*",
++            "KEY_*",
++            "TEMPO_*",
++            "POS_*",
++        ],
++        "voice_events": [
++            "VOICE_{0..K-1}",
++            "DUR_{ticks}",
++            "REST_{ticks}",
++        ],
++        "anchors": [
++            "ABS_VOICE_{v}_{MIDI}",
++            "ABS_LOW_{MIDI}",
++            "ABS_HIGH_{MIDI}",
++        ],
++        "intervals": [
++            "MEL_INT12_{-24..+24}",
++            "HARM_OCT_{-2..4|NA}",
++            "HARM_CLASS_{0..11|NA}",
++        ],
++        "doubling": ["DUP_{1..N}"],
++    }
++
++
+ @dataclass
+ class EventSpec:
+     """
+-    Defines the tokenization schema version and parameters.
++    Stage-1 event schema. This schema is versioned and fixed to TPQ=24.
+     """
+-    version: str = "remi_tab_v1"
+-    tpq: int = 24
+-    # Dictionary of token types to their vocabulary lists (or descriptions)
+-    tokens: Dict[str, List[str]] = field(default_factory=dict)
+ 
++    version: str = SCHEMA_VERSION
++    tpq: int = STAGE1_TPQ
++    tokens: Dict[str, List[str]] = field(default_factory=_default_event_tokens)
++
++    def __post_init__(self) -> None:
++        if self.version != SCHEMA_VERSION:
++            raise ValueError(
++                f"unsupported event schema version: {self.version!r}; expected {SCHEMA_VERSION!r}"
++            )
++        if self.tpq != STAGE1_TPQ:
++            raise ValueError(f"Stage-1 requires tpq={STAGE1_TPQ}, got {self.tpq}")
++
++
+ @dataclass
+ class DescriptorSpec:
+     """
+-    Defines the available bar-level descriptors.
++    Declares supported bar-level descriptor fields for Stage-1 data rows.
+     """
+-    fields: List[str] = field(default_factory=lambda: [
+-        "TIME_SIG",
+-        "KEY",
+-        "CHORD_FN", # Simplified to just 'CHORD' usually (Root+Quality)
+-        "DENSITY",  # Onsets per bar
+-        "CADENCE",  # Optional: PAC, IAC, Half
+-        "DIFFICULTY" # Optional: derived from intervals/speed
+-    ])
+ 
++    fields: List[str] = field(
++        default_factory=lambda: [
++            "TIME_SIG",
++            "KEY",
++            "CHORD_FN",
++            "DENSITY",
++            "CADENCE",
++            "DIFFICULTY",
++        ]
++    )
++
++
+ @dataclass
+ class BarPlan:
+     """
+-    Container for the high-level descriptors of a single bar.
+-    These are used as conditions/labels for the model.
++    Container for high-level descriptors of a single bar.
+     """
++
+     bar_index: int
+-    time_sig: str          # e.g., "4/4"
+-    key: str               # e.g., "Cm"
+-    density_bucket: str    # e.g., "DENSITY_LOW"
+-    pitch_range: Optional[int] = None  # semitone span (max - min MIDI pitch)
+-    polyphony_max: Optional[int] = None  # max simultaneous onsets at any POS
+-    chord_token: Optional[str] = None # e.g., "C:min"
++    time_sig: str
++    key: str
++    density_bucket: str
++    pitch_range: Optional[int] = None
++    polyphony_max: Optional[int] = None
++    chord_token: Optional[str] = None
+     cadence_token: Optional[str] = None
+     difficulty_token: Optional[str] = None
+ 
+     def to_token_string(self) -> str:
+-        """
+-        Returns a string of descriptor tokens to prepend to the bar.
+-        Example: "TIME_SIG_4_4 KEY_Cm DENSITY_LOW"
+-        """
+         toks = [
+             f"TIME_SIG_{self.time_sig.replace('/', '_')}",
+             f"KEY_{self.key}",
+-            self.density_bucket
++            self.density_bucket,
+         ]
+         if self.chord_token:
+             toks.append(self.chord_token)
+         if self.cadence_token:
+             toks.append(self.cadence_token)
+-        # Note: DIFFICULTY is often a piece-level tag, but can be bar-level.
+         return " ".join(toks)
+diff --git a/tests/test_schema.py b/tests/test_schema.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..7aa223d5c372bac21faea38483f35a4b38fe711f
+--- /dev/null
++++ b/tests/test_schema.py
+@@ -0,0 +1,51 @@
++from pathlib import Path
++import sys
++
++import pytest
++
++sys.path.insert(0, str(Path(__file__).parents[1]))
++
++from src.tokens.schema import DescriptorSpec, EventSpec, SCHEMA_VERSION, STAGE1_TPQ
++
++
++def test_event_spec_defaults():
++    spec = EventSpec()
++    assert spec.version == SCHEMA_VERSION
++    assert spec.tpq == STAGE1_TPQ
++
++    assert set(spec.tokens) == {
++        "structural",
++        "voice_events",
++        "anchors",
++        "intervals",
++        "doubling",
++    }
++    assert "BAR" in spec.tokens["structural"]
++    assert "MEL_INT12_{-24..+24}" in spec.tokens["intervals"]
++
++
++def test_event_spec_enforces_stage1_constraints():
++    with pytest.raises(ValueError, match="unsupported event schema version"):
++        EventSpec(version="remi_tab_v2")
++
++    with pytest.raises(ValueError, match="requires tpq=24"):
++        EventSpec(tpq=12)
++
++
++def test_event_spec_tokens_not_shared_between_instances():
++    first = EventSpec()
++    second = EventSpec()
++    first.tokens["structural"].append("EXTRA_TOKEN")
++    assert "EXTRA_TOKEN" not in second.tokens["structural"]
++
++
++def test_descriptor_spec_defaults():
++    spec = DescriptorSpec()
++    assert spec.fields == [
++        "TIME_SIG",
++        "KEY",
++        "CHORD_FN",
++        "DENSITY",
++        "CADENCE",
++        "DIFFICULTY",
++    ]
+
+file update:
+diff --git a/PROGRESS.md b/PROGRESS.md
+index 4833a7122ceee94f3ed4a82b2a82d1f48360c51e..ca9b651f73a531ba694712b3fc92db19dc528baa
+--- a/PROGRESS.md
++++ b/PROGRESS.md
+@@ -5,3 +5,4 @@
+ - 2026-02-24: Added python-test-env skill and test helper script; loop now defaults to conda env `bach` and includes environment precheck in prompt.
+ - 2026-02-24: Fixed loop compatibility with installed Codex CLI (removed hard dependency on `-a`, added auto-detect for approval flags, and fail-fast on CLI usage errors).
+ - 2026-02-24: Updated loop to use `--full-auto` on newer Codex CLI builds where explicit approval flags are unavailable.
++- 2026-02-24: Completed Stage-1 ExecPlan item 1 by defining versioned `EventSpec`/`DescriptorSpec` in `src/tokens/schema.py` (`remi_tab_v1`, `tpq=24`) and added `tests/test_schema.py`.
+diff --git a/TODO.md b/TODO.md
+index 88c5bb578fc00626ba548f0e455746ed42d509a8..d4163ce110c4af257b2949658ec8cfa949f9f5af
+--- a/TODO.md
++++ b/TODO.md
+@@ -1,7 +1,7 @@
+ # TODO
+ 
+ ## Milestone: Stage-1 Tokenizer & Dataset
+-- [ ] Implement `src/tokens/schema.py` (EventSpec + DescriptorSpec, versioned)
++- [x] Implement `src/tokens/schema.py` (EventSpec + DescriptorSpec, versioned)
+ - [ ] Implement tokenizer interval math + round-trip tests
+ - [ ] Implement `scripts/make_dataset.py` basic pipeline
+ - [ ] Produce `data/processed/{events.parquet,barplans.parquet,stats.json}`
+diff --git a/docs/exec/EXECPLAN_stage1.md b/docs/exec/EXECPLAN_stage1.md
+index 4ce76e256e20ed838c3b0dd76cf2ef2289cf7232..ef0c66b4dbc93cb2d19b4491bc03f2277b2d8ab4
+--- a/docs/exec/EXECPLAN_stage1.md
++++ b/docs/exec/EXECPLAN_stage1.md
+@@ -9,7 +9,7 @@
+ - Update `TODO.md` and append to `PROGRESS.md`.
+ 
+ ## Checklist (one item per loop)
+-- [ ] Define EventSpec + DescriptorSpec in `src/tokens/schema.py` with version `remi_tab_v1` and `tpq=24`.
++- [x] Define EventSpec + DescriptorSpec in `src/tokens/schema.py` with version `remi_tab_v1` and `tpq=24`.
+ - [ ] Implement interval math helpers (melodic + harmonic ref) with QA vs production behavior.
+ - [ ] Implement event parsing/serialization in `src/tokens/tokenizer.py` with canonical ordering.
+ - [ ] Add round-trip tests for pitch reconstruction and `HARM_*` consistency.
+diff --git a/src/tokens/schema.py b/src/tokens/schema.py
+index db5c6ab4e9f1e4b6d11cc726d68cef74da294d17..771fcb91484a6e15426af933f0e60284bfca636b
+--- a/src/tokens/schema.py
++++ b/src/tokens/schema.py
+@@ -1,59 +1,99 @@
+ from dataclasses import dataclass, field
+ from typing import Dict, List, Optional
+ 
++SCHEMA_VERSION = "remi_tab_v1"
++STAGE1_TPQ = 24
++
++
++def _default_event_tokens() -> Dict[str, List[str]]:
++    return {
++        "structural": [
++            "BAR",
++            "TIME_SIG_*",
++            "KEY_*",
++            "TEMPO_*",
++            "POS_*",
++        ],
++        "voice_events": [
++            "VOICE_{0..K-1}",
++            "DUR_{ticks}",
++            "REST_{ticks}",
++        ],
++        "anchors": [
++            "ABS_VOICE_{v}_{MIDI}",
++            "ABS_LOW_{MIDI}",
++            "ABS_HIGH_{MIDI}",
++        ],
++        "intervals": [
++            "MEL_INT12_{-24..+24}",
++            "HARM_OCT_{-2..4|NA}",
++            "HARM_CLASS_{0..11|NA}",
++        ],
++        "doubling": ["DUP_{1..N}"],
++    }
++
++
+ @dataclass
+ class EventSpec:
+     """
+-    Defines the tokenization schema version and parameters.
++    Stage-1 event schema. This schema is versioned and fixed to TPQ=24.
+     """
+-    version: str = "remi_tab_v1"
+-    tpq: int = 24
+-    # Dictionary of token types to their vocabulary lists (or descriptions)
+-    tokens: Dict[str, List[str]] = field(default_factory=dict)
+ 
++    version: str = SCHEMA_VERSION
++    tpq: int = STAGE1_TPQ
++    tokens: Dict[str, List[str]] = field(default_factory=_default_event_tokens)
++
++    def __post_init__(self) -> None:
++        if self.version != SCHEMA_VERSION:
++            raise ValueError(
++                f"unsupported event schema version: {self.version!r}; expected {SCHEMA_VERSION!r}"
++            )
++        if self.tpq != STAGE1_TPQ:
++            raise ValueError(f"Stage-1 requires tpq={STAGE1_TPQ}, got {self.tpq}")
++
++
+ @dataclass
+ class DescriptorSpec:
+     """
+-    Defines the available bar-level descriptors.
++    Declares supported bar-level descriptor fields for Stage-1 data rows.
+     """
+-    fields: List[str] = field(default_factory=lambda: [
+-        "TIME_SIG",
+-        "KEY",
+-        "CHORD_FN", # Simplified to just 'CHORD' usually (Root+Quality)
+-        "DENSITY",  # Onsets per bar
+-        "CADENCE",  # Optional: PAC, IAC, Half
+-        "DIFFICULTY" # Optional: derived from intervals/speed
+-    ])
+ 
++    fields: List[str] = field(
++        default_factory=lambda: [
++            "TIME_SIG",
++            "KEY",
++            "CHORD_FN",
++            "DENSITY",
++            "CADENCE",
++            "DIFFICULTY",
++        ]
++    )
++
++
+ @dataclass
+ class BarPlan:
+     """
+-    Container for the high-level descriptors of a single bar.
+-    These are used as conditions/labels for the model.
++    Container for high-level descriptors of a single bar.
+     """
++
+     bar_index: int
+-    time_sig: str          # e.g., "4/4"
+-    key: str               # e.g., "Cm"
+-    density_bucket: str    # e.g., "DENSITY_LOW"
+-    pitch_range: Optional[int] = None  # semitone span (max - min MIDI pitch)
+-    polyphony_max: Optional[int] = None  # max simultaneous onsets at any POS
+-    chord_token: Optional[str] = None # e.g., "C:min"
++    time_sig: str
++    key: str
++    density_bucket: str
++    pitch_range: Optional[int] = None
++    polyphony_max: Optional[int] = None
++    chord_token: Optional[str] = None
+     cadence_token: Optional[str] = None
+     difficulty_token: Optional[str] = None
+ 
+     def to_token_string(self) -> str:
+-        """
+-        Returns a string of descriptor tokens to prepend to the bar.
+-        Example: "TIME_SIG_4_4 KEY_Cm DENSITY_LOW"
+-        """
+         toks = [
+             f"TIME_SIG_{self.time_sig.replace('/', '_')}",
+             f"KEY_{self.key}",
+-            self.density_bucket
++            self.density_bucket,
+         ]
+         if self.chord_token:
+             toks.append(self.chord_token)
+         if self.cadence_token:
+             toks.append(self.cadence_token)
+-        # Note: DIFFICULTY is often a piece-level tag, but can be bar-level.
+         return " ".join(toks)
+diff --git a/tests/test_schema.py b/tests/test_schema.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..7aa223d5c372bac21faea38483f35a4b38fe711f
+--- /dev/null
++++ b/tests/test_schema.py
+@@ -0,0 +1,51 @@
++from pathlib import Path
++import sys
++
++import pytest
++
++sys.path.insert(0, str(Path(__file__).parents[1]))
++
++from src.tokens.schema import DescriptorSpec, EventSpec, SCHEMA_VERSION, STAGE1_TPQ
++
++
++def test_event_spec_defaults():
++    spec = EventSpec()
++    assert spec.version == SCHEMA_VERSION
++    assert spec.tpq == STAGE1_TPQ
++
++    assert set(spec.tokens) == {
++        "structural",
++        "voice_events",
++        "anchors",
++        "intervals",
++        "doubling",
++    }
++    assert "BAR" in spec.tokens["structural"]
++    assert "MEL_INT12_{-24..+24}" in spec.tokens["intervals"]
++
++
++def test_event_spec_enforces_stage1_constraints():
++    with pytest.raises(ValueError, match="unsupported event schema version"):
++        EventSpec(version="remi_tab_v2")
++
++    with pytest.raises(ValueError, match="requires tpq=24"):
++        EventSpec(tpq=12)
++
++
++def test_event_spec_tokens_not_shared_between_instances():
++    first = EventSpec()
++    second = EventSpec()
++    first.tokens["structural"].append("EXTRA_TOKEN")
++    assert "EXTRA_TOKEN" not in second.tokens["structural"]
++
++
++def test_descriptor_spec_defaults():
++    spec = DescriptorSpec()
++    assert spec.fields == [
++        "TIME_SIG",
++        "KEY",
++        "CHORD_FN",
++        "DENSITY",
++        "CADENCE",
++        "DIFFICULTY",
++    ]
+
+
+thinking
+**Planning test runs for verification**
+codex
+{"done":false,"progress_made":true,"summary":"Edits are in place for the first Stage-1 checklist item, plus focused schema tests and TODO/PROGRESS/EXECPLAN updates. I’m running the repo verify command now to validate the change set.","tests_ran":true,"tests_status":"pass","next_step":"Run bash docs/skills/python-test-env/scripts/run_tests.sh and inspect any failures.","stop_reason":""}
+
+thinking
+**Running tests**
+exec
+/bin/bash -lc 'bash docs/skills/python-test-env/scripts/run_tests.sh' in /home/stephen-reilly/dev/bach_genfile update:
+diff --git a/PROGRESS.md b/PROGRESS.md
+index 4833a7122ceee94f3ed4a82b2a82d1f48360c51e..ca9b651f73a531ba694712b3fc92db19dc528baa
+--- a/PROGRESS.md
++++ b/PROGRESS.md
+@@ -5,3 +5,4 @@
+ - 2026-02-24: Added python-test-env skill and test helper script; loop now defaults to conda env `bach` and includes environment precheck in prompt.
+ - 2026-02-24: Fixed loop compatibility with installed Codex CLI (removed hard dependency on `-a`, added auto-detect for approval flags, and fail-fast on CLI usage errors).
+ - 2026-02-24: Updated loop to use `--full-auto` on newer Codex CLI builds where explicit approval flags are unavailable.
++- 2026-02-24: Completed Stage-1 ExecPlan item 1 by defining versioned `EventSpec`/`DescriptorSpec` in `src/tokens/schema.py` (`remi_tab_v1`, `tpq=24`) and added `tests/test_schema.py`.
+diff --git a/TODO.md b/TODO.md
+index 88c5bb578fc00626ba548f0e455746ed42d509a8..d4163ce110c4af257b2949658ec8cfa949f9f5af
+--- a/TODO.md
++++ b/TODO.md
+@@ -1,7 +1,7 @@
+ # TODO
+ 
+ ## Milestone: Stage-1 Tokenizer & Dataset
+-- [ ] Implement `src/tokens/schema.py` (EventSpec + DescriptorSpec, versioned)
++- [x] Implement `src/tokens/schema.py` (EventSpec + DescriptorSpec, versioned)
+ - [ ] Implement tokenizer interval math + round-trip tests
+ - [ ] Implement `scripts/make_dataset.py` basic pipeline
+ - [ ] Produce `data/processed/{events.parquet,barplans.parquet,stats.json}`
+diff --git a/docs/exec/EXECPLAN_stage1.md b/docs/exec/EXECPLAN_stage1.md
+index 4ce76e256e20ed838c3b0dd76cf2ef2289cf7232..ef0c66b4dbc93cb2d19b4491bc03f2277b2d8ab4
+--- a/docs/exec/EXECPLAN_stage1.md
++++ b/docs/exec/EXECPLAN_stage1.md
+@@ -9,7 +9,7 @@
+ - Update `TODO.md` and append to `PROGRESS.md`.
+ 
+ ## Checklist (one item per loop)
+-- [ ] Define EventSpec + DescriptorSpec in `src/tokens/schema.py` with version `remi_tab_v1` and `tpq=24`.
++- [x] Define EventSpec + DescriptorSpec in `src/tokens/schema.py` with version `remi_tab_v1` and `tpq=24`.
+ - [ ] Implement interval math helpers (melodic + harmonic ref) with QA vs production behavior.
+ - [ ] Implement event parsing/serialization in `src/tokens/tokenizer.py` with canonical ordering.
+ - [ ] Add round-trip tests for pitch reconstruction and `HARM_*` consistency.
+diff --git a/src/tokens/schema.py b/src/tokens/schema.py
+index db5c6ab4e9f1e4b6d11cc726d68cef74da294d17..771fcb91484a6e15426af933f0e60284bfca636b
+--- a/src/tokens/schema.py
++++ b/src/tokens/schema.py
+@@ -1,59 +1,99 @@
+ from dataclasses import dataclass, field
+ from typing import Dict, List, Optional
+ 
++SCHEMA_VERSION = "remi_tab_v1"
++STAGE1_TPQ = 24
++
++
++def _default_event_tokens() -> Dict[str, List[str]]:
++    return {
++        "structural": [
++            "BAR",
++            "TIME_SIG_*",
++            "KEY_*",
++            "TEMPO_*",
++            "POS_*",
++        ],
++        "voice_events": [
++            "VOICE_{0..K-1}",
++            "DUR_{ticks}",
++            "REST_{ticks}",
++        ],
++        "anchors": [
++            "ABS_VOICE_{v}_{MIDI}",
++            "ABS_LOW_{MIDI}",
++            "ABS_HIGH_{MIDI}",
++        ],
++        "intervals": [
++            "MEL_INT12_{-24..+24}",
++            "HARM_OCT_{-2..4|NA}",
++            "HARM_CLASS_{0..11|NA}",
++        ],
++        "doubling": ["DUP_{1..N}"],
++    }
++
++
+ @dataclass
+ class EventSpec:
+     """
+-    Defines the tokenization schema version and parameters.
++    Stage-1 event schema. This schema is versioned and fixed to TPQ=24.
+     """
+-    version: str = "remi_tab_v1"
+-    tpq: int = 24
+-    # Dictionary of token types to their vocabulary lists (or descriptions)
+-    tokens: Dict[str, List[str]] = field(default_factory=dict)
+ 
++    version: str = SCHEMA_VERSION
++    tpq: int = STAGE1_TPQ
++    tokens: Dict[str, List[str]] = field(default_factory=_default_event_tokens)
++
++    def __post_init__(self) -> None:
++        if self.version != SCHEMA_VERSION:
++            raise ValueError(
++                f"unsupported event schema version: {self.version!r}; expected {SCHEMA_VERSION!r}"
++            )
++        if self.tpq != STAGE1_TPQ:
++            raise ValueError(f"Stage-1 requires tpq={STAGE1_TPQ}, got {self.tpq}")
++
++
+ @dataclass
+ class DescriptorSpec:
+     """
+-    Defines the available bar-level descriptors.
++    Declares supported bar-level descriptor fields for Stage-1 data rows.
+     """
+-    fields: List[str] = field(default_factory=lambda: [
+-        "TIME_SIG",
+-        "KEY",
+-        "CHORD_FN", # Simplified to just 'CHORD' usually (Root+Quality)
+-        "DENSITY",  # Onsets per bar
+-        "CADENCE",  # Optional: PAC, IAC, Half
+-        "DIFFICULTY" # Optional: derived from intervals/speed
+-    ])
+ 
++    fields: List[str] = field(
++        default_factory=lambda: [
++            "TIME_SIG",
++            "KEY",
++            "CHORD_FN",
++            "DENSITY",
++            "CADENCE",
++            "DIFFICULTY",
++        ]
++    )
++
++
+ @dataclass
+ class BarPlan:
+     """
+-    Container for the high-level descriptors of a single bar.
+-    These are used as conditions/labels for the model.
++    Container for high-level descriptors of a single bar.
+     """
++
+     bar_index: int
+-    time_sig: str          # e.g., "4/4"
+-    key: str               # e.g., "Cm"
+-    density_bucket: str    # e.g., "DENSITY_LOW"
+-    pitch_range: Optional[int] = None  # semitone span (max - min MIDI pitch)
+-    polyphony_max: Optional[int] = None  # max simultaneous onsets at any POS
+-    chord_token: Optional[str] = None # e.g., "C:min"
++    time_sig: str
++    key: str
++    density_bucket: str
++    pitch_range: Optional[int] = None
++    polyphony_max: Optional[int] = None
++    chord_token: Optional[str] = None
+     cadence_token: Optional[str] = None
+     difficulty_token: Optional[str] = None
+ 
+     def to_token_string(self) -> str:
+-        """
+-        Returns a string of descriptor tokens to prepend to the bar.
+-        Example: "TIME_SIG_4_4 KEY_Cm DENSITY_LOW"
+-        """
+         toks = [
+             f"TIME_SIG_{self.time_sig.replace('/', '_')}",
+             f"KEY_{self.key}",
+-            self.density_bucket
++            self.density_bucket,
+         ]
+         if self.chord_token:
+             toks.append(self.chord_token)
+         if self.cadence_token:
+             toks.append(self.cadence_token)
+-        # Note: DIFFICULTY is often a piece-level tag, but can be bar-level.
+         return " ".join(toks)
+diff --git a/tests/test_schema.py b/tests/test_schema.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..7aa223d5c372bac21faea38483f35a4b38fe711f
+--- /dev/null
++++ b/tests/test_schema.py
+@@ -0,0 +1,51 @@
++from pathlib import Path
++import sys
++
++import pytest
++
++sys.path.insert(0, str(Path(__file__).parents[1]))
++
++from src.tokens.schema import DescriptorSpec, EventSpec, SCHEMA_VERSION, STAGE1_TPQ
++
++
++def test_event_spec_defaults():
++    spec = EventSpec()
++    assert spec.version == SCHEMA_VERSION
++    assert spec.tpq == STAGE1_TPQ
++
++    assert set(spec.tokens) == {
++        "structural",
++        "voice_events",
++        "anchors",
++        "intervals",
++        "doubling",
++    }
++    assert "BAR" in spec.tokens["structural"]
++    assert "MEL_INT12_{-24..+24}" in spec.tokens["intervals"]
++
++
++def test_event_spec_enforces_stage1_constraints():
++    with pytest.raises(ValueError, match="unsupported event schema version"):
++        EventSpec(version="remi_tab_v2")
++
++    with pytest.raises(ValueError, match="requires tpq=24"):
++        EventSpec(tpq=12)
++
++
++def test_event_spec_tokens_not_shared_between_instances():
++    first = EventSpec()
++    second = EventSpec()
++    first.tokens["structural"].append("EXTRA_TOKEN")
++    assert "EXTRA_TOKEN" not in second.tokens["structural"]
++
++
++def test_descriptor_spec_defaults():
++    spec = DescriptorSpec()
++    assert spec.fields == [
++        "TIME_SIG",
++        "KEY",
++        "CHORD_FN",
++        "DENSITY",
++        "CADENCE",
++        "DIFFICULTY",
++    ]
+
+file update:
+diff --git a/PROGRESS.md b/PROGRESS.md
+index 4833a7122ceee94f3ed4a82b2a82d1f48360c51e..ca9b651f73a531ba694712b3fc92db19dc528baa
+--- a/PROGRESS.md
++++ b/PROGRESS.md
+@@ -5,3 +5,4 @@
+ - 2026-02-24: Added python-test-env skill and test helper script; loop now defaults to conda env `bach` and includes environment precheck in prompt.
+ - 2026-02-24: Fixed loop compatibility with installed Codex CLI (removed hard dependency on `-a`, added auto-detect for approval flags, and fail-fast on CLI usage errors).
+ - 2026-02-24: Updated loop to use `--full-auto` on newer Codex CLI builds where explicit approval flags are unavailable.
++- 2026-02-24: Completed Stage-1 ExecPlan item 1 by defining versioned `EventSpec`/`DescriptorSpec` in `src/tokens/schema.py` (`remi_tab_v1`, `tpq=24`) and added `tests/test_schema.py`.
+diff --git a/TODO.md b/TODO.md
+index 88c5bb578fc00626ba548f0e455746ed42d509a8..d4163ce110c4af257b2949658ec8cfa949f9f5af
+--- a/TODO.md
++++ b/TODO.md
+@@ -1,7 +1,7 @@
+ # TODO
+ 
+ ## Milestone: Stage-1 Tokenizer & Dataset
+-- [ ] Implement `src/tokens/schema.py` (EventSpec + DescriptorSpec, versioned)
++- [x] Implement `src/tokens/schema.py` (EventSpec + DescriptorSpec, versioned)
+ - [ ] Implement tokenizer interval math + round-trip tests
+ - [ ] Implement `scripts/make_dataset.py` basic pipeline
+ - [ ] Produce `data/processed/{events.parquet,barplans.parquet,stats.json}`
+diff --git a/docs/exec/EXECPLAN_stage1.md b/docs/exec/EXECPLAN_stage1.md
+index 4ce76e256e20ed838c3b0dd76cf2ef2289cf7232..ef0c66b4dbc93cb2d19b4491bc03f2277b2d8ab4
+--- a/docs/exec/EXECPLAN_stage1.md
++++ b/docs/exec/EXECPLAN_stage1.md
+@@ -9,7 +9,7 @@
+ - Update `TODO.md` and append to `PROGRESS.md`.
+ 
+ ## Checklist (one item per loop)
+-- [ ] Define EventSpec + DescriptorSpec in `src/tokens/schema.py` with version `remi_tab_v1` and `tpq=24`.
++- [x] Define EventSpec + DescriptorSpec in `src/tokens/schema.py` with version `remi_tab_v1` and `tpq=24`.
+ - [ ] Implement interval math helpers (melodic + harmonic ref) with QA vs production behavior.
+ - [ ] Implement event parsing/serialization in `src/tokens/tokenizer.py` with canonical ordering.
+ - [ ] Add round-trip tests for pitch reconstruction and `HARM_*` consistency.
+diff --git a/src/tokens/schema.py b/src/tokens/schema.py
+index db5c6ab4e9f1e4b6d11cc726d68cef74da294d17..771fcb91484a6e15426af933f0e60284bfca636b
+--- a/src/tokens/schema.py
++++ b/src/tokens/schema.py
+@@ -1,59 +1,99 @@
+ from dataclasses import dataclass, field
+ from typing import Dict, List, Optional
+ 
++SCHEMA_VERSION = "remi_tab_v1"
++STAGE1_TPQ = 24
++
++
++def _default_event_tokens() -> Dict[str, List[str]]:
++    return {
++        "structural": [
++            "BAR",
++            "TIME_SIG_*",
++            "KEY_*",
++            "TEMPO_*",
++            "POS_*",
++        ],
++        "voice_events": [
++            "VOICE_{0..K-1}",
++            "DUR_{ticks}",
++            "REST_{ticks}",
++        ],
++        "anchors": [
++            "ABS_VOICE_{v}_{MIDI}",
++            "ABS_LOW_{MIDI}",
++            "ABS_HIGH_{MIDI}",
++        ],
++        "intervals": [
++            "MEL_INT12_{-24..+24}",
++            "HARM_OCT_{-2..4|NA}",
++            "HARM_CLASS_{0..11|NA}",
++        ],
++        "doubling": ["DUP_{1..N}"],
++    }
++
++
+ @dataclass
+ class EventSpec:
+     """
+-    Defines the tokenization schema version and parameters.
++    Stage-1 event schema. This schema is versioned and fixed to TPQ=24.
+     """
+-    version: str = "remi_tab_v1"
+-    tpq: int = 24
+-    # Dictionary of token types to their vocabulary lists (or descriptions)
+-    tokens: Dict[str, List[str]] = field(default_factory=dict)
+ 
++    version: str = SCHEMA_VERSION
++    tpq: int = STAGE1_TPQ
++    tokens: Dict[str, List[str]] = field(default_factory=_default_event_tokens)
++
++    def __post_init__(self) -> None:
++        if self.version != SCHEMA_VERSION:
++            raise ValueError(
++                f"unsupported event schema version: {self.version!r}; expected {SCHEMA_VERSION!r}"
++            )
++        if self.tpq != STAGE1_TPQ:
++            raise ValueError(f"Stage-1 requires tpq={STAGE1_TPQ}, got {self.tpq}")
++
++
+ @dataclass
+ class DescriptorSpec:
+     """
+-    Defines the available bar-level descriptors.
++    Declares supported bar-level descriptor fields for Stage-1 data rows.
+     """
+-    fields: List[str] = field(default_factory=lambda: [
+-        "TIME_SIG",
+-        "KEY",
+-        "CHORD_FN", # Simplified to just 'CHORD' usually (Root+Quality)
+-        "DENSITY",  # Onsets per bar
+-        "CADENCE",  # Optional: PAC, IAC, Half
+-        "DIFFICULTY" # Optional: derived from intervals/speed
+-    ])
+ 
++    fields: List[str] = field(
++        default_factory=lambda: [
++            "TIME_SIG",
++            "KEY",
++            "CHORD_FN",
++            "DENSITY",
++            "CADENCE",
++            "DIFFICULTY",
++        ]
++    )
++
++
+ @dataclass
+ class BarPlan:
+     """
+-    Container for the high-level descriptors of a single bar.
+-    These are used as conditions/labels for the model.
++    Container for high-level descriptors of a single bar.
+     """
++
+     bar_index: int
+-    time_sig: str          # e.g., "4/4"
+-    key: str               # e.g., "Cm"
+-    density_bucket: str    # e.g., "DENSITY_LOW"
+-    pitch_range: Optional[int] = None  # semitone span (max - min MIDI pitch)
+-    polyphony_max: Optional[int] = None  # max simultaneous onsets at any POS
+-    chord_token: Optional[str] = None # e.g., "C:min"
++    time_sig: str
++    key: str
++    density_bucket: str
++    pitch_range: Optional[int] = None
++    polyphony_max: Optional[int] = None
++    chord_token: Optional[str] = None
+     cadence_token: Optional[str] = None
+     difficulty_token: Optional[str] = None
+ 
+     def to_token_string(self) -> str:
+-        """
+-        Returns a string of descriptor tokens to prepend to the bar.
+-        Example: "TIME_SIG_4_4 KEY_Cm DENSITY_LOW"
+-        """
+         toks = [
+             f"TIME_SIG_{self.time_sig.replace('/', '_')}",
+             f"KEY_{self.key}",
+-            self.density_bucket
++            self.density_bucket,
+         ]
+         if self.chord_token:
+             toks.append(self.chord_token)
+         if self.cadence_token:
+             toks.append(self.cadence_token)
+-        # Note: DIFFICULTY is often a piece-level tag, but can be bar-level.
+         return " ".join(toks)
+diff --git a/tests/test_schema.py b/tests/test_schema.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..7aa223d5c372bac21faea38483f35a4b38fe711f
+--- /dev/null
++++ b/tests/test_schema.py
+@@ -0,0 +1,51 @@
++from pathlib import Path
++import sys
++
++import pytest
++
++sys.path.insert(0, str(Path(__file__).parents[1]))
++
++from src.tokens.schema import DescriptorSpec, EventSpec, SCHEMA_VERSION, STAGE1_TPQ
++
++
++def test_event_spec_defaults():
++    spec = EventSpec()
++    assert spec.version == SCHEMA_VERSION
++    assert spec.tpq == STAGE1_TPQ
++
++    assert set(spec.tokens) == {
++        "structural",
++        "voice_events",
++        "anchors",
++        "intervals",
++        "doubling",
++    }
++    assert "BAR" in spec.tokens["structural"]
++    assert "MEL_INT12_{-24..+24}" in spec.tokens["intervals"]
++
++
++def test_event_spec_enforces_stage1_constraints():
++    with pytest.raises(ValueError, match="unsupported event schema version"):
++        EventSpec(version="remi_tab_v2")
++
++    with pytest.raises(ValueError, match="requires tpq=24"):
++        EventSpec(tpq=12)
++
++
++def test_event_spec_tokens_not_shared_between_instances():
++    first = EventSpec()
++    second = EventSpec()
++    first.tokens["structural"].append("EXTRA_TOKEN")
++    assert "EXTRA_TOKEN" not in second.tokens["structural"]
++
++
++def test_descriptor_spec_defaults():
++    spec = DescriptorSpec()
++    assert spec.fields == [
++        "TIME_SIG",
++        "KEY",
++        "CHORD_FN",
++        "DENSITY",
++        "CADENCE",
++        "DIFFICULTY",
++    ]
+
+ succeeded in 50.53s:
+...............s...............................                          [100%]
+46 passed, 1 skipped in 48.19s
+
+
+thinking
+**Verifying clean git state**
+exec
+/bin/bash -lc 'git status --short' in /home/stephen-reilly/dev/bach_gen succeeded in 51ms:
+ M src/tokens/schema.py
+?? .codex/
+?? AGENTS.md
+?? PROGRESS.md
+?? SPEC.md
+?? TODO.md
+?? docs/
+?? loop_output.schema.json
+?? scripts/ralph_codex.sh
+?? tests/test_schema.py
+file update:
+diff --git a/PROGRESS.md b/PROGRESS.md
+index 4833a7122ceee94f3ed4a82b2a82d1f48360c51e..ca9b651f73a531ba694712b3fc92db19dc528baa
+--- a/PROGRESS.md
++++ b/PROGRESS.md
+@@ -5,3 +5,4 @@
+ - 2026-02-24: Added python-test-env skill and test helper script; loop now defaults to conda env `bach` and includes environment precheck in prompt.
+ - 2026-02-24: Fixed loop compatibility with installed Codex CLI (removed hard dependency on `-a`, added auto-detect for approval flags, and fail-fast on CLI usage errors).
+ - 2026-02-24: Updated loop to use `--full-auto` on newer Codex CLI builds where explicit approval flags are unavailable.
++- 2026-02-24: Completed Stage-1 ExecPlan item 1 by defining versioned `EventSpec`/`DescriptorSpec` in `src/tokens/schema.py` (`remi_tab_v1`, `tpq=24`) and added `tests/test_schema.py`.
+diff --git a/TODO.md b/TODO.md
+index 88c5bb578fc00626ba548f0e455746ed42d509a8..d4163ce110c4af257b2949658ec8cfa949f9f5af
+--- a/TODO.md
++++ b/TODO.md
+@@ -1,7 +1,7 @@
+ # TODO
+ 
+ ## Milestone: Stage-1 Tokenizer & Dataset
+-- [ ] Implement `src/tokens/schema.py` (EventSpec + DescriptorSpec, versioned)
++- [x] Implement `src/tokens/schema.py` (EventSpec + DescriptorSpec, versioned)
+ - [ ] Implement tokenizer interval math + round-trip tests
+ - [ ] Implement `scripts/make_dataset.py` basic pipeline
+ - [ ] Produce `data/processed/{events.parquet,barplans.parquet,stats.json}`
+diff --git a/docs/exec/EXECPLAN_stage1.md b/docs/exec/EXECPLAN_stage1.md
+index 4ce76e256e20ed838c3b0dd76cf2ef2289cf7232..ef0c66b4dbc93cb2d19b4491bc03f2277b2d8ab4
+--- a/docs/exec/EXECPLAN_stage1.md
++++ b/docs/exec/EXECPLAN_stage1.md
+@@ -9,7 +9,7 @@
+ - Update `TODO.md` and append to `PROGRESS.md`.
+ 
+ ## Checklist (one item per loop)
+-- [ ] Define EventSpec + DescriptorSpec in `src/tokens/schema.py` with version `remi_tab_v1` and `tpq=24`.
++- [x] Define EventSpec + DescriptorSpec in `src/tokens/schema.py` with version `remi_tab_v1` and `tpq=24`.
+ - [ ] Implement interval math helpers (melodic + harmonic ref) with QA vs production behavior.
+ - [ ] Implement event parsing/serialization in `src/tokens/tokenizer.py` with canonical ordering.
+ - [ ] Add round-trip tests for pitch reconstruction and `HARM_*` consistency.
+diff --git a/src/tokens/schema.py b/src/tokens/schema.py
+index db5c6ab4e9f1e4b6d11cc726d68cef74da294d17..771fcb91484a6e15426af933f0e60284bfca636b
+--- a/src/tokens/schema.py
++++ b/src/tokens/schema.py
+@@ -1,59 +1,99 @@
+ from dataclasses import dataclass, field
+ from typing import Dict, List, Optional
+ 
++SCHEMA_VERSION = "remi_tab_v1"
++STAGE1_TPQ = 24
++
++
++def _default_event_tokens() -> Dict[str, List[str]]:
++    return {
++        "structural": [
++            "BAR",
++            "TIME_SIG_*",
++            "KEY_*",
++            "TEMPO_*",
++            "POS_*",
++        ],
++        "voice_events": [
++            "VOICE_{0..K-1}",
++            "DUR_{ticks}",
++            "REST_{ticks}",
++        ],
++        "anchors": [
++            "ABS_VOICE_{v}_{MIDI}",
++            "ABS_LOW_{MIDI}",
++            "ABS_HIGH_{MIDI}",
++        ],
++        "intervals": [
++            "MEL_INT12_{-24..+24}",
++            "HARM_OCT_{-2..4|NA}",
++            "HARM_CLASS_{0..11|NA}",
++        ],
++        "doubling": ["DUP_{1..N}"],
++    }
++
++
+ @dataclass
+ class EventSpec:
+     """
+-    Defines the tokenization schema version and parameters.
++    Stage-1 event schema. This schema is versioned and fixed to TPQ=24.
+     """
+-    version: str = "remi_tab_v1"
+-    tpq: int = 24
+-    # Dictionary of token types to their vocabulary lists (or descriptions)
+-    tokens: Dict[str, List[str]] = field(default_factory=dict)
+ 
++    version: str = SCHEMA_VERSION
++    tpq: int = STAGE1_TPQ
++    tokens: Dict[str, List[str]] = field(default_factory=_default_event_tokens)
++
++    def __post_init__(self) -> None:
++        if self.version != SCHEMA_VERSION:
++            raise ValueError(
++                f"unsupported event schema version: {self.version!r}; expected {SCHEMA_VERSION!r}"
++            )
++        if self.tpq != STAGE1_TPQ:
++            raise ValueError(f"Stage-1 requires tpq={STAGE1_TPQ}, got {self.tpq}")
++
++
+ @dataclass
+ class DescriptorSpec:
+     """
+-    Defines the available bar-level descriptors.
++    Declares supported bar-level descriptor fields for Stage-1 data rows.
+     """
+-    fields: List[str] = field(default_factory=lambda: [
+-        "TIME_SIG",
+-        "KEY",
+-        "CHORD_FN", # Simplified to just 'CHORD' usually (Root+Quality)
+-        "DENSITY",  # Onsets per bar
+-        "CADENCE",  # Optional: PAC, IAC, Half
+-        "DIFFICULTY" # Optional: derived from intervals/speed
+-    ])
+ 
++    fields: List[str] = field(
++        default_factory=lambda: [
++            "TIME_SIG",
++            "KEY",
++            "CHORD_FN",
++            "DENSITY",
++            "CADENCE",
++            "DIFFICULTY",
++        ]
++    )
++
++
+ @dataclass
+ class BarPlan:
+     """
+-    Container for the high-level descriptors of a single bar.
+-    These are used as conditions/labels for the model.
++    Container for high-level descriptors of a single bar.
+     """
++
+     bar_index: int
+-    time_sig: str          # e.g., "4/4"
+-    key: str               # e.g., "Cm"
+-    density_bucket: str    # e.g., "DENSITY_LOW"
+-    pitch_range: Optional[int] = None  # semitone span (max - min MIDI pitch)
+-    polyphony_max: Optional[int] = None  # max simultaneous onsets at any POS
+-    chord_token: Optional[str] = None # e.g., "C:min"
++    time_sig: str
++    key: str
++    density_bucket: str
++    pitch_range: Optional[int] = None
++    polyphony_max: Optional[int] = None
++    chord_token: Optional[str] = None
+     cadence_token: Optional[str] = None
+     difficulty_token: Optional[str] = None
+ 
+     def to_token_string(self) -> str:
+-        """
+-        Returns a string of descriptor tokens to prepend to the bar.
+-        Example: "TIME_SIG_4_4 KEY_Cm DENSITY_LOW"
+-        """
+         toks = [
+             f"TIME_SIG_{self.time_sig.replace('/', '_')}",
+             f"KEY_{self.key}",
+-            self.density_bucket
++            self.density_bucket,
+         ]
+         if self.chord_token:
+             toks.append(self.chord_token)
+         if self.cadence_token:
+             toks.append(self.cadence_token)
+-        # Note: DIFFICULTY is often a piece-level tag, but can be bar-level.
+         return " ".join(toks)
+diff --git a/tests/test_schema.py b/tests/test_schema.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..7aa223d5c372bac21faea38483f35a4b38fe711f
+--- /dev/null
++++ b/tests/test_schema.py
+@@ -0,0 +1,51 @@
++from pathlib import Path
++import sys
++
++import pytest
++
++sys.path.insert(0, str(Path(__file__).parents[1]))
++
++from src.tokens.schema import DescriptorSpec, EventSpec, SCHEMA_VERSION, STAGE1_TPQ
++
++
++def test_event_spec_defaults():
++    spec = EventSpec()
++    assert spec.version == SCHEMA_VERSION
++    assert spec.tpq == STAGE1_TPQ
++
++    assert set(spec.tokens) == {
++        "structural",
++        "voice_events",
++        "anchors",
++        "intervals",
++        "doubling",
++    }
++    assert "BAR" in spec.tokens["structural"]
++    assert "MEL_INT12_{-24..+24}" in spec.tokens["intervals"]
++
++
++def test_event_spec_enforces_stage1_constraints():
++    with pytest.raises(ValueError, match="unsupported event schema version"):
++        EventSpec(version="remi_tab_v2")
++
++    with pytest.raises(ValueError, match="requires tpq=24"):
++        EventSpec(tpq=12)
++
++
++def test_event_spec_tokens_not_shared_between_instances():
++    first = EventSpec()
++    second = EventSpec()
++    first.tokens["structural"].append("EXTRA_TOKEN")
++    assert "EXTRA_TOKEN" not in second.tokens["structural"]
++
++
++def test_descriptor_spec_defaults():
++    spec = DescriptorSpec()
++    assert spec.fields == [
++        "TIME_SIG",
++        "KEY",
++        "CHORD_FN",
++        "DENSITY",
++        "CADENCE",
++        "DIFFICULTY",
++    ]
+
+
+
+thinking
+**Considering diff visibility for untracked files**
+thinking
+**Inspecting output schema requirements**
+exec
+/bin/bash -lc 'cat loop_output.schema.json' in /home/stephen-reilly/dev/bach_gen succeeded in 51ms:
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "done": { "type": "boolean" },
+    "progress_made": { "type": "boolean" },
+    "summary": { "type": "string" },
+    "tests_ran": { "type": "boolean" },
+    "tests_status": { "type": "string", "enum": ["pass", "fail", "not_run"] },
+    "next_step": { "type": "string" },
+    "stop_reason": { "type": "string" }
+  },
+  "required": [
+    "done",
+    "progress_made",
+    "summary",
+    "tests_ran",
+    "tests_status",
+    "next_step",
+file update:
+diff --git a/PROGRESS.md b/PROGRESS.md
+index 4833a7122ceee94f3ed4a82b2a82d1f48360c51e..ca9b651f73a531ba694712b3fc92db19dc528baa
+--- a/PROGRESS.md
++++ b/PROGRESS.md
+@@ -5,3 +5,4 @@
+ - 2026-02-24: Added python-test-env skill and test helper script; loop now defaults to conda env `bach` and includes environment precheck in prompt.
+ - 2026-02-24: Fixed loop compatibility with installed Codex CLI (removed hard dependency on `-a`, added auto-detect for approval flags, and fail-fast on CLI usage errors).
+ - 2026-02-24: Updated loop to use `--full-auto` on newer Codex CLI builds where explicit approval flags are unavailable.
++- 2026-02-24: Completed Stage-1 ExecPlan item 1 by defining versioned `EventSpec`/`DescriptorSpec` in `src/tokens/schema.py` (`remi_tab_v1`, `tpq=24`) and added `tests/test_schema.py`.
+diff --git a/TODO.md b/TODO.md
+index 88c5bb578fc00626ba548f0e455746ed42d509a8..d4163ce110c4af257b2949658ec8cfa949f9f5af
+--- a/TODO.md
++++ b/TODO.md
+@@ -1,7 +1,7 @@
+ # TODO
+ 
+ ## Milestone: Stage-1 Tokenizer & Dataset
+-- [ ] Implement `src/tokens/schema.py` (EventSpec + DescriptorSpec, versioned)
++- [x] Implement `src/tokens/schema.py` (EventSpec + DescriptorSpec, versioned)
+ - [ ] Implement tokenizer interval math + round-trip tests
+ - [ ] Implement `scripts/make_dataset.py` basic pipeline
+ - [ ] Produce `data/processed/{events.parquet,barplans.parquet,stats.json}`
+diff --git a/docs/exec/EXECPLAN_stage1.md b/docs/exec/EXECPLAN_stage1.md
+index 4ce76e256e20ed838c3b0dd76cf2ef2289cf7232..ef0c66b4dbc93cb2d19b4491bc03f2277b2d8ab4
+--- a/docs/exec/EXECPLAN_stage1.md
++++ b/docs/exec/EXECPLAN_stage1.md
+@@ -9,7 +9,7 @@
+ - Update `TODO.md` and append to `PROGRESS.md`.
+ 
+ ## Checklist (one item per loop)
+-- [ ] Define EventSpec + DescriptorSpec in `src/tokens/schema.py` with version `remi_tab_v1` and `tpq=24`.
++- [x] Define EventSpec + DescriptorSpec in `src/tokens/schema.py` with version `remi_tab_v1` and `tpq=24`.
+ - [ ] Implement interval math helpers (melodic + harmonic ref) with QA vs production behavior.
+ - [ ] Implement event parsing/serialization in `src/tokens/tokenizer.py` with canonical ordering.
+ - [ ] Add round-trip tests for pitch reconstruction and `HARM_*` consistency.
+diff --git a/src/tokens/schema.py b/src/tokens/schema.py
+index db5c6ab4e9f1e4b6d11cc726d68cef74da294d17..771fcb91484a6e15426af933f0e60284bfca636b
+--- a/src/tokens/schema.py
++++ b/src/tokens/schema.py
+@@ -1,59 +1,99 @@
+ from dataclasses import dataclass, field
+ from typing import Dict, List, Optional
+ 
++SCHEMA_VERSION = "remi_tab_v1"
++STAGE1_TPQ = 24
++
++
++def _default_event_tokens() -> Dict[str, List[str]]:
++    return {
++        "structural": [
++            "BAR",
++            "TIME_SIG_*",
++            "KEY_*",
++            "TEMPO_*",
++            "POS_*",
++        ],
++        "voice_events": [
++            "VOICE_{0..K-1}",
++            "DUR_{ticks}",
++            "REST_{ticks}",
++        ],
++        "anchors": [
++            "ABS_VOICE_{v}_{MIDI}",
++            "ABS_LOW_{MIDI}",
++            "ABS_HIGH_{MIDI}",
++        ],
++        "intervals": [
++            "MEL_INT12_{-24..+24}",
++            "HARM_OCT_{-2..4|NA}",
++            "HARM_CLASS_{0..11|NA}",
++        ],
++        "doubling": ["DUP_{1..N}"],
++    }
++
++
+ @dataclass
+ class EventSpec:
+     """
+-    Defines the tokenization schema version and parameters.
++    Stage-1 event schema. This schema is versioned and fixed to TPQ=24.
+     """
+-    version: str = "remi_tab_v1"
+-    tpq: int = 24
+-    # Dictionary of token types to their vocabulary lists (or descriptions)
+-    tokens: Dict[str, List[str]] = field(default_factory=dict)
+ 
++    version: str = SCHEMA_VERSION
++    tpq: int = STAGE1_TPQ
++    tokens: Dict[str, List[str]] = field(default_factory=_default_event_tokens)
++
++    def __post_init__(self) -> None:
++        if self.version != SCHEMA_VERSION:
++            raise ValueError(
++                f"unsupported event schema version: {self.version!r}; expected {SCHEMA_VERSION!r}"
++            )
++        if self.tpq != STAGE1_TPQ:
++            raise ValueError(f"Stage-1 requires tpq={STAGE1_TPQ}, got {self.tpq}")
++
++
+ @dataclass
+ class DescriptorSpec:
+     """
+-    Defines the available bar-level descriptors.
++    Declares supported bar-level descriptor fields for Stage-1 data rows.
+     """
+-    fields: List[str] = field(default_factory=lambda: [
+-        "TIME_SIG",
+-        "KEY",
+-        "CHORD_FN", # Simplified to just 'CHORD' usually (Root+Quality)
+-        "DENSITY",  # Onsets per bar
+-        "CADENCE",  # Optional: PAC, IAC, Half
+-        "DIFFICULTY" # Optional: derived from intervals/speed
+-    ])
+ 
++    fields: List[str] = field(
++        default_factory=lambda: [
++            "TIME_SIG",
++            "KEY",
++            "CHORD_FN",
++            "DENSITY",
++            "CADENCE",
++            "DIFFICULTY",
++        ]
++    )
++
++
+ @dataclass
+ class BarPlan:
+     """
+-    Container for the high-level descriptors of a single bar.
+-    These are used as conditions/labels for the model.
++    Container for high-level descriptors of a single bar.
+     """
++
+     bar_index: int
+-    time_sig: str          # e.g., "4/4"
+-    key: str               # e.g., "Cm"
+-    density_bucket: str    # e.g., "DENSITY_LOW"
+-    pitch_range: Optional[int] = None  # semitone span (max - min MIDI pitch)
+-    polyphony_max: Optional[int] = None  # max simultaneous onsets at any POS
+-    chord_token: Optional[str] = None # e.g., "C:min"
++    time_sig: str
++    key: str
++    density_bucket: str
++    pitch_range: Optional[int] = None
++    polyphony_max: Optional[int] = None
++    chord_token: Optional[str] = None
+     cadence_token: Optional[str] = None
+     difficulty_token: Optional[str] = None
+ 
+     def to_token_string(self) -> str:
+-        """
+-        Returns a string of descriptor tokens to prepend to the bar.
+-        Example: "TIME_SIG_4_4 KEY_Cm DENSITY_LOW"
+-        """
+         toks = [
+             f"TIME_SIG_{self.time_sig.replace('/', '_')}",
+             f"KEY_{self.key}",
+-            self.density_bucket
++            self.density_bucket,
+         ]
+         if self.chord_token:
+             toks.append(self.chord_token)
+         if self.cadence_token:
+             toks.append(self.cadence_token)
+-        # Note: DIFFICULTY is often a piece-level tag, but can be bar-level.
+         return " ".join(toks)
+diff --git a/tests/test_schema.py b/tests/test_schema.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..7aa223d5c372bac21faea38483f35a4b38fe711f
+--- /dev/null
++++ b/tests/test_schema.py
+@@ -0,0 +1,51 @@
++from pathlib import Path
++import sys
++
++import pytest
++
++sys.path.insert(0, str(Path(__file__).parents[1]))
++
++from src.tokens.schema import DescriptorSpec, EventSpec, SCHEMA_VERSION, STAGE1_TPQ
++
++
++def test_event_spec_defaults():
++    spec = EventSpec()
++    assert spec.version == SCHEMA_VERSION
++    assert spec.tpq == STAGE1_TPQ
++
++    assert set(spec.tokens) == {
++        "structural",
++        "voice_events",
++        "anchors",
++        "intervals",
++        "doubling",
++    }
++    assert "BAR" in spec.tokens["structural"]
++    assert "MEL_INT12_{-24..+24}" in spec.tokens["intervals"]
++
++
++def test_event_spec_enforces_stage1_constraints():
++    with pytest.raises(ValueError, match="unsupported event schema version"):
++        EventSpec(version="remi_tab_v2")
++
++    with pytest.raises(ValueError, match="requires tpq=24"):
++        EventSpec(tpq=12)
++
++
++def test_event_spec_tokens_not_shared_between_instances():
++    first = EventSpec()
++    second = EventSpec()
++    first.tokens["structural"].append("EXTRA_TOKEN")
++    assert "EXTRA_TOKEN" not in second.tokens["structural"]
++
++
++def test_descriptor_spec_defaults():
++    spec = DescriptorSpec()
++    assert spec.fields == [
++        "TIME_SIG",
++        "KEY",
++        "CHORD_FN",
++        "DENSITY",
++        "CADENCE",
++        "DIFFICULTY",
++    ]
+
+
+thinking
+**Finalizing JSON output**
+codex
+{"done":false,"progress_made":true,"summary":"Completed the next unchecked ExecPlan item: defined a versioned Stage-1 schema in `src/tokens/schema.py` with enforced `version=\"remi_tab_v1\"` and `tpq=24`, added default token families, and kept `DescriptorSpec` defaults explicit. Added coverage in `tests/test_schema.py`. Synced tracking docs by checking the corresponding item in `docs/exec/EXECPLAN_stage1.md`, checking `TODO.md` item 1, and appending a dated note to `PROGRESS.md`.","tests_ran":true,"tests_status":"pass","next_step":"Proceed to the next unchecked ExecPlan item: implement interval math helpers (melodic + harmonic reference) with QA vs production behavior.","stop_reason":""}
+file update:
+diff --git a/PROGRESS.md b/PROGRESS.md
+index 4833a7122ceee94f3ed4a82b2a82d1f48360c51e..ca9b651f73a531ba694712b3fc92db19dc528baa
+--- a/PROGRESS.md
++++ b/PROGRESS.md
+@@ -5,3 +5,4 @@
+ - 2026-02-24: Added python-test-env skill and test helper script; loop now defaults to conda env `bach` and includes environment precheck in prompt.
+ - 2026-02-24: Fixed loop compatibility with installed Codex CLI (removed hard dependency on `-a`, added auto-detect for approval flags, and fail-fast on CLI usage errors).
+ - 2026-02-24: Updated loop to use `--full-auto` on newer Codex CLI builds where explicit approval flags are unavailable.
++- 2026-02-24: Completed Stage-1 ExecPlan item 1 by defining versioned `EventSpec`/`DescriptorSpec` in `src/tokens/schema.py` (`remi_tab_v1`, `tpq=24`) and added `tests/test_schema.py`.
+diff --git a/TODO.md b/TODO.md
+index 88c5bb578fc00626ba548f0e455746ed42d509a8..d4163ce110c4af257b2949658ec8cfa949f9f5af
+--- a/TODO.md
++++ b/TODO.md
+@@ -1,7 +1,7 @@
+ # TODO
+ 
+ ## Milestone: Stage-1 Tokenizer & Dataset
+-- [ ] Implement `src/tokens/schema.py` (EventSpec + DescriptorSpec, versioned)
++- [x] Implement `src/tokens/schema.py` (EventSpec + DescriptorSpec, versioned)
+ - [ ] Implement tokenizer interval math + round-trip tests
+ - [ ] Implement `scripts/make_dataset.py` basic pipeline
+ - [ ] Produce `data/processed/{events.parquet,barplans.parquet,stats.json}`
+diff --git a/docs/exec/EXECPLAN_stage1.md b/docs/exec/EXECPLAN_stage1.md
+index 4ce76e256e20ed838c3b0dd76cf2ef2289cf7232..ef0c66b4dbc93cb2d19b4491bc03f2277b2d8ab4
+--- a/docs/exec/EXECPLAN_stage1.md
++++ b/docs/exec/EXECPLAN_stage1.md
+@@ -9,7 +9,7 @@
+ - Update `TODO.md` and append to `PROGRESS.md`.
+ 
+ ## Checklist (one item per loop)
+-- [ ] Define EventSpec + DescriptorSpec in `src/tokens/schema.py` with version `remi_tab_v1` and `tpq=24`.
++- [x] Define EventSpec + DescriptorSpec in `src/tokens/schema.py` with version `remi_tab_v1` and `tpq=24`.
+ - [ ] Implement interval math helpers (melodic + harmonic ref) with QA vs production behavior.
+ - [ ] Implement event parsing/serialization in `src/tokens/tokenizer.py` with canonical ordering.
+ - [ ] Add round-trip tests for pitch reconstruction and `HARM_*` consistency.
+diff --git a/src/tokens/schema.py b/src/tokens/schema.py
+index db5c6ab4e9f1e4b6d11cc726d68cef74da294d17..771fcb91484a6e15426af933f0e60284bfca636b
+--- a/src/tokens/schema.py
++++ b/src/tokens/schema.py
+@@ -1,59 +1,99 @@
+ from dataclasses import dataclass, field
+ from typing import Dict, List, Optional
+ 
++SCHEMA_VERSION = "remi_tab_v1"
++STAGE1_TPQ = 24
++
++
++def _default_event_tokens() -> Dict[str, List[str]]:
++    return {
++        "structural": [
++            "BAR",
++            "TIME_SIG_*",
++            "KEY_*",
++            "TEMPO_*",
++            "POS_*",
++        ],
++        "voice_events": [
++            "VOICE_{0..K-1}",
++            "DUR_{ticks}",
++            "REST_{ticks}",
++        ],
++        "anchors": [
++            "ABS_VOICE_{v}_{MIDI}",
++            "ABS_LOW_{MIDI}",
++            "ABS_HIGH_{MIDI}",
++        ],
++        "intervals": [
++            "MEL_INT12_{-24..+24}",
++            "HARM_OCT_{-2..4|NA}",
++            "HARM_CLASS_{0..11|NA}",
++        ],
++        "doubling": ["DUP_{1..N}"],
++    }
++
++
+ @dataclass
+ class EventSpec:
+     """
+-    Defines the tokenization schema version and parameters.
++    Stage-1 event schema. This schema is versioned and fixed to TPQ=24.
+     """
+-    version: str = "remi_tab_v1"
+-    tpq: int = 24
+-    # Dictionary of token types to their vocabulary lists (or descriptions)
+-    tokens: Dict[str, List[str]] = field(default_factory=dict)
+ 
++    version: str = SCHEMA_VERSION
++    tpq: int = STAGE1_TPQ
++    tokens: Dict[str, List[str]] = field(default_factory=_default_event_tokens)
++
++    def __post_init__(self) -> None:
++        if self.version != SCHEMA_VERSION:
++            raise ValueError(
++                f"unsupported event schema version: {self.version!r}; expected {SCHEMA_VERSION!r}"
++            )
++        if self.tpq != STAGE1_TPQ:
++            raise ValueError(f"Stage-1 requires tpq={STAGE1_TPQ}, got {self.tpq}")
++
++
+ @dataclass
+ class DescriptorSpec:
+     """
+-    Defines the available bar-level descriptors.
++    Declares supported bar-level descriptor fields for Stage-1 data rows.
+     """
+-    fields: List[str] = field(default_factory=lambda: [
+-        "TIME_SIG",
+-        "KEY",
+-        "CHORD_FN", # Simplified to just 'CHORD' usually (Root+Quality)
+-        "DENSITY",  # Onsets per bar
+-        "CADENCE",  # Optional: PAC, IAC, Half
+-        "DIFFICULTY" # Optional: derived from intervals/speed
+-    ])
+ 
++    fields: List[str] = field(
++        default_factory=lambda: [
++            "TIME_SIG",
++            "KEY",
++            "CHORD_FN",
++            "DENSITY",
++            "CADENCE",
++            "DIFFICULTY",
++        ]
++    )
++
++
+ @dataclass
+ class BarPlan:
+     """
+-    Container for the high-level descriptors of a single bar.
+-    These are used as conditions/labels for the model.
++    Container for high-level descriptors of a single bar.
+     """
++
+     bar_index: int
+-    time_sig: str          # e.g., "4/4"
+-    key: str               # e.g., "Cm"
+-    density_bucket: str    # e.g., "DENSITY_LOW"
+-    pitch_range: Optional[int] = None  # semitone span (max - min MIDI pitch)
+-    polyphony_max: Optional[int] = None  # max simultaneous onsets at any POS
+-    chord_token: Optional[str] = None # e.g., "C:min"
++    time_sig: str
++    key: str
++    density_bucket: str
++    pitch_range: Optional[int] = None
++    polyphony_max: Optional[int] = None
++    chord_token: Optional[str] = None
+     cadence_token: Optional[str] = None
+     difficulty_token: Optional[str] = None
+ 
+     def to_token_string(self) -> str:
+-        """
+-        Returns a string of descriptor tokens to prepend to the bar.
+-        Example: "TIME_SIG_4_4 KEY_Cm DENSITY_LOW"
+-        """
+         toks = [
+             f"TIME_SIG_{self.time_sig.replace('/', '_')}",
+             f"KEY_{self.key}",
+-            self.density_bucket
++            self.density_bucket,
+         ]
+         if self.chord_token:
+             toks.append(self.chord_token)
+         if self.cadence_token:
+             toks.append(self.cadence_token)
+-        # Note: DIFFICULTY is often a piece-level tag, but can be bar-level.
+         return " ".join(toks)
+diff --git a/tests/test_schema.py b/tests/test_schema.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..7aa223d5c372bac21faea38483f35a4b38fe711f
+--- /dev/null
++++ b/tests/test_schema.py
+@@ -0,0 +1,51 @@
++from pathlib import Path
++import sys
++
++import pytest
++
++sys.path.insert(0, str(Path(__file__).parents[1]))
++
++from src.tokens.schema import DescriptorSpec, EventSpec, SCHEMA_VERSION, STAGE1_TPQ
++
++
++def test_event_spec_defaults():
++    spec = EventSpec()
++    assert spec.version == SCHEMA_VERSION
++    assert spec.tpq == STAGE1_TPQ
++
++    assert set(spec.tokens) == {
++        "structural",
++        "voice_events",
++        "anchors",
++        "intervals",
++        "doubling",
++    }
++    assert "BAR" in spec.tokens["structural"]
++    assert "MEL_INT12_{-24..+24}" in spec.tokens["intervals"]
++
++
++def test_event_spec_enforces_stage1_constraints():
++    with pytest.raises(ValueError, match="unsupported event schema version"):
++        EventSpec(version="remi_tab_v2")
++
++    with pytest.raises(ValueError, match="requires tpq=24"):
++        EventSpec(tpq=12)
++
++
++def test_event_spec_tokens_not_shared_between_instances():
++    first = EventSpec()
++    second = EventSpec()
++    first.tokens["structural"].append("EXTRA_TOKEN")
++    assert "EXTRA_TOKEN" not in second.tokens["structural"]
++
++
++def test_descriptor_spec_defaults():
++    spec = DescriptorSpec()
++    assert spec.fields == [
++        "TIME_SIG",
++        "KEY",
++        "CHORD_FN",
++        "DENSITY",
++        "CADENCE",
++        "DIFFICULTY",
++    ]
+
+tokens used
+75,184

@@ -1,0 +1,8 @@
+# PROGRESS
+
+- 2026-02-24: Initialized AGENTS.md, SPEC.md, TODO.md, and PROGRESS.md for Stage-1 loop setup.
+- 2026-02-24: Added ExecPlan, Codex loop script, config, and schema for structured loop output.
+- 2026-02-24: Added python-test-env skill and test helper script; loop now defaults to conda env `bach` and includes environment precheck in prompt.
+- 2026-02-24: Fixed loop compatibility with installed Codex CLI (removed hard dependency on `-a`, added auto-detect for approval flags, and fail-fast on CLI usage errors).
+- 2026-02-24: Updated loop to use `--full-auto` on newer Codex CLI builds where explicit approval flags are unavailable.
+- 2026-02-24: Completed Stage-1 ExecPlan item 1 by defining versioned `EventSpec`/`DescriptorSpec` in `src/tokens/schema.py` (`remi_tab_v1`, `tpq=24`) and added `tests/test_schema.py`.
