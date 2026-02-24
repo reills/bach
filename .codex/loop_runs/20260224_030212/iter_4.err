@@ -1,0 +1,3713 @@
+OpenAI Codex v0.104.0 (research preview)
+--------
+workdir: /home/stephen-reilly/dev/bach_gen
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: high
+reasoning summaries: auto
+session id: 019c8f60-b11c-7bf0-bc65-f39ccec1c505
+--------
+user
+You are working in this repo.
+
+Read:
+- AGENTS.md
+- SPEC.md
+- TODO.md
+- PROGRESS.md
+- docs/exec/EXECPLAN_stage1.md
+- docs/skills/python-test-env/SKILL.md
+- .codex/loop_runs/20260224_030212/context_4.md (current context snapshot)
+
+Before coding, run:
+- bash docs/skills/python-test-env/scripts/run_tests.sh --check
+
+Do the next unchecked item in docs/exec/EXECPLAN_stage1.md.
+Keep TODO.md in sync.
+Run the verify command mentioned in AGENTS.md (or reuse the failing one from the context).
+Update TODO.md (check completed items) and append notes to PROGRESS.md.
+
+Your final message MUST be valid JSON matching loop_output.schema.json.
+If you made no progress, set progress_made=false and explain why in summary.
+
+mcp: chrome-devtools starting
+mcp: chrome-devtools ready
+mcp startup: ready: chrome-devtools
+
+thinking
+**Acknowledging initial update plan**
+codex
+{"done":false,"progress_made":true,"summary":"I’ll read the required project docs and the current context snapshot, run the pre-check test command, then implement the next unchecked Stage 1 item and verify with the repo test command.","tests_ran":false,"tests_status":"not_run","next_step":"Open the listed files and inspect the next unchecked task in docs/exec/EXECPLAN_stage1.md.","stop_reason":""}
+
+thinking
+**Planning parallel file reading**
+exec
+/bin/bash -lc "sed -n '1,260p' SPEC.md" in /home/stephen-reilly/dev/bach_genexec
+/bin/bash -lc "sed -n '1,260p' PROGRESS.md" in /home/stephen-reilly/dev/bach_genexec
+/bin/bash -lc "sed -n '1,260p' TODO.md" in /home/stephen-reilly/dev/bach_genexec
+/bin/bash -lc "sed -n '1,220p' AGENTS.md" in /home/stephen-reilly/dev/bach_gen succeeded in 50ms:
+# AGENTS.md — bach-gen
+
+## How to run
+- Preferred runtime: `conda run -n bach python`
+- Optional venv fallback: `python -m venv .venv && source .venv/bin/activate`
+- Environment/test helper: `bash docs/skills/python-test-env/scripts/run_tests.sh --check`
+- Tests: `bash docs/skills/python-test-env/scripts/run_tests.sh`
+
+## Rules
+- Do one task per run.
+- Prefer small diffs; don't refactor unrelated code.
+- Always run tests for touched areas (use `bash docs/skills/python-test-env/scripts/run_tests.sh`).
+- Don't weaken or remove tests to make them pass.
+- If you add a new feature without tests, add tests in the same run.
+- Do not hard-code tests; test real behavior.
+- If tests fail, find and fix the underlying code issue before proceeding.
+- Update `TODO.md` when items are completed.
+- Append a short entry to `PROGRESS.md` for each change set.
+- Don't add heavy deps without asking.
+ succeeded in 51ms:
+# SPEC — Stage-1 Tokenizer & Dataset (Condensed)
+
+## Goal
+Implement the Stage-1 symbolic event stream and dataset builder for Bach-style polyphony on a fixed 24 TPQ grid.
+
+## Core Rules
+- TPQ is fixed at 24.
+- Events are sparse: emit `POS_t` only where at least one voice event starts.
+- Per-voice continuity is tracked across barlines by `prev_pitch` and `active_until`.
+- Absolute pitch truth is `ABS_VOICE_*` + `MEL_INT12_*`.
+- `HARM_*` tokens are derived from the lowest active reference pitch at time t.
+
+## Event Schema (v1)
+Structural:
+- `BAR`, `TIME_SIG_*`, `KEY_*`, `TEMPO_*`, `POS_*`
+
+Voice events:
+- `VOICE_{0..K-1}`, `DUR_{ticks}`, optional `REST_{ticks}`
+
+Anchors:
+ succeeded in 51ms:
+# PROGRESS
+
+- 2026-02-24: Initialized AGENTS.md, SPEC.md, TODO.md, and PROGRESS.md for Stage-1 loop setup.
+- 2026-02-24: Added ExecPlan, Codex loop script, config, and schema for structured loop output.
+- 2026-02-24: Added python-test-env skill and test helper script; loop now defaults to conda env `bach` and includes environment precheck in prompt.
+- 2026-02-24: Fixed loop compatibility with installed Codex CLI (removed hard dependency on `-a`, added auto-detect for approval flags, and fail-fast on CLI usage errors).
+- 2026-02-24: Updated loop to use `--full-auto` on newer Codex CLI builds where explicit approval flags are unavailable.
+- 2026-02-24: Completed Stage-1 ExecPlan item 1 by defining versioned `EventSpec`/`DescriptorSpec` in `src/tokens/schema.py` (`remi_tab_v1`, `tpq=24`) and added `tests/test_schema.py`.
+- 2026-02-24: Completed Stage-1 ExecPlan item 2 by adding `src/tokens/intervals.py` (melodic/harmonic helpers with QA vs production behavior), wiring repairs into `eventize_musicxml`, updating harmonic validation to shared math helpers, and adding `tests/test_intervals.py`; verify run: `53 passed, 1 skipped`.
+- 2026-02-24: Completed Stage-1 ExecPlan item 3 by adding `src/tokens/tokenizer.py` (voice-event parsing/serialization, stream canonicalization helpers), wiring `eventize_musicxml` pitched-onset emission through tokenizer serialization for canonical ordering, and adding `tests/test_tokenizer.py`; verify run: `59 passed, 1 skipped`.
+ succeeded in 51ms:
+# TODO
+
+## Milestone: Stage-1 Tokenizer & Dataset
+- [x] Implement `src/tokens/schema.py` (EventSpec + DescriptorSpec, versioned)
+- [x] Implement tokenizer interval math + round-trip tests
+- [x] Implement event parsing/serialization in `src/tokens/tokenizer.py` with canonical ordering
+- [ ] Implement `scripts/make_dataset.py` basic pipeline
+- [ ] Produce `data/processed/{events.parquet,barplans.parquet,stats.json}`
+- [x] CI: `pytest -q` passes
+
+thinking
+**Planning parallel file reads**
+codex
+{"done":false,"progress_made":true,"summary":"I’ve loaded AGENTS/SPEC/TODO/PROGRESS and will now read the Stage-1 ExecPlan, test-skill instructions, and the latest context snapshot to identify the exact next unchecked task.","tests_ran":false,"tests_status":"not_run","next_step":"Open docs/exec/EXECPLAN_stage1.md, docs/skills/python-test-env/SKILL.md, and .codex/loop_runs/.../context_4.md.","stop_reason":""}
+exec
+/bin/bash -lc "sed -n '1,320p' docs/exec/EXECPLAN_stage1.md" in /home/stephen-reilly/dev/bach_genexec
+/bin/bash -lc "sed -n '1,360p' .codex/loop_runs/20260224_030212/context_4.md" in /home/stephen-reilly/dev/bach_genexec
+/bin/bash -lc "sed -n '1,320p' docs/skills/python-test-env/SKILL.md" in /home/stephen-reilly/dev/bach_gen succeeded in 50ms:
+# ExecPlan — Stage-1 Tokenizer & Dataset
+
+## Rules
+- One task per run.
+- Run `bash docs/skills/python-test-env/scripts/run_tests.sh` and do not weaken tests.
+- If you add a new feature without tests, add tests in the same run.
+- Do not hard-code tests; test real behavior.
+- If tests fail, fix the underlying code issue before proceeding.
+- Update `TODO.md` and append to `PROGRESS.md`.
+
+## Checklist (one item per loop)
+- [x] Define EventSpec + DescriptorSpec in `src/tokens/schema.py` with version `remi_tab_v1` and `tpq=24`.
+- [x] Implement interval math helpers (melodic + harmonic ref) with QA vs production behavior.
+- [x] Implement event parsing/serialization in `src/tokens/tokenizer.py` with canonical ordering.
+- [ ] Add round-trip tests for pitch reconstruction and `HARM_*` consistency.
+- [ ] Implement `scripts/make_dataset.py` basic pipeline (parse, normalize, collapse doublings, track assignment, tokenize, stats).
+- [ ] Produce dataset artifacts in `data/processed/` and document counts in `stats.json`.
+- [ ] Verify `bash docs/skills/python-test-env/scripts/run_tests.sh` passes.
+ succeeded in 50ms:
+# Context (iter 4) — 2026-02-24T03:19:15-08:00
+
+## Git status
+## codex-loop-20260224-030212
+?? .codex/loop_runs/20260224_030212/context_4.md
+
+## Diffstat
+
+## Verify (may fail)
+...............s............................................             [100%]
+59 passed, 1 skipped in 47.67s
+
+ succeeded in 51ms:
+---
+name: python-test-env
+description: Ensure deterministic Python test execution in this repo by selecting a valid runtime (`conda` env `bach` first, then `.venv`) and running pytest with dependency checks. Use when preparing to run tests, when a loop run needs a stable verify command, or when failures may be caused by environment mismatch.
+---
+
+# Python Test Env
+
+## Workflow
+
+1. Run `bash docs/skills/python-test-env/scripts/run_tests.sh --check`.
+2. If check passes, use the printed verify command for all test runs.
+3. If check fails, fix environment selection first before code changes.
+4. Run `bash docs/skills/python-test-env/scripts/run_tests.sh` to execute tests.
+
+## Environment Selection Rules
+
+- Prefer `conda` env `bach` when available.
+- Fall back to `.venv` only if `.venv/bin/python` is executable.
+- Reject broken `.venv` layouts (for example zero-byte `python` launcher files).
+- Verify imports: `pytest`, `torch`, `music21`, `pandas`, `pyarrow`.
+
+thinking
+**Preparing to run pre-check**
+codex
+{"done":false,"progress_made":true,"summary":"I identified the next unchecked ExecPlan item as adding round-trip pitch/HARM consistency tests. I’ll run the required environment pre-check now before touching code.","tests_ran":false,"tests_status":"not_run","next_step":"Run `bash docs/skills/python-test-env/scripts/run_tests.sh --check`.","stop_reason":""}
+exec
+/bin/bash -lc 'bash docs/skills/python-test-env/scripts/run_tests.sh --check' in /home/stephen-reilly/dev/bach_gen succeeded in 1.73s:
+Environment check passed.
+Using verify command: CONDA_NO_PLUGINS=true conda run -n bach python -m pytest -q
+
+thinking
+**Planning round-trip test exploration**
+codex
+{"done":false,"progress_made":true,"summary":"Environment pre-check passed and selected verify command is `CONDA_NO_PLUGINS=true conda run -n bach python -m pytest -q`. Next I’ll inspect tokenizer/eventization tests to add the missing round-trip and harmonic-consistency coverage.","tests_ran":false,"tests_status":"not_run","next_step":"Read `tests/` and `src/tokens/` files related to pitch reconstruction and `HARM_*` emission.","stop_reason":""}
+
+thinking
+**Planning parallel file reading**
+exec
+/bin/bash -lc "sed -n '1,320p' tests/test_tokenizer.py" in /home/stephen-reilly/dev/bach_genexec
+/bin/bash -lc "sed -n '1,340p' src/tokens/tokenizer.py" in /home/stephen-reilly/dev/bach_genexec
+/bin/bash -lc "sed -n '1,340p' tests/test_intervals.py" in /home/stephen-reilly/dev/bach_genexec
+/bin/bash -lc "rg --files tests src/tokens scripts | sed -n '1,240p'" in /home/stephen-reilly/dev/bach_gen succeeded in 51ms:
+import sys
+from pathlib import Path
+
+import pytest
+
+sys.path.insert(0, str(Path(__file__).parents[1]))
+
+from src.tokens.tokenizer import (
+    VoiceEvent,
+    canonicalize_event_stream,
+    parse_event_stream,
+    parse_voice_event,
+    serialize_event_stream,
+    serialize_voice_event,
+    tokenize_event_text,
+)
+
+
+def test_parse_pitched_voice_event_with_dup_and_tab():
+    tokens = [
+ succeeded in 50ms:
+import sys
+from pathlib import Path
+
+import pytest
+from music21 import meter, note, stream
+
+sys.path.insert(0, str(Path(__file__).parents[1]))
+
+from src.tokens.eventizer import eventize_musicxml
+from src.tokens.intervals import (
+    IntervalRepairStats,
+    compute_harmonic_interval,
+    compute_melodic_interval,
+    compute_reference_pitch,
+    harmonic_tokens_for_pitch,
+)
+
+
+def test_compute_reference_pitch():
+    assert compute_reference_pitch([67, 60, 64]) == 60
+ succeeded in 51ms:
+from dataclasses import dataclass
+from typing import List, Sequence, Tuple, Union
+
+from src.tokens.intervals import format_signed_interval
+
+
+@dataclass(frozen=True)
+class VoiceEvent:
+    voice: int
+    duration_ticks: int = 0
+    rest_ticks: int = 0
+    mel_int: int = 0
+    harm_oct: Union[int, None] = None
+    harm_class: Union[int, None] = None
+    dup_count: Union[int, None] = None
+    string: Union[int, None] = None
+    fret: Union[int, None] = None
+
+    def __post_init__(self) -> None:
+        if self.voice < 0:
+ succeeded in 51ms:
+src/tokens/validator.py
+src/tokens/eventizer.py
+src/tokens/intervals.py
+src/tokens/schema.py
+src/tokens/roundtrip.py
+src/tokens/tokenizer.py
+src/tokens/__init__.py
+tests/test_model_integration.py
+tests/test_tokenizer.py
+tests/test_tokens.py
+tests/test_schema.py
+tests/test_descriptors.py
+tests/test_intervals.py
+scripts/compare_imslp_tobis_timesigs.py
+scripts/ralph_codex.sh
+scripts/build_vocab.py
+scripts/extract_time_signatures.py
+scripts/train_v1.py
+scripts/eventize_piece.py
+scripts/make_dataset.py
+
+thinking
+**Reviewing eventizer and roundtrip decoding**
+exec
+/bin/bash -lc "sed -n '1,420p' src/tokens/eventizer.py" in /home/stephen-reilly/dev/bach_genexec
+/bin/bash -lc "sed -n '1,360p' tests/test_tokens.py" in /home/stephen-reilly/dev/bach_genexec
+/bin/bash -lc "sed -n '1,360p' src/tokens/roundtrip.py" in /home/stephen-reilly/dev/bach_genexec
+/bin/bash -lc "sed -n '1,360p' tests/test_model_integration.py" in /home/stephen-reilly/dev/bach_gen succeeded in 51ms:
+from dataclasses import dataclass
+from pathlib import Path
+import re
+import warnings
+from statistics import median
+from typing import Dict, List, Optional, Tuple, Union
+
+import music21
+from music21.musicxml.xmlToM21 import MusicXMLWarning
+
+from src.tokens.intervals import (
+    IntervalRepairStats,
+    compute_reference_pitch,
+    compute_melodic_interval,
+    harmonic_tokens_for_pitch,
+)
+from src.tokens.tokenizer import VoiceEvent, serialize_voice_event
+
+DEFAULT_MAX_VOICES = 8
+DEFAULT_MAX_OCTAVES_PER_PITCH_CLASS = 3
+ succeeded in 50ms:
+from typing import List, Optional, Tuple
+
+import music21
+
+
+def _parse_time_sig_token(token: str) -> Tuple[int, int]:
+    parts = token.split("_")
+    if len(parts) != 4:
+        raise ValueError(f"bad time signature token: {token}")
+    return int(parts[2]), int(parts[3])
+
+
+def _parse_key_token(token: str) -> music21.key.Key:
+    key_str = token[len("KEY_") :]
+    mode = "major"
+    if key_str.endswith("m"):
+        mode = "minor"
+        key_str = key_str[:-1]
+    tonic = key_str.replace("b", "-")
+    return music21.key.Key(tonic, mode)
+ succeeded in 51ms:
+import sys
+from pathlib import Path
+import pytest
+from music21 import corpus
+
+# Ensure src is in path if running from root
+sys.path.insert(0, str(Path(__file__).parents[1]))
+
+from src.tokens.eventizer import eventize_musicxml
+from src.tokens.roundtrip import tokens_to_midi
+from src.tokens.validator import validate_harm_tokens
+
+def _local_xml(path: Path) -> str:
+    if not path.exists():
+        pytest.skip(f"Local file {path} not found")
+    return str(path)
+
+@pytest.fixture
+def bwv66_xml(tmp_path):
+    """Creates a temporary MusicXML file for BWV 66.6."""
+ succeeded in 51ms:
+import torch
+import pytest
+from pathlib import Path
+import json
+import pandas as pd
+from src.dataio.dataset import BarDataset
+from src.models.notelm.model import NoteLM, NoteLMConfig
+
+@pytest.fixture
+def mock_vocab(tmp_path):
+    vocab = {
+        "<pad>": 0,
+        "<bos>": 1,
+        "<eos>": 2,
+        "BAR": 3,
+        "TIME_SIG_4_4": 4,
+        "KEY_C": 5,
+        "POS_0": 6,
+        "VOICE_0": 7,
+        "DUR_24": 8,
+
+thinking
+**Planning validator and eventizer review**
+exec
+/bin/bash -lc "sed -n '360,760p' src/tokens/eventizer.py" in /home/stephen-reilly/dev/bach_gen succeeded in 51ms:
+                )
+        kept.sort(key=lambda ev: ev.pitch)
+        collapsed[onset] = kept
+    return collapsed
+
+
+def _assign_events_by_continuity(
+    events_by_tick: Dict[int, List[NoteEvent]],
+    *,
+    max_voices: int,
+) -> Dict[int, List[NoteEvent]]:
+    events_by_voice: Dict[int, List[NoteEvent]] = {v: [] for v in range(max_voices)}
+    prev_pitch: List[Optional[int]] = [None] * max_voices
+    active_until: List[int] = [0] * max_voices
+
+    for onset in sorted(events_by_tick.keys()):
+        events = sorted(events_by_tick[onset], key=lambda ev: ev.pitch)
+
+        active_count = sum(1 for v in range(max_voices) if active_until[v] > onset)
+        free_voices = [v for v in range(max_voices) if active_until[v] <= onset]
+
+thinking
+**Inspecting harmonic validation logic**
+exec
+/bin/bash -lc "sed -n '1,380p' src/tokens/validator.py" in /home/stephen-reilly/dev/bach_gen succeeded in 51ms:
+from typing import List, Optional, Tuple
+
+from src.tokens.intervals import compute_reference_pitch, harmonic_tokens_for_pitch
+
+
+def _infer_num_voices(tokens: List[str]) -> int:
+    max_idx = -1
+    for tok in tokens:
+        if tok.startswith("VOICE_"):
+            try:
+                v = int(tok.split("_", 1)[1])
+            except ValueError:
+                continue
+            max_idx = max(max_idx, v)
+        elif tok.startswith("ABS_VOICE_"):
+            parts = tok.split("_")
+            if len(parts) == 4:
+                try:
+                    v = int(parts[2])
+                except ValueError:
+
+thinking
+**Planning round-trip pitch tests**
+exec
+/bin/bash -lc "sed -n '1,280p' docs/skills/python-test-env/scripts/run_tests.sh" in /home/stephen-reilly/dev/bach_gen succeeded in 50ms:
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$ROOT"
+
+pick_python() {
+  if CONDA_NO_PLUGINS=true conda run -n bach python -V >/dev/null 2>&1; then
+    echo "CONDA_NO_PLUGINS=true conda run -n bach python"
+    return 0
+  fi
+
+  if [[ -x ".venv/bin/python" ]]; then
+    echo ".venv/bin/python"
+    return 0
+  fi
+
+  return 1
+}
+
+
+thinking
+**Designing comprehensive roundtrip tests**
+codex
+{"done":false,"progress_made":true,"summary":"Plan for this run:\n1) Add a focused test module for the next ExecPlan item: pitch round-trip reconstruction and HARM consistency.\n2) Cover random multi-bar score round-trips by eventizing MusicXML then decoding tokens back to score and comparing per-voice note events (pitch exact, timing tolerance ±1 tick).\n3) Add a deterministic sustained-reference case that asserts expected `HARM_OCT/HARM_CLASS` at a specific position and also runs `validate_harm_tokens`.\n4) Run the repo verify command, then update `docs/exec/EXECPLAN_stage1.md`, `TODO.md`, and `PROGRESS.md` to reflect completion.","tests_ran":false,"tests_status":"not_run","next_step":"Create the new tests and run them before full-suite verification.","stop_reason":""}
+
+thinking
+**Planning patch application and testing**
+codex
+{"done":false,"progress_made":true,"summary":"I’m about to add a new test file for round-trip pitch reconstruction and harmonic consistency, then I’ll update the checklist docs once verification passes.","tests_ran":false,"tests_status":"not_run","next_step":"Patch `tests/` with the new Stage-1 round-trip/HARM tests.","stop_reason":""}
+
+thinking
+**Applying new file patch**
+file update
+A /home/stephen-reilly/dev/bach_gen/tests/test_roundtrip_pitch.py
+import random
+import sys
+from pathlib import Path
+from typing import Dict, List, Tuple
+
+import pytest
+from music21 import meter, note, stream
+
+sys.path.insert(0, str(Path(__file__).parents[1]))
+
+from src.tokens.eventizer import eventize_musicxml
+from src.tokens.roundtrip import tokens_to_score
+from src.tokens.tokenizer import parse_voice_event
+from src.tokens.validator import validate_harm_tokens
+
+TPQ = 24
+
+
+def _note_events_by_voice(score: stream.Score) -> Dict[int, List[Tuple[int, int, int]]]:
+    by_voice: Dict[int, List[Tuple[int, int, int]]] = {}
+    for voice_idx, part in enumerate(score.parts):
+        events: List[Tuple[int, int, int]] = []
+        flat_part = part.flatten()
+        for el in flat_part.notesAndRests:
+            if el.isRest:
+                continue
+            if el.isChord:
+                pitch = max(p.midi for p in el.pitches)
+            else:
+                pitch = el.pitch.midi
+            onset = int(round(el.offset * TPQ))
+            duration = int(round(el.duration.quarterLength * TPQ))
+            events.append((onset, duration, pitch))
+        by_voice[voice_idx] = events
+    return by_voice
+
+
+def _assert_events_match_with_tick_tolerance(
+    expected: Dict[int, List[Tuple[int, int, int]]],
+    actual: Dict[int, List[Tuple[int, int, int]]],
+    *,
+    tick_tolerance: int = 1,
+) -> None:
+    assert set(expected.keys()) == set(actual.keys())
+    for voice_idx in expected:
+        exp_events = expected[voice_idx]
+        got_events = actual[voice_idx]
+        assert len(exp_events) == len(got_events)
+        for (exp_onset, exp_dur, exp_pitch), (got_onset, got_dur, got_pitch) in zip(
+            exp_events, got_events
+        ):
+            assert got_pitch == exp_pitch
+            assert abs(got_onset - exp_onset) <= tick_tolerance
+            assert abs(got_dur - exp_dur) <= tick_tolerance
+
+
+def _build_random_score(seed: int, *, bars: int = 3, voices: int = 3) -> stream.Score:
+    rng = random.Random(seed)
+    score = stream.Score()
+    for voice_idx in range(voices):
+        part = stream.Part(id=f"Voice{voice_idx}")
+        part.append(meter.TimeSignature("4/4"))
+        base_pitch = 48 + voice_idx * 7
+        for _ in range(bars):
+            remaining = 4.0
+            while remaining > 1e-9:
+                options = [dur for dur in (0.5, 1.0, 1.5, 2.0) if dur <= remaining + 1e-9]
+                quarter_len = rng.choice(options)
+                if rng.random() < 0.3:
+                    part.append(note.Rest(quarterLength=quarter_len))
+                else:
+                    pitch = base_pitch + rng.randint(0, 12)
+                    part.append(note.Note(midi=pitch, quarterLength=quarter_len))
+                remaining = round(remaining - quarter_len, 6)
+        score.insert(0, part)
+    return score
+
+
+def _write_sustained_reference_xml(tmp_path: Path) -> Path:
+    score = stream.Score()
+
+    bass = stream.Part(id="Bass")
+    bass.append(meter.TimeSignature("4/4"))
+    bass.append(note.Note("C3", quarterLength=2.0))
+    bass.append(note.Rest(quarterLength=2.0))
+
+    upper = stream.Part(id="Upper")
+    upper.append(meter.TimeSignature("4/4"))
+    upper.append(note.Note("G3", quarterLength=1.0))
+    upper.append(note.Note("A3", quarterLength=1.0))
+    upper.append(note.Rest(quarterLength=2.0))
+
+    score.insert(0, bass)
+    score.insert(0, upper)
+
+    out_path = tmp_path / "sustained_reference.xml"
+    score.write("musicxml", fp=str(out_path))
+    return out_path
+
+
+@pytest.mark.parametrize("seed", [7, 17, 27])
+def test_roundtrip_pitch_reconstruction_on_random_bars(seed: int, tmp_path: Path) -> None:
+    score = _build_random_score(seed)
+    xml_path = tmp_path / f"random_seed_{seed}.xml"
+    score.write("musicxml", fp=str(xml_path))
+
+    tokens, _ = eventize_musicxml(str(xml_path), voice_mode="parts")
+    harm_errors = validate_harm_tokens(tokens)
+    assert not harm_errors
+
+    reconstructed = tokens_to_score(tokens, tpq=TPQ)
+    _assert_events_match_with_tick_tolerance(
+        _note_events_by_voice(score),
+        _note_events_by_voice(reconstructed),
+        tick_tolerance=1,
+    )
+
+
+def test_harm_consistency_uses_lowest_active_reference_pitch(tmp_path: Path) -> None:
+    xml_path = _write_sustained_reference_xml(tmp_path)
+    tokens, _ = eventize_musicxml(str(xml_path), voice_mode="parts")
+
+    harm_errors = validate_harm_tokens(tokens)
+    assert not harm_errors
+
+    pos_idx = tokens.index("POS_24")
+    found_upper = False
+    idx = pos_idx + 1
+    while idx < len(tokens) and tokens[idx] != "BAR" and not tokens[idx].startswith("POS_"):
+        if not tokens[idx].startswith("VOICE_"):
+            idx += 1
+            continue
+        event, next_idx = parse_voice_event(tokens, idx)
+        if event.voice == 1:
+            found_upper = True
+            assert event.mel_int == 2
+            assert event.harm_oct == 0
+            assert event.harm_class == 9
+        idx = next_idx
+
+    assert found_upper
+apply_patch(auto_approved=true) exited 0 in 14ms:
+Success. Updated the following files:
+A tests/test_roundtrip_pitch.py
+file update:
+diff --git a/tests/test_roundtrip_pitch.py b/tests/test_roundtrip_pitch.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..b6fbfef56a9df3df629ed8135abb4b79c3e98a39
+--- /dev/null
++++ b/tests/test_roundtrip_pitch.py
+@@ -0,0 +1,141 @@
++import random
++import sys
++from pathlib import Path
++from typing import Dict, List, Tuple
++
++import pytest
++from music21 import meter, note, stream
++
++sys.path.insert(0, str(Path(__file__).parents[1]))
++
++from src.tokens.eventizer import eventize_musicxml
++from src.tokens.roundtrip import tokens_to_score
++from src.tokens.tokenizer import parse_voice_event
++from src.tokens.validator import validate_harm_tokens
++
++TPQ = 24
++
++
++def _note_events_by_voice(score: stream.Score) -> Dict[int, List[Tuple[int, int, int]]]:
++    by_voice: Dict[int, List[Tuple[int, int, int]]] = {}
++    for voice_idx, part in enumerate(score.parts):
++        events: List[Tuple[int, int, int]] = []
++        flat_part = part.flatten()
++        for el in flat_part.notesAndRests:
++            if el.isRest:
++                continue
++            if el.isChord:
++                pitch = max(p.midi for p in el.pitches)
++            else:
++                pitch = el.pitch.midi
++            onset = int(round(el.offset * TPQ))
++            duration = int(round(el.duration.quarterLength * TPQ))
++            events.append((onset, duration, pitch))
++        by_voice[voice_idx] = events
++    return by_voice
++
++
++def _assert_events_match_with_tick_tolerance(
++    expected: Dict[int, List[Tuple[int, int, int]]],
++    actual: Dict[int, List[Tuple[int, int, int]]],
++    *,
++    tick_tolerance: int = 1,
++) -> None:
++    assert set(expected.keys()) == set(actual.keys())
++    for voice_idx in expected:
++        exp_events = expected[voice_idx]
++        got_events = actual[voice_idx]
++        assert len(exp_events) == len(got_events)
++        for (exp_onset, exp_dur, exp_pitch), (got_onset, got_dur, got_pitch) in zip(
++            exp_events, got_events
++        ):
++            assert got_pitch == exp_pitch
++            assert abs(got_onset - exp_onset) <= tick_tolerance
++            assert abs(got_dur - exp_dur) <= tick_tolerance
++
++
++def _build_random_score(seed: int, *, bars: int = 3, voices: int = 3) -> stream.Score:
++    rng = random.Random(seed)
++    score = stream.Score()
++    for voice_idx in range(voices):
++        part = stream.Part(id=f"Voice{voice_idx}")
++        part.append(meter.TimeSignature("4/4"))
++        base_pitch = 48 + voice_idx * 7
++        for _ in range(bars):
++            remaining = 4.0
++            while remaining > 1e-9:
++                options = [dur for dur in (0.5, 1.0, 1.5, 2.0) if dur <= remaining + 1e-9]
++                quarter_len = rng.choice(options)
++                if rng.random() < 0.3:
++                    part.append(note.Rest(quarterLength=quarter_len))
++                else:
++                    pitch = base_pitch + rng.randint(0, 12)
++                    part.append(note.Note(midi=pitch, quarterLength=quarter_len))
++                remaining = round(remaining - quarter_len, 6)
++        score.insert(0, part)
++    return score
++
++
++def _write_sustained_reference_xml(tmp_path: Path) -> Path:
++    score = stream.Score()
++
++    bass = stream.Part(id="Bass")
++    bass.append(meter.TimeSignature("4/4"))
++    bass.append(note.Note("C3", quarterLength=2.0))
++    bass.append(note.Rest(quarterLength=2.0))
++
++    upper = stream.Part(id="Upper")
++    upper.append(meter.TimeSignature("4/4"))
++    upper.append(note.Note("G3", quarterLength=1.0))
++    upper.append(note.Note("A3", quarterLength=1.0))
++    upper.append(note.Rest(quarterLength=2.0))
++
++    score.insert(0, bass)
++    score.insert(0, upper)
++
++    out_path = tmp_path / "sustained_reference.xml"
++    score.write("musicxml", fp=str(out_path))
++    return out_path
++
++
++@pytest.mark.parametrize("seed", [7, 17, 27])
++def test_roundtrip_pitch_reconstruction_on_random_bars(seed: int, tmp_path: Path) -> None:
++    score = _build_random_score(seed)
++    xml_path = tmp_path / f"random_seed_{seed}.xml"
++    score.write("musicxml", fp=str(xml_path))
++
++    tokens, _ = eventize_musicxml(str(xml_path), voice_mode="parts")
++    harm_errors = validate_harm_tokens(tokens)
++    assert not harm_errors
++
++    reconstructed = tokens_to_score(tokens, tpq=TPQ)
++    _assert_events_match_with_tick_tolerance(
++        _note_events_by_voice(score),
++        _note_events_by_voice(reconstructed),
++        tick_tolerance=1,
++    )
++
++
++def test_harm_consistency_uses_lowest_active_reference_pitch(tmp_path: Path) -> None:
++    xml_path = _write_sustained_reference_xml(tmp_path)
++    tokens, _ = eventize_musicxml(str(xml_path), voice_mode="parts")
++
++    harm_errors = validate_harm_tokens(tokens)
++    assert not harm_errors
++
++    pos_idx = tokens.index("POS_24")
++    found_upper = False
++    idx = pos_idx + 1
++    while idx < len(tokens) and tokens[idx] != "BAR" and not tokens[idx].startswith("POS_"):
++        if not tokens[idx].startswith("VOICE_"):
++            idx += 1
++            continue
++        event, next_idx = parse_voice_event(tokens, idx)
++        if event.voice == 1:
++            found_upper = True
++            assert event.mel_int == 2
++            assert event.harm_oct == 0
++            assert event.harm_class == 9
++        idx = next_idx
++
++    assert found_upper
+
+file update:
+diff --git a/tests/test_roundtrip_pitch.py b/tests/test_roundtrip_pitch.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..b6fbfef56a9df3df629ed8135abb4b79c3e98a39
+--- /dev/null
++++ b/tests/test_roundtrip_pitch.py
+@@ -0,0 +1,141 @@
++import random
++import sys
++from pathlib import Path
++from typing import Dict, List, Tuple
++
++import pytest
++from music21 import meter, note, stream
++
++sys.path.insert(0, str(Path(__file__).parents[1]))
++
++from src.tokens.eventizer import eventize_musicxml
++from src.tokens.roundtrip import tokens_to_score
++from src.tokens.tokenizer import parse_voice_event
++from src.tokens.validator import validate_harm_tokens
++
++TPQ = 24
++
++
++def _note_events_by_voice(score: stream.Score) -> Dict[int, List[Tuple[int, int, int]]]:
++    by_voice: Dict[int, List[Tuple[int, int, int]]] = {}
++    for voice_idx, part in enumerate(score.parts):
++        events: List[Tuple[int, int, int]] = []
++        flat_part = part.flatten()
++        for el in flat_part.notesAndRests:
++            if el.isRest:
++                continue
++            if el.isChord:
++                pitch = max(p.midi for p in el.pitches)
++            else:
++                pitch = el.pitch.midi
++            onset = int(round(el.offset * TPQ))
++            duration = int(round(el.duration.quarterLength * TPQ))
++            events.append((onset, duration, pitch))
++        by_voice[voice_idx] = events
++    return by_voice
++
++
++def _assert_events_match_with_tick_tolerance(
++    expected: Dict[int, List[Tuple[int, int, int]]],
++    actual: Dict[int, List[Tuple[int, int, int]]],
++    *,
++    tick_tolerance: int = 1,
++) -> None:
++    assert set(expected.keys()) == set(actual.keys())
++    for voice_idx in expected:
++        exp_events = expected[voice_idx]
++        got_events = actual[voice_idx]
++        assert len(exp_events) == len(got_events)
++        for (exp_onset, exp_dur, exp_pitch), (got_onset, got_dur, got_pitch) in zip(
++            exp_events, got_events
++        ):
++            assert got_pitch == exp_pitch
++            assert abs(got_onset - exp_onset) <= tick_tolerance
++            assert abs(got_dur - exp_dur) <= tick_tolerance
++
++
++def _build_random_score(seed: int, *, bars: int = 3, voices: int = 3) -> stream.Score:
++    rng = random.Random(seed)
++    score = stream.Score()
++    for voice_idx in range(voices):
++        part = stream.Part(id=f"Voice{voice_idx}")
++        part.append(meter.TimeSignature("4/4"))
++        base_pitch = 48 + voice_idx * 7
++        for _ in range(bars):
++            remaining = 4.0
++            while remaining > 1e-9:
++                options = [dur for dur in (0.5, 1.0, 1.5, 2.0) if dur <= remaining + 1e-9]
++                quarter_len = rng.choice(options)
++                if rng.random() < 0.3:
++                    part.append(note.Rest(quarterLength=quarter_len))
++                else:
++                    pitch = base_pitch + rng.randint(0, 12)
++                    part.append(note.Note(midi=pitch, quarterLength=quarter_len))
++                remaining = round(remaining - quarter_len, 6)
++        score.insert(0, part)
++    return score
++
++
++def _write_sustained_reference_xml(tmp_path: Path) -> Path:
++    score = stream.Score()
++
++    bass = stream.Part(id="Bass")
++    bass.append(meter.TimeSignature("4/4"))
++    bass.append(note.Note("C3", quarterLength=2.0))
++    bass.append(note.Rest(quarterLength=2.0))
++
++    upper = stream.Part(id="Upper")
++    upper.append(meter.TimeSignature("4/4"))
++    upper.append(note.Note("G3", quarterLength=1.0))
++    upper.append(note.Note("A3", quarterLength=1.0))
++    upper.append(note.Rest(quarterLength=2.0))
++
++    score.insert(0, bass)
++    score.insert(0, upper)
++
++    out_path = tmp_path / "sustained_reference.xml"
++    score.write("musicxml", fp=str(out_path))
++    return out_path
++
++
++@pytest.mark.parametrize("seed", [7, 17, 27])
++def test_roundtrip_pitch_reconstruction_on_random_bars(seed: int, tmp_path: Path) -> None:
++    score = _build_random_score(seed)
++    xml_path = tmp_path / f"random_seed_{seed}.xml"
++    score.write("musicxml", fp=str(xml_path))
++
++    tokens, _ = eventize_musicxml(str(xml_path), voice_mode="parts")
++    harm_errors = validate_harm_tokens(tokens)
++    assert not harm_errors
++
++    reconstructed = tokens_to_score(tokens, tpq=TPQ)
++    _assert_events_match_with_tick_tolerance(
++        _note_events_by_voice(score),
++        _note_events_by_voice(reconstructed),
++        tick_tolerance=1,
++    )
++
++
++def test_harm_consistency_uses_lowest_active_reference_pitch(tmp_path: Path) -> None:
++    xml_path = _write_sustained_reference_xml(tmp_path)
++    tokens, _ = eventize_musicxml(str(xml_path), voice_mode="parts")
++
++    harm_errors = validate_harm_tokens(tokens)
++    assert not harm_errors
++
++    pos_idx = tokens.index("POS_24")
++    found_upper = False
++    idx = pos_idx + 1
++    while idx < len(tokens) and tokens[idx] != "BAR" and not tokens[idx].startswith("POS_"):
++        if not tokens[idx].startswith("VOICE_"):
++            idx += 1
++            continue
++        event, next_idx = parse_voice_event(tokens, idx)
++        if event.voice == 1:
++            found_upper = True
++            assert event.mel_int == 2
++            assert event.harm_oct == 0
++            assert event.harm_class == 9
++        idx = next_idx
++
++    assert found_upper
+
+
+thinking
+**Running tests for changes**
+codex
+{"done":false,"progress_made":true,"summary":"The new round-trip/HARM test module is in place. I’ll run the targeted tests first, then the full verify command.","tests_ran":false,"tests_status":"not_run","next_step":"Execute `bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_roundtrip_pitch.py`.","stop_reason":""}
+exec
+/bin/bash -lc 'bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_roundtrip_pitch.py' in /home/stephen-reilly/dev/bach_genfile update:
+diff --git a/tests/test_roundtrip_pitch.py b/tests/test_roundtrip_pitch.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..b6fbfef56a9df3df629ed8135abb4b79c3e98a39
+--- /dev/null
++++ b/tests/test_roundtrip_pitch.py
+@@ -0,0 +1,141 @@
++import random
++import sys
++from pathlib import Path
++from typing import Dict, List, Tuple
++
++import pytest
++from music21 import meter, note, stream
++
++sys.path.insert(0, str(Path(__file__).parents[1]))
++
++from src.tokens.eventizer import eventize_musicxml
++from src.tokens.roundtrip import tokens_to_score
++from src.tokens.tokenizer import parse_voice_event
++from src.tokens.validator import validate_harm_tokens
++
++TPQ = 24
++
++
++def _note_events_by_voice(score: stream.Score) -> Dict[int, List[Tuple[int, int, int]]]:
++    by_voice: Dict[int, List[Tuple[int, int, int]]] = {}
++    for voice_idx, part in enumerate(score.parts):
++        events: List[Tuple[int, int, int]] = []
++        flat_part = part.flatten()
++        for el in flat_part.notesAndRests:
++            if el.isRest:
++                continue
++            if el.isChord:
++                pitch = max(p.midi for p in el.pitches)
++            else:
++                pitch = el.pitch.midi
++            onset = int(round(el.offset * TPQ))
++            duration = int(round(el.duration.quarterLength * TPQ))
++            events.append((onset, duration, pitch))
++        by_voice[voice_idx] = events
++    return by_voice
++
++
++def _assert_events_match_with_tick_tolerance(
++    expected: Dict[int, List[Tuple[int, int, int]]],
++    actual: Dict[int, List[Tuple[int, int, int]]],
++    *,
++    tick_tolerance: int = 1,
++) -> None:
++    assert set(expected.keys()) == set(actual.keys())
++    for voice_idx in expected:
++        exp_events = expected[voice_idx]
++        got_events = actual[voice_idx]
++        assert len(exp_events) == len(got_events)
++        for (exp_onset, exp_dur, exp_pitch), (got_onset, got_dur, got_pitch) in zip(
++            exp_events, got_events
++        ):
++            assert got_pitch == exp_pitch
++            assert abs(got_onset - exp_onset) <= tick_tolerance
++            assert abs(got_dur - exp_dur) <= tick_tolerance
++
++
++def _build_random_score(seed: int, *, bars: int = 3, voices: int = 3) -> stream.Score:
++    rng = random.Random(seed)
++    score = stream.Score()
++    for voice_idx in range(voices):
++        part = stream.Part(id=f"Voice{voice_idx}")
++        part.append(meter.TimeSignature("4/4"))
++        base_pitch = 48 + voice_idx * 7
++        for _ in range(bars):
++            remaining = 4.0
++            while remaining > 1e-9:
++                options = [dur for dur in (0.5, 1.0, 1.5, 2.0) if dur <= remaining + 1e-9]
++                quarter_len = rng.choice(options)
++                if rng.random() < 0.3:
++                    part.append(note.Rest(quarterLength=quarter_len))
++                else:
++                    pitch = base_pitch + rng.randint(0, 12)
++                    part.append(note.Note(midi=pitch, quarterLength=quarter_len))
++                remaining = round(remaining - quarter_len, 6)
++        score.insert(0, part)
++    return score
++
++
++def _write_sustained_reference_xml(tmp_path: Path) -> Path:
++    score = stream.Score()
++
++    bass = stream.Part(id="Bass")
++    bass.append(meter.TimeSignature("4/4"))
++    bass.append(note.Note("C3", quarterLength=2.0))
++    bass.append(note.Rest(quarterLength=2.0))
++
++    upper = stream.Part(id="Upper")
++    upper.append(meter.TimeSignature("4/4"))
++    upper.append(note.Note("G3", quarterLength=1.0))
++    upper.append(note.Note("A3", quarterLength=1.0))
++    upper.append(note.Rest(quarterLength=2.0))
++
++    score.insert(0, bass)
++    score.insert(0, upper)
++
++    out_path = tmp_path / "sustained_reference.xml"
++    score.write("musicxml", fp=str(out_path))
++    return out_path
++
++
++@pytest.mark.parametrize("seed", [7, 17, 27])
++def test_roundtrip_pitch_reconstruction_on_random_bars(seed: int, tmp_path: Path) -> None:
++    score = _build_random_score(seed)
++    xml_path = tmp_path / f"random_seed_{seed}.xml"
++    score.write("musicxml", fp=str(xml_path))
++
++    tokens, _ = eventize_musicxml(str(xml_path), voice_mode="parts")
++    harm_errors = validate_harm_tokens(tokens)
++    assert not harm_errors
++
++    reconstructed = tokens_to_score(tokens, tpq=TPQ)
++    _assert_events_match_with_tick_tolerance(
++        _note_events_by_voice(score),
++        _note_events_by_voice(reconstructed),
++        tick_tolerance=1,
++    )
++
++
++def test_harm_consistency_uses_lowest_active_reference_pitch(tmp_path: Path) -> None:
++    xml_path = _write_sustained_reference_xml(tmp_path)
++    tokens, _ = eventize_musicxml(str(xml_path), voice_mode="parts")
++
++    harm_errors = validate_harm_tokens(tokens)
++    assert not harm_errors
++
++    pos_idx = tokens.index("POS_24")
++    found_upper = False
++    idx = pos_idx + 1
++    while idx < len(tokens) and tokens[idx] != "BAR" and not tokens[idx].startswith("POS_"):
++        if not tokens[idx].startswith("VOICE_"):
++            idx += 1
++            continue
++        event, next_idx = parse_voice_event(tokens, idx)
++        if event.voice == 1:
++            found_upper = True
++            assert event.mel_int == 2
++            assert event.harm_oct == 0
++            assert event.harm_class == 9
++        idx = next_idx
++
++    assert found_upper
+
+
+thinking
+**Noting need for polling**
+file update:
+diff --git a/tests/test_roundtrip_pitch.py b/tests/test_roundtrip_pitch.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..b6fbfef56a9df3df629ed8135abb4b79c3e98a39
+--- /dev/null
++++ b/tests/test_roundtrip_pitch.py
+@@ -0,0 +1,141 @@
++import random
++import sys
++from pathlib import Path
++from typing import Dict, List, Tuple
++
++import pytest
++from music21 import meter, note, stream
++
++sys.path.insert(0, str(Path(__file__).parents[1]))
++
++from src.tokens.eventizer import eventize_musicxml
++from src.tokens.roundtrip import tokens_to_score
++from src.tokens.tokenizer import parse_voice_event
++from src.tokens.validator import validate_harm_tokens
++
++TPQ = 24
++
++
++def _note_events_by_voice(score: stream.Score) -> Dict[int, List[Tuple[int, int, int]]]:
++    by_voice: Dict[int, List[Tuple[int, int, int]]] = {}
++    for voice_idx, part in enumerate(score.parts):
++        events: List[Tuple[int, int, int]] = []
++        flat_part = part.flatten()
++        for el in flat_part.notesAndRests:
++            if el.isRest:
++                continue
++            if el.isChord:
++                pitch = max(p.midi for p in el.pitches)
++            else:
++                pitch = el.pitch.midi
++            onset = int(round(el.offset * TPQ))
++            duration = int(round(el.duration.quarterLength * TPQ))
++            events.append((onset, duration, pitch))
++        by_voice[voice_idx] = events
++    return by_voice
++
++
++def _assert_events_match_with_tick_tolerance(
++    expected: Dict[int, List[Tuple[int, int, int]]],
++    actual: Dict[int, List[Tuple[int, int, int]]],
++    *,
++    tick_tolerance: int = 1,
++) -> None:
++    assert set(expected.keys()) == set(actual.keys())
++    for voice_idx in expected:
++        exp_events = expected[voice_idx]
++        got_events = actual[voice_idx]
++        assert len(exp_events) == len(got_events)
++        for (exp_onset, exp_dur, exp_pitch), (got_onset, got_dur, got_pitch) in zip(
++            exp_events, got_events
++        ):
++            assert got_pitch == exp_pitch
++            assert abs(got_onset - exp_onset) <= tick_tolerance
++            assert abs(got_dur - exp_dur) <= tick_tolerance
++
++
++def _build_random_score(seed: int, *, bars: int = 3, voices: int = 3) -> stream.Score:
++    rng = random.Random(seed)
++    score = stream.Score()
++    for voice_idx in range(voices):
++        part = stream.Part(id=f"Voice{voice_idx}")
++        part.append(meter.TimeSignature("4/4"))
++        base_pitch = 48 + voice_idx * 7
++        for _ in range(bars):
++            remaining = 4.0
++            while remaining > 1e-9:
++                options = [dur for dur in (0.5, 1.0, 1.5, 2.0) if dur <= remaining + 1e-9]
++                quarter_len = rng.choice(options)
++                if rng.random() < 0.3:
++                    part.append(note.Rest(quarterLength=quarter_len))
++                else:
++                    pitch = base_pitch + rng.randint(0, 12)
++                    part.append(note.Note(midi=pitch, quarterLength=quarter_len))
++                remaining = round(remaining - quarter_len, 6)
++        score.insert(0, part)
++    return score
++
++
++def _write_sustained_reference_xml(tmp_path: Path) -> Path:
++    score = stream.Score()
++
++    bass = stream.Part(id="Bass")
++    bass.append(meter.TimeSignature("4/4"))
++    bass.append(note.Note("C3", quarterLength=2.0))
++    bass.append(note.Rest(quarterLength=2.0))
++
++    upper = stream.Part(id="Upper")
++    upper.append(meter.TimeSignature("4/4"))
++    upper.append(note.Note("G3", quarterLength=1.0))
++    upper.append(note.Note("A3", quarterLength=1.0))
++    upper.append(note.Rest(quarterLength=2.0))
++
++    score.insert(0, bass)
++    score.insert(0, upper)
++
++    out_path = tmp_path / "sustained_reference.xml"
++    score.write("musicxml", fp=str(out_path))
++    return out_path
++
++
++@pytest.mark.parametrize("seed", [7, 17, 27])
++def test_roundtrip_pitch_reconstruction_on_random_bars(seed: int, tmp_path: Path) -> None:
++    score = _build_random_score(seed)
++    xml_path = tmp_path / f"random_seed_{seed}.xml"
++    score.write("musicxml", fp=str(xml_path))
++
++    tokens, _ = eventize_musicxml(str(xml_path), voice_mode="parts")
++    harm_errors = validate_harm_tokens(tokens)
++    assert not harm_errors
++
++    reconstructed = tokens_to_score(tokens, tpq=TPQ)
++    _assert_events_match_with_tick_tolerance(
++        _note_events_by_voice(score),
++        _note_events_by_voice(reconstructed),
++        tick_tolerance=1,
++    )
++
++
++def test_harm_consistency_uses_lowest_active_reference_pitch(tmp_path: Path) -> None:
++    xml_path = _write_sustained_reference_xml(tmp_path)
++    tokens, _ = eventize_musicxml(str(xml_path), voice_mode="parts")
++
++    harm_errors = validate_harm_tokens(tokens)
++    assert not harm_errors
++
++    pos_idx = tokens.index("POS_24")
++    found_upper = False
++    idx = pos_idx + 1
++    while idx < len(tokens) and tokens[idx] != "BAR" and not tokens[idx].startswith("POS_"):
++        if not tokens[idx].startswith("VOICE_"):
++            idx += 1
++            continue
++        event, next_idx = parse_voice_event(tokens, idx)
++        if event.voice == 1:
++            found_upper = True
++            assert event.mel_int == 2
++            assert event.harm_oct == 0
++            assert event.harm_class == 9
++        idx = next_idx
++
++    assert found_upper
+
+ succeeded in 49.61s:
+...............s................................................         [100%]
+63 passed, 1 skipped in 47.31s
+
+
+thinking
+**Planning test run verification and TODO sync**
+codex
+{"done":false,"progress_made":true,"summary":"Tests are passing (`63 passed, 1 skipped`). I’ll now mark the completed ExecPlan/TODO item for this loop and append a PROGRESS entry, then run the standard verify command exactly as written.","tests_ran":true,"tests_status":"pass","next_step":"Update `docs/exec/EXECPLAN_stage1.md`, `TODO.md`, and `PROGRESS.md`.","stop_reason":""}
+
+thinking
+**Preparing multi-file patch**
+exec
+/bin/bash -lc 'tail -n 40 PROGRESS.md' in /home/stephen-reilly/dev/bach_genexec
+/bin/bash -lc "sed -n '1,220p' docs/exec/EXECPLAN_stage1.md" in /home/stephen-reilly/dev/bach_genexec
+/bin/bash -lc "sed -n '1,220p' TODO.md" in /home/stephen-reilly/dev/bach_gen succeeded in 50ms:
+# PROGRESS
+
+- 2026-02-24: Initialized AGENTS.md, SPEC.md, TODO.md, and PROGRESS.md for Stage-1 loop setup.
+- 2026-02-24: Added ExecPlan, Codex loop script, config, and schema for structured loop output.
+- 2026-02-24: Added python-test-env skill and test helper script; loop now defaults to conda env `bach` and includes environment precheck in prompt.
+- 2026-02-24: Fixed loop compatibility with installed Codex CLI (removed hard dependency on `-a`, added auto-detect for approval flags, and fail-fast on CLI usage errors).
+- 2026-02-24: Updated loop to use `--full-auto` on newer Codex CLI builds where explicit approval flags are unavailable.
+- 2026-02-24: Completed Stage-1 ExecPlan item 1 by defining versioned `EventSpec`/`DescriptorSpec` in `src/tokens/schema.py` (`remi_tab_v1`, `tpq=24`) and added `tests/test_schema.py`.
+- 2026-02-24: Completed Stage-1 ExecPlan item 2 by adding `src/tokens/intervals.py` (melodic/harmonic helpers with QA vs production behavior), wiring repairs into `eventize_musicxml`, updating harmonic validation to shared math helpers, and adding `tests/test_intervals.py`; verify run: `53 passed, 1 skipped`.
+- 2026-02-24: Completed Stage-1 ExecPlan item 3 by adding `src/tokens/tokenizer.py` (voice-event parsing/serialization, stream canonicalization helpers), wiring `eventize_musicxml` pitched-onset emission through tokenizer serialization for canonical ordering, and adding `tests/test_tokenizer.py`; verify run: `59 passed, 1 skipped`.
+ succeeded in 50ms:
+# ExecPlan — Stage-1 Tokenizer & Dataset
+
+## Rules
+- One task per run.
+- Run `bash docs/skills/python-test-env/scripts/run_tests.sh` and do not weaken tests.
+- If you add a new feature without tests, add tests in the same run.
+- Do not hard-code tests; test real behavior.
+- If tests fail, fix the underlying code issue before proceeding.
+- Update `TODO.md` and append to `PROGRESS.md`.
+
+## Checklist (one item per loop)
+- [x] Define EventSpec + DescriptorSpec in `src/tokens/schema.py` with version `remi_tab_v1` and `tpq=24`.
+- [x] Implement interval math helpers (melodic + harmonic ref) with QA vs production behavior.
+- [x] Implement event parsing/serialization in `src/tokens/tokenizer.py` with canonical ordering.
+- [ ] Add round-trip tests for pitch reconstruction and `HARM_*` consistency.
+- [ ] Implement `scripts/make_dataset.py` basic pipeline (parse, normalize, collapse doublings, track assignment, tokenize, stats).
+- [ ] Produce dataset artifacts in `data/processed/` and document counts in `stats.json`.
+- [ ] Verify `bash docs/skills/python-test-env/scripts/run_tests.sh` passes.
+ succeeded in 50ms:
+# TODO
+
+## Milestone: Stage-1 Tokenizer & Dataset
+- [x] Implement `src/tokens/schema.py` (EventSpec + DescriptorSpec, versioned)
+- [x] Implement tokenizer interval math + round-trip tests
+- [x] Implement event parsing/serialization in `src/tokens/tokenizer.py` with canonical ordering
+- [ ] Implement `scripts/make_dataset.py` basic pipeline
+- [ ] Produce `data/processed/{events.parquet,barplans.parquet,stats.json}`
+- [x] CI: `pytest -q` passes
+file update:
+diff --git a/tests/test_roundtrip_pitch.py b/tests/test_roundtrip_pitch.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..b6fbfef56a9df3df629ed8135abb4b79c3e98a39
+--- /dev/null
++++ b/tests/test_roundtrip_pitch.py
+@@ -0,0 +1,141 @@
++import random
++import sys
++from pathlib import Path
++from typing import Dict, List, Tuple
++
++import pytest
++from music21 import meter, note, stream
++
++sys.path.insert(0, str(Path(__file__).parents[1]))
++
++from src.tokens.eventizer import eventize_musicxml
++from src.tokens.roundtrip import tokens_to_score
++from src.tokens.tokenizer import parse_voice_event
++from src.tokens.validator import validate_harm_tokens
++
++TPQ = 24
++
++
++def _note_events_by_voice(score: stream.Score) -> Dict[int, List[Tuple[int, int, int]]]:
++    by_voice: Dict[int, List[Tuple[int, int, int]]] = {}
++    for voice_idx, part in enumerate(score.parts):
++        events: List[Tuple[int, int, int]] = []
++        flat_part = part.flatten()
++        for el in flat_part.notesAndRests:
++            if el.isRest:
++                continue
++            if el.isChord:
++                pitch = max(p.midi for p in el.pitches)
++            else:
++                pitch = el.pitch.midi
++            onset = int(round(el.offset * TPQ))
++            duration = int(round(el.duration.quarterLength * TPQ))
++            events.append((onset, duration, pitch))
++        by_voice[voice_idx] = events
++    return by_voice
++
++
++def _assert_events_match_with_tick_tolerance(
++    expected: Dict[int, List[Tuple[int, int, int]]],
++    actual: Dict[int, List[Tuple[int, int, int]]],
++    *,
++    tick_tolerance: int = 1,
++) -> None:
++    assert set(expected.keys()) == set(actual.keys())
++    for voice_idx in expected:
++        exp_events = expected[voice_idx]
++        got_events = actual[voice_idx]
++        assert len(exp_events) == len(got_events)
++        for (exp_onset, exp_dur, exp_pitch), (got_onset, got_dur, got_pitch) in zip(
++            exp_events, got_events
++        ):
++            assert got_pitch == exp_pitch
++            assert abs(got_onset - exp_onset) <= tick_tolerance
++            assert abs(got_dur - exp_dur) <= tick_tolerance
++
++
++def _build_random_score(seed: int, *, bars: int = 3, voices: int = 3) -> stream.Score:
++    rng = random.Random(seed)
++    score = stream.Score()
++    for voice_idx in range(voices):
++        part = stream.Part(id=f"Voice{voice_idx}")
++        part.append(meter.TimeSignature("4/4"))
++        base_pitch = 48 + voice_idx * 7
++        for _ in range(bars):
++            remaining = 4.0
++            while remaining > 1e-9:
++                options = [dur for dur in (0.5, 1.0, 1.5, 2.0) if dur <= remaining + 1e-9]
++                quarter_len = rng.choice(options)
++                if rng.random() < 0.3:
++                    part.append(note.Rest(quarterLength=quarter_len))
++                else:
++                    pitch = base_pitch + rng.randint(0, 12)
++                    part.append(note.Note(midi=pitch, quarterLength=quarter_len))
++                remaining = round(remaining - quarter_len, 6)
++        score.insert(0, part)
++    return score
++
++
++def _write_sustained_reference_xml(tmp_path: Path) -> Path:
++    score = stream.Score()
++
++    bass = stream.Part(id="Bass")
++    bass.append(meter.TimeSignature("4/4"))
++    bass.append(note.Note("C3", quarterLength=2.0))
++    bass.append(note.Rest(quarterLength=2.0))
++
++    upper = stream.Part(id="Upper")
++    upper.append(meter.TimeSignature("4/4"))
++    upper.append(note.Note("G3", quarterLength=1.0))
++    upper.append(note.Note("A3", quarterLength=1.0))
++    upper.append(note.Rest(quarterLength=2.0))
++
++    score.insert(0, bass)
++    score.insert(0, upper)
++
++    out_path = tmp_path / "sustained_reference.xml"
++    score.write("musicxml", fp=str(out_path))
++    return out_path
++
++
++@pytest.mark.parametrize("seed", [7, 17, 27])
++def test_roundtrip_pitch_reconstruction_on_random_bars(seed: int, tmp_path: Path) -> None:
++    score = _build_random_score(seed)
++    xml_path = tmp_path / f"random_seed_{seed}.xml"
++    score.write("musicxml", fp=str(xml_path))
++
++    tokens, _ = eventize_musicxml(str(xml_path), voice_mode="parts")
++    harm_errors = validate_harm_tokens(tokens)
++    assert not harm_errors
++
++    reconstructed = tokens_to_score(tokens, tpq=TPQ)
++    _assert_events_match_with_tick_tolerance(
++        _note_events_by_voice(score),
++        _note_events_by_voice(reconstructed),
++        tick_tolerance=1,
++    )
++
++
++def test_harm_consistency_uses_lowest_active_reference_pitch(tmp_path: Path) -> None:
++    xml_path = _write_sustained_reference_xml(tmp_path)
++    tokens, _ = eventize_musicxml(str(xml_path), voice_mode="parts")
++
++    harm_errors = validate_harm_tokens(tokens)
++    assert not harm_errors
++
++    pos_idx = tokens.index("POS_24")
++    found_upper = False
++    idx = pos_idx + 1
++    while idx < len(tokens) and tokens[idx] != "BAR" and not tokens[idx].startswith("POS_"):
++        if not tokens[idx].startswith("VOICE_"):
++            idx += 1
++            continue
++        event, next_idx = parse_voice_event(tokens, idx)
++        if event.voice == 1:
++            found_upper = True
++            assert event.mel_int == 2
++            assert event.harm_oct == 0
++            assert event.harm_class == 9
++        idx = next_idx
++
++    assert found_upper
+
+
+thinking
+**Adding test TODO and patching**
+file update
+M /home/stephen-reilly/dev/bach_gen/docs/exec/EXECPLAN_stage1.md
+@@ -14,3 +14,3 @@
+ - [x] Implement event parsing/serialization in `src/tokens/tokenizer.py` with canonical ordering.
+-- [ ] Add round-trip tests for pitch reconstruction and `HARM_*` consistency.
++- [x] Add round-trip tests for pitch reconstruction and `HARM_*` consistency.
+ - [ ] Implement `scripts/make_dataset.py` basic pipeline (parse, normalize, collapse doublings, track assignment, tokenize, stats).
+apply_patch(auto_approved=true) exited 0 in 10ms:
+Success. Updated the following files:
+M docs/exec/EXECPLAN_stage1.md
+file update:
+diff --git a/docs/exec/EXECPLAN_stage1.md b/docs/exec/EXECPLAN_stage1.md
+index b8ee585fca521d0ea892fa6b21d13bb879078f5d..5804cb1423e039105830941eb6e393ebe9d0a4f6
+--- a/docs/exec/EXECPLAN_stage1.md
++++ b/docs/exec/EXECPLAN_stage1.md
+@@ -12,7 +12,7 @@
+ - [x] Define EventSpec + DescriptorSpec in `src/tokens/schema.py` with version `remi_tab_v1` and `tpq=24`.
+ - [x] Implement interval math helpers (melodic + harmonic ref) with QA vs production behavior.
+ - [x] Implement event parsing/serialization in `src/tokens/tokenizer.py` with canonical ordering.
+-- [ ] Add round-trip tests for pitch reconstruction and `HARM_*` consistency.
++- [x] Add round-trip tests for pitch reconstruction and `HARM_*` consistency.
+ - [ ] Implement `scripts/make_dataset.py` basic pipeline (parse, normalize, collapse doublings, track assignment, tokenize, stats).
+ - [ ] Produce dataset artifacts in `data/processed/` and document counts in `stats.json`.
+ - [ ] Verify `bash docs/skills/python-test-env/scripts/run_tests.sh` passes.
+diff --git a/tests/test_roundtrip_pitch.py b/tests/test_roundtrip_pitch.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..b6fbfef56a9df3df629ed8135abb4b79c3e98a39
+--- /dev/null
++++ b/tests/test_roundtrip_pitch.py
+@@ -0,0 +1,141 @@
++import random
++import sys
++from pathlib import Path
++from typing import Dict, List, Tuple
++
++import pytest
++from music21 import meter, note, stream
++
++sys.path.insert(0, str(Path(__file__).parents[1]))
++
++from src.tokens.eventizer import eventize_musicxml
++from src.tokens.roundtrip import tokens_to_score
++from src.tokens.tokenizer import parse_voice_event
++from src.tokens.validator import validate_harm_tokens
++
++TPQ = 24
++
++
++def _note_events_by_voice(score: stream.Score) -> Dict[int, List[Tuple[int, int, int]]]:
++    by_voice: Dict[int, List[Tuple[int, int, int]]] = {}
++    for voice_idx, part in enumerate(score.parts):
++        events: List[Tuple[int, int, int]] = []
++        flat_part = part.flatten()
++        for el in flat_part.notesAndRests:
++            if el.isRest:
++                continue
++            if el.isChord:
++                pitch = max(p.midi for p in el.pitches)
++            else:
++                pitch = el.pitch.midi
++            onset = int(round(el.offset * TPQ))
++            duration = int(round(el.duration.quarterLength * TPQ))
++            events.append((onset, duration, pitch))
++        by_voice[voice_idx] = events
++    return by_voice
++
++
++def _assert_events_match_with_tick_tolerance(
++    expected: Dict[int, List[Tuple[int, int, int]]],
++    actual: Dict[int, List[Tuple[int, int, int]]],
++    *,
++    tick_tolerance: int = 1,
++) -> None:
++    assert set(expected.keys()) == set(actual.keys())
++    for voice_idx in expected:
++        exp_events = expected[voice_idx]
++        got_events = actual[voice_idx]
++        assert len(exp_events) == len(got_events)
++        for (exp_onset, exp_dur, exp_pitch), (got_onset, got_dur, got_pitch) in zip(
++            exp_events, got_events
++        ):
++            assert got_pitch == exp_pitch
++            assert abs(got_onset - exp_onset) <= tick_tolerance
++            assert abs(got_dur - exp_dur) <= tick_tolerance
++
++
++def _build_random_score(seed: int, *, bars: int = 3, voices: int = 3) -> stream.Score:
++    rng = random.Random(seed)
++    score = stream.Score()
++    for voice_idx in range(voices):
++        part = stream.Part(id=f"Voice{voice_idx}")
++        part.append(meter.TimeSignature("4/4"))
++        base_pitch = 48 + voice_idx * 7
++        for _ in range(bars):
++            remaining = 4.0
++            while remaining > 1e-9:
++                options = [dur for dur in (0.5, 1.0, 1.5, 2.0) if dur <= remaining + 1e-9]
++                quarter_len = rng.choice(options)
++                if rng.random() < 0.3:
++                    part.append(note.Rest(quarterLength=quarter_len))
++                else:
++                    pitch = base_pitch + rng.randint(0, 12)
++                    part.append(note.Note(midi=pitch, quarterLength=quarter_len))
++                remaining = round(remaining - quarter_len, 6)
++        score.insert(0, part)
++    return score
++
++
++def _write_sustained_reference_xml(tmp_path: Path) -> Path:
++    score = stream.Score()
++
++    bass = stream.Part(id="Bass")
++    bass.append(meter.TimeSignature("4/4"))
++    bass.append(note.Note("C3", quarterLength=2.0))
++    bass.append(note.Rest(quarterLength=2.0))
++
++    upper = stream.Part(id="Upper")
++    upper.append(meter.TimeSignature("4/4"))
++    upper.append(note.Note("G3", quarterLength=1.0))
++    upper.append(note.Note("A3", quarterLength=1.0))
++    upper.append(note.Rest(quarterLength=2.0))
++
++    score.insert(0, bass)
++    score.insert(0, upper)
++
++    out_path = tmp_path / "sustained_reference.xml"
++    score.write("musicxml", fp=str(out_path))
++    return out_path
++
++
++@pytest.mark.parametrize("seed", [7, 17, 27])
++def test_roundtrip_pitch_reconstruction_on_random_bars(seed: int, tmp_path: Path) -> None:
++    score = _build_random_score(seed)
++    xml_path = tmp_path / f"random_seed_{seed}.xml"
++    score.write("musicxml", fp=str(xml_path))
++
++    tokens, _ = eventize_musicxml(str(xml_path), voice_mode="parts")
++    harm_errors = validate_harm_tokens(tokens)
++    assert not harm_errors
++
++    reconstructed = tokens_to_score(tokens, tpq=TPQ)
++    _assert_events_match_with_tick_tolerance(
++        _note_events_by_voice(score),
++        _note_events_by_voice(reconstructed),
++        tick_tolerance=1,
++    )
++
++
++def test_harm_consistency_uses_lowest_active_reference_pitch(tmp_path: Path) -> None:
++    xml_path = _write_sustained_reference_xml(tmp_path)
++    tokens, _ = eventize_musicxml(str(xml_path), voice_mode="parts")
++
++    harm_errors = validate_harm_tokens(tokens)
++    assert not harm_errors
++
++    pos_idx = tokens.index("POS_24")
++    found_upper = False
++    idx = pos_idx + 1
++    while idx < len(tokens) and tokens[idx] != "BAR" and not tokens[idx].startswith("POS_"):
++        if not tokens[idx].startswith("VOICE_"):
++            idx += 1
++            continue
++        event, next_idx = parse_voice_event(tokens, idx)
++        if event.voice == 1:
++            found_upper = True
++            assert event.mel_int == 2
++            assert event.harm_oct == 0
++            assert event.harm_class == 9
++        idx = next_idx
++
++    assert found_upper
+
+file update:
+diff --git a/docs/exec/EXECPLAN_stage1.md b/docs/exec/EXECPLAN_stage1.md
+index b8ee585fca521d0ea892fa6b21d13bb879078f5d..5804cb1423e039105830941eb6e393ebe9d0a4f6
+--- a/docs/exec/EXECPLAN_stage1.md
++++ b/docs/exec/EXECPLAN_stage1.md
+@@ -12,7 +12,7 @@
+ - [x] Define EventSpec + DescriptorSpec in `src/tokens/schema.py` with version `remi_tab_v1` and `tpq=24`.
+ - [x] Implement interval math helpers (melodic + harmonic ref) with QA vs production behavior.
+ - [x] Implement event parsing/serialization in `src/tokens/tokenizer.py` with canonical ordering.
+-- [ ] Add round-trip tests for pitch reconstruction and `HARM_*` consistency.
++- [x] Add round-trip tests for pitch reconstruction and `HARM_*` consistency.
+ - [ ] Implement `scripts/make_dataset.py` basic pipeline (parse, normalize, collapse doublings, track assignment, tokenize, stats).
+ - [ ] Produce dataset artifacts in `data/processed/` and document counts in `stats.json`.
+ - [ ] Verify `bash docs/skills/python-test-env/scripts/run_tests.sh` passes.
+diff --git a/tests/test_roundtrip_pitch.py b/tests/test_roundtrip_pitch.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..b6fbfef56a9df3df629ed8135abb4b79c3e98a39
+--- /dev/null
++++ b/tests/test_roundtrip_pitch.py
+@@ -0,0 +1,141 @@
++import random
++import sys
++from pathlib import Path
++from typing import Dict, List, Tuple
++
++import pytest
++from music21 import meter, note, stream
++
++sys.path.insert(0, str(Path(__file__).parents[1]))
++
++from src.tokens.eventizer import eventize_musicxml
++from src.tokens.roundtrip import tokens_to_score
++from src.tokens.tokenizer import parse_voice_event
++from src.tokens.validator import validate_harm_tokens
++
++TPQ = 24
++
++
++def _note_events_by_voice(score: stream.Score) -> Dict[int, List[Tuple[int, int, int]]]:
++    by_voice: Dict[int, List[Tuple[int, int, int]]] = {}
++    for voice_idx, part in enumerate(score.parts):
++        events: List[Tuple[int, int, int]] = []
++        flat_part = part.flatten()
++        for el in flat_part.notesAndRests:
++            if el.isRest:
++                continue
++            if el.isChord:
++                pitch = max(p.midi for p in el.pitches)
++            else:
++                pitch = el.pitch.midi
++            onset = int(round(el.offset * TPQ))
++            duration = int(round(el.duration.quarterLength * TPQ))
++            events.append((onset, duration, pitch))
++        by_voice[voice_idx] = events
++    return by_voice
++
++
++def _assert_events_match_with_tick_tolerance(
++    expected: Dict[int, List[Tuple[int, int, int]]],
++    actual: Dict[int, List[Tuple[int, int, int]]],
++    *,
++    tick_tolerance: int = 1,
++) -> None:
++    assert set(expected.keys()) == set(actual.keys())
++    for voice_idx in expected:
++        exp_events = expected[voice_idx]
++        got_events = actual[voice_idx]
++        assert len(exp_events) == len(got_events)
++        for (exp_onset, exp_dur, exp_pitch), (got_onset, got_dur, got_pitch) in zip(
++            exp_events, got_events
++        ):
++            assert got_pitch == exp_pitch
++            assert abs(got_onset - exp_onset) <= tick_tolerance
++            assert abs(got_dur - exp_dur) <= tick_tolerance
++
++
++def _build_random_score(seed: int, *, bars: int = 3, voices: int = 3) -> stream.Score:
++    rng = random.Random(seed)
++    score = stream.Score()
++    for voice_idx in range(voices):
++        part = stream.Part(id=f"Voice{voice_idx}")
++        part.append(meter.TimeSignature("4/4"))
++        base_pitch = 48 + voice_idx * 7
++        for _ in range(bars):
++            remaining = 4.0
++            while remaining > 1e-9:
++                options = [dur for dur in (0.5, 1.0, 1.5, 2.0) if dur <= remaining + 1e-9]
++                quarter_len = rng.choice(options)
++                if rng.random() < 0.3:
++                    part.append(note.Rest(quarterLength=quarter_len))
++                else:
++                    pitch = base_pitch + rng.randint(0, 12)
++                    part.append(note.Note(midi=pitch, quarterLength=quarter_len))
++                remaining = round(remaining - quarter_len, 6)
++        score.insert(0, part)
++    return score
++
++
++def _write_sustained_reference_xml(tmp_path: Path) -> Path:
++    score = stream.Score()
++
++    bass = stream.Part(id="Bass")
++    bass.append(meter.TimeSignature("4/4"))
++    bass.append(note.Note("C3", quarterLength=2.0))
++    bass.append(note.Rest(quarterLength=2.0))
++
++    upper = stream.Part(id="Upper")
++    upper.append(meter.TimeSignature("4/4"))
++    upper.append(note.Note("G3", quarterLength=1.0))
++    upper.append(note.Note("A3", quarterLength=1.0))
++    upper.append(note.Rest(quarterLength=2.0))
++
++    score.insert(0, bass)
++    score.insert(0, upper)
++
++    out_path = tmp_path / "sustained_reference.xml"
++    score.write("musicxml", fp=str(out_path))
++    return out_path
++
++
++@pytest.mark.parametrize("seed", [7, 17, 27])
++def test_roundtrip_pitch_reconstruction_on_random_bars(seed: int, tmp_path: Path) -> None:
++    score = _build_random_score(seed)
++    xml_path = tmp_path / f"random_seed_{seed}.xml"
++    score.write("musicxml", fp=str(xml_path))
++
++    tokens, _ = eventize_musicxml(str(xml_path), voice_mode="parts")
++    harm_errors = validate_harm_tokens(tokens)
++    assert not harm_errors
++
++    reconstructed = tokens_to_score(tokens, tpq=TPQ)
++    _assert_events_match_with_tick_tolerance(
++        _note_events_by_voice(score),
++        _note_events_by_voice(reconstructed),
++        tick_tolerance=1,
++    )
++
++
++def test_harm_consistency_uses_lowest_active_reference_pitch(tmp_path: Path) -> None:
++    xml_path = _write_sustained_reference_xml(tmp_path)
++    tokens, _ = eventize_musicxml(str(xml_path), voice_mode="parts")
++
++    harm_errors = validate_harm_tokens(tokens)
++    assert not harm_errors
++
++    pos_idx = tokens.index("POS_24")
++    found_upper = False
++    idx = pos_idx + 1
++    while idx < len(tokens) and tokens[idx] != "BAR" and not tokens[idx].startswith("POS_"):
++        if not tokens[idx].startswith("VOICE_"):
++            idx += 1
++            continue
++        event, next_idx = parse_voice_event(tokens, idx)
++        if event.voice == 1:
++            found_upper = True
++            assert event.mel_int == 2
++            assert event.harm_oct == 0
++            assert event.harm_class == 9
++        idx = next_idx
++
++    assert found_upper
+
+
+thinking
+**Updating progress comments**
+file update
+M /home/stephen-reilly/dev/bach_gen/TODO.md
+@@ -6,2 +6,3 @@
+ - [x] Implement event parsing/serialization in `src/tokens/tokenizer.py` with canonical ordering
++- [x] Add round-trip tests for pitch reconstruction and `HARM_*` consistency
+ - [ ] Implement `scripts/make_dataset.py` basic pipeline
+apply_patch(auto_approved=true) exited 0 in 17ms:
+Success. Updated the following files:
+M TODO.md
+file update:
+diff --git a/TODO.md b/TODO.md
+index f34ae3002cbb8b57163085ffe73aebe53b830893..1bb5aaf5722a90e458248dd07c4b684eeed5f712
+--- a/TODO.md
++++ b/TODO.md
+@@ -4,6 +4,7 @@
+ - [x] Implement `src/tokens/schema.py` (EventSpec + DescriptorSpec, versioned)
+ - [x] Implement tokenizer interval math + round-trip tests
+ - [x] Implement event parsing/serialization in `src/tokens/tokenizer.py` with canonical ordering
++- [x] Add round-trip tests for pitch reconstruction and `HARM_*` consistency
+ - [ ] Implement `scripts/make_dataset.py` basic pipeline
+ - [ ] Produce `data/processed/{events.parquet,barplans.parquet,stats.json}`
+ - [x] CI: `pytest -q` passes
+diff --git a/docs/exec/EXECPLAN_stage1.md b/docs/exec/EXECPLAN_stage1.md
+index b8ee585fca521d0ea892fa6b21d13bb879078f5d..5804cb1423e039105830941eb6e393ebe9d0a4f6
+--- a/docs/exec/EXECPLAN_stage1.md
++++ b/docs/exec/EXECPLAN_stage1.md
+@@ -12,7 +12,7 @@
+ - [x] Define EventSpec + DescriptorSpec in `src/tokens/schema.py` with version `remi_tab_v1` and `tpq=24`.
+ - [x] Implement interval math helpers (melodic + harmonic ref) with QA vs production behavior.
+ - [x] Implement event parsing/serialization in `src/tokens/tokenizer.py` with canonical ordering.
+-- [ ] Add round-trip tests for pitch reconstruction and `HARM_*` consistency.
++- [x] Add round-trip tests for pitch reconstruction and `HARM_*` consistency.
+ - [ ] Implement `scripts/make_dataset.py` basic pipeline (parse, normalize, collapse doublings, track assignment, tokenize, stats).
+ - [ ] Produce dataset artifacts in `data/processed/` and document counts in `stats.json`.
+ - [ ] Verify `bash docs/skills/python-test-env/scripts/run_tests.sh` passes.
+diff --git a/tests/test_roundtrip_pitch.py b/tests/test_roundtrip_pitch.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..b6fbfef56a9df3df629ed8135abb4b79c3e98a39
+--- /dev/null
++++ b/tests/test_roundtrip_pitch.py
+@@ -0,0 +1,141 @@
++import random
++import sys
++from pathlib import Path
++from typing import Dict, List, Tuple
++
++import pytest
++from music21 import meter, note, stream
++
++sys.path.insert(0, str(Path(__file__).parents[1]))
++
++from src.tokens.eventizer import eventize_musicxml
++from src.tokens.roundtrip import tokens_to_score
++from src.tokens.tokenizer import parse_voice_event
++from src.tokens.validator import validate_harm_tokens
++
++TPQ = 24
++
++
++def _note_events_by_voice(score: stream.Score) -> Dict[int, List[Tuple[int, int, int]]]:
++    by_voice: Dict[int, List[Tuple[int, int, int]]] = {}
++    for voice_idx, part in enumerate(score.parts):
++        events: List[Tuple[int, int, int]] = []
++        flat_part = part.flatten()
++        for el in flat_part.notesAndRests:
++            if el.isRest:
++                continue
++            if el.isChord:
++                pitch = max(p.midi for p in el.pitches)
++            else:
++                pitch = el.pitch.midi
++            onset = int(round(el.offset * TPQ))
++            duration = int(round(el.duration.quarterLength * TPQ))
++            events.append((onset, duration, pitch))
++        by_voice[voice_idx] = events
++    return by_voice
++
++
++def _assert_events_match_with_tick_tolerance(
++    expected: Dict[int, List[Tuple[int, int, int]]],
++    actual: Dict[int, List[Tuple[int, int, int]]],
++    *,
++    tick_tolerance: int = 1,
++) -> None:
++    assert set(expected.keys()) == set(actual.keys())
++    for voice_idx in expected:
++        exp_events = expected[voice_idx]
++        got_events = actual[voice_idx]
++        assert len(exp_events) == len(got_events)
++        for (exp_onset, exp_dur, exp_pitch), (got_onset, got_dur, got_pitch) in zip(
++            exp_events, got_events
++        ):
++            assert got_pitch == exp_pitch
++            assert abs(got_onset - exp_onset) <= tick_tolerance
++            assert abs(got_dur - exp_dur) <= tick_tolerance
++
++
++def _build_random_score(seed: int, *, bars: int = 3, voices: int = 3) -> stream.Score:
++    rng = random.Random(seed)
++    score = stream.Score()
++    for voice_idx in range(voices):
++        part = stream.Part(id=f"Voice{voice_idx}")
++        part.append(meter.TimeSignature("4/4"))
++        base_pitch = 48 + voice_idx * 7
++        for _ in range(bars):
++            remaining = 4.0
++            while remaining > 1e-9:
++                options = [dur for dur in (0.5, 1.0, 1.5, 2.0) if dur <= remaining + 1e-9]
++                quarter_len = rng.choice(options)
++                if rng.random() < 0.3:
++                    part.append(note.Rest(quarterLength=quarter_len))
++                else:
++                    pitch = base_pitch + rng.randint(0, 12)
++                    part.append(note.Note(midi=pitch, quarterLength=quarter_len))
++                remaining = round(remaining - quarter_len, 6)
++        score.insert(0, part)
++    return score
++
++
++def _write_sustained_reference_xml(tmp_path: Path) -> Path:
++    score = stream.Score()
++
++    bass = stream.Part(id="Bass")
++    bass.append(meter.TimeSignature("4/4"))
++    bass.append(note.Note("C3", quarterLength=2.0))
++    bass.append(note.Rest(quarterLength=2.0))
++
++    upper = stream.Part(id="Upper")
++    upper.append(meter.TimeSignature("4/4"))
++    upper.append(note.Note("G3", quarterLength=1.0))
++    upper.append(note.Note("A3", quarterLength=1.0))
++    upper.append(note.Rest(quarterLength=2.0))
++
++    score.insert(0, bass)
++    score.insert(0, upper)
++
++    out_path = tmp_path / "sustained_reference.xml"
++    score.write("musicxml", fp=str(out_path))
++    return out_path
++
++
++@pytest.mark.parametrize("seed", [7, 17, 27])
++def test_roundtrip_pitch_reconstruction_on_random_bars(seed: int, tmp_path: Path) -> None:
++    score = _build_random_score(seed)
++    xml_path = tmp_path / f"random_seed_{seed}.xml"
++    score.write("musicxml", fp=str(xml_path))
++
++    tokens, _ = eventize_musicxml(str(xml_path), voice_mode="parts")
++    harm_errors = validate_harm_tokens(tokens)
++    assert not harm_errors
++
++    reconstructed = tokens_to_score(tokens, tpq=TPQ)
++    _assert_events_match_with_tick_tolerance(
++        _note_events_by_voice(score),
++        _note_events_by_voice(reconstructed),
++        tick_tolerance=1,
++    )
++
++
++def test_harm_consistency_uses_lowest_active_reference_pitch(tmp_path: Path) -> None:
++    xml_path = _write_sustained_reference_xml(tmp_path)
++    tokens, _ = eventize_musicxml(str(xml_path), voice_mode="parts")
++
++    harm_errors = validate_harm_tokens(tokens)
++    assert not harm_errors
++
++    pos_idx = tokens.index("POS_24")
++    found_upper = False
++    idx = pos_idx + 1
++    while idx < len(tokens) and tokens[idx] != "BAR" and not tokens[idx].startswith("POS_"):
++        if not tokens[idx].startswith("VOICE_"):
++            idx += 1
++            continue
++        event, next_idx = parse_voice_event(tokens, idx)
++        if event.voice == 1:
++            found_upper = True
++            assert event.mel_int == 2
++            assert event.harm_oct == 0
++            assert event.harm_class == 9
++        idx = next_idx
++
++    assert found_upper
+
+file update:
+diff --git a/TODO.md b/TODO.md
+index f34ae3002cbb8b57163085ffe73aebe53b830893..1bb5aaf5722a90e458248dd07c4b684eeed5f712
+--- a/TODO.md
++++ b/TODO.md
+@@ -4,6 +4,7 @@
+ - [x] Implement `src/tokens/schema.py` (EventSpec + DescriptorSpec, versioned)
+ - [x] Implement tokenizer interval math + round-trip tests
+ - [x] Implement event parsing/serialization in `src/tokens/tokenizer.py` with canonical ordering
++- [x] Add round-trip tests for pitch reconstruction and `HARM_*` consistency
+ - [ ] Implement `scripts/make_dataset.py` basic pipeline
+ - [ ] Produce `data/processed/{events.parquet,barplans.parquet,stats.json}`
+ - [x] CI: `pytest -q` passes
+diff --git a/docs/exec/EXECPLAN_stage1.md b/docs/exec/EXECPLAN_stage1.md
+index b8ee585fca521d0ea892fa6b21d13bb879078f5d..5804cb1423e039105830941eb6e393ebe9d0a4f6
+--- a/docs/exec/EXECPLAN_stage1.md
++++ b/docs/exec/EXECPLAN_stage1.md
+@@ -12,7 +12,7 @@
+ - [x] Define EventSpec + DescriptorSpec in `src/tokens/schema.py` with version `remi_tab_v1` and `tpq=24`.
+ - [x] Implement interval math helpers (melodic + harmonic ref) with QA vs production behavior.
+ - [x] Implement event parsing/serialization in `src/tokens/tokenizer.py` with canonical ordering.
+-- [ ] Add round-trip tests for pitch reconstruction and `HARM_*` consistency.
++- [x] Add round-trip tests for pitch reconstruction and `HARM_*` consistency.
+ - [ ] Implement `scripts/make_dataset.py` basic pipeline (parse, normalize, collapse doublings, track assignment, tokenize, stats).
+ - [ ] Produce dataset artifacts in `data/processed/` and document counts in `stats.json`.
+ - [ ] Verify `bash docs/skills/python-test-env/scripts/run_tests.sh` passes.
+diff --git a/tests/test_roundtrip_pitch.py b/tests/test_roundtrip_pitch.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..b6fbfef56a9df3df629ed8135abb4b79c3e98a39
+--- /dev/null
++++ b/tests/test_roundtrip_pitch.py
+@@ -0,0 +1,141 @@
++import random
++import sys
++from pathlib import Path
++from typing import Dict, List, Tuple
++
++import pytest
++from music21 import meter, note, stream
++
++sys.path.insert(0, str(Path(__file__).parents[1]))
++
++from src.tokens.eventizer import eventize_musicxml
++from src.tokens.roundtrip import tokens_to_score
++from src.tokens.tokenizer import parse_voice_event
++from src.tokens.validator import validate_harm_tokens
++
++TPQ = 24
++
++
++def _note_events_by_voice(score: stream.Score) -> Dict[int, List[Tuple[int, int, int]]]:
++    by_voice: Dict[int, List[Tuple[int, int, int]]] = {}
++    for voice_idx, part in enumerate(score.parts):
++        events: List[Tuple[int, int, int]] = []
++        flat_part = part.flatten()
++        for el in flat_part.notesAndRests:
++            if el.isRest:
++                continue
++            if el.isChord:
++                pitch = max(p.midi for p in el.pitches)
++            else:
++                pitch = el.pitch.midi
++            onset = int(round(el.offset * TPQ))
++            duration = int(round(el.duration.quarterLength * TPQ))
++            events.append((onset, duration, pitch))
++        by_voice[voice_idx] = events
++    return by_voice
++
++
++def _assert_events_match_with_tick_tolerance(
++    expected: Dict[int, List[Tuple[int, int, int]]],
++    actual: Dict[int, List[Tuple[int, int, int]]],
++    *,
++    tick_tolerance: int = 1,
++) -> None:
++    assert set(expected.keys()) == set(actual.keys())
++    for voice_idx in expected:
++        exp_events = expected[voice_idx]
++        got_events = actual[voice_idx]
++        assert len(exp_events) == len(got_events)
++        for (exp_onset, exp_dur, exp_pitch), (got_onset, got_dur, got_pitch) in zip(
++            exp_events, got_events
++        ):
++            assert got_pitch == exp_pitch
++            assert abs(got_onset - exp_onset) <= tick_tolerance
++            assert abs(got_dur - exp_dur) <= tick_tolerance
++
++
++def _build_random_score(seed: int, *, bars: int = 3, voices: int = 3) -> stream.Score:
++    rng = random.Random(seed)
++    score = stream.Score()
++    for voice_idx in range(voices):
++        part = stream.Part(id=f"Voice{voice_idx}")
++        part.append(meter.TimeSignature("4/4"))
++        base_pitch = 48 + voice_idx * 7
++        for _ in range(bars):
++            remaining = 4.0
++            while remaining > 1e-9:
++                options = [dur for dur in (0.5, 1.0, 1.5, 2.0) if dur <= remaining + 1e-9]
++                quarter_len = rng.choice(options)
++                if rng.random() < 0.3:
++                    part.append(note.Rest(quarterLength=quarter_len))
++                else:
++                    pitch = base_pitch + rng.randint(0, 12)
++                    part.append(note.Note(midi=pitch, quarterLength=quarter_len))
++                remaining = round(remaining - quarter_len, 6)
++        score.insert(0, part)
++    return score
++
++
++def _write_sustained_reference_xml(tmp_path: Path) -> Path:
++    score = stream.Score()
++
++    bass = stream.Part(id="Bass")
++    bass.append(meter.TimeSignature("4/4"))
++    bass.append(note.Note("C3", quarterLength=2.0))
++    bass.append(note.Rest(quarterLength=2.0))
++
++    upper = stream.Part(id="Upper")
++    upper.append(meter.TimeSignature("4/4"))
++    upper.append(note.Note("G3", quarterLength=1.0))
++    upper.append(note.Note("A3", quarterLength=1.0))
++    upper.append(note.Rest(quarterLength=2.0))
++
++    score.insert(0, bass)
++    score.insert(0, upper)
++
++    out_path = tmp_path / "sustained_reference.xml"
++    score.write("musicxml", fp=str(out_path))
++    return out_path
++
++
++@pytest.mark.parametrize("seed", [7, 17, 27])
++def test_roundtrip_pitch_reconstruction_on_random_bars(seed: int, tmp_path: Path) -> None:
++    score = _build_random_score(seed)
++    xml_path = tmp_path / f"random_seed_{seed}.xml"
++    score.write("musicxml", fp=str(xml_path))
++
++    tokens, _ = eventize_musicxml(str(xml_path), voice_mode="parts")
++    harm_errors = validate_harm_tokens(tokens)
++    assert not harm_errors
++
++    reconstructed = tokens_to_score(tokens, tpq=TPQ)
++    _assert_events_match_with_tick_tolerance(
++        _note_events_by_voice(score),
++        _note_events_by_voice(reconstructed),
++        tick_tolerance=1,
++    )
++
++
++def test_harm_consistency_uses_lowest_active_reference_pitch(tmp_path: Path) -> None:
++    xml_path = _write_sustained_reference_xml(tmp_path)
++    tokens, _ = eventize_musicxml(str(xml_path), voice_mode="parts")
++
++    harm_errors = validate_harm_tokens(tokens)
++    assert not harm_errors
++
++    pos_idx = tokens.index("POS_24")
++    found_upper = False
++    idx = pos_idx + 1
++    while idx < len(tokens) and tokens[idx] != "BAR" and not tokens[idx].startswith("POS_"):
++        if not tokens[idx].startswith("VOICE_"):
++            idx += 1
++            continue
++        event, next_idx = parse_voice_event(tokens, idx)
++        if event.voice == 1:
++            found_upper = True
++            assert event.mel_int == 2
++            assert event.harm_oct == 0
++            assert event.harm_class == 9
++        idx = next_idx
++
++    assert found_upper
+
+
+thinking
+**Appending progress update**
+file update
+M /home/stephen-reilly/dev/bach_gen/PROGRESS.md
+@@ -10 +10,2 @@
+ - 2026-02-24: Completed Stage-1 ExecPlan item 3 by adding `src/tokens/tokenizer.py` (voice-event parsing/serialization, stream canonicalization helpers), wiring `eventize_musicxml` pitched-onset emission through tokenizer serialization for canonical ordering, and adding `tests/test_tokenizer.py`; verify run: `59 passed, 1 skipped`.
++- 2026-02-24: Completed Stage-1 ExecPlan item 4 by adding `tests/test_roundtrip_pitch.py` with random-bar pitch reconstruction round-trip checks (anchors + `MEL_INT12`) and sustained-reference `HARM_*` consistency assertions; verify run: `63 passed, 1 skipped`.
+apply_patch(auto_approved=true) exited 0 in 29ms:
+Success. Updated the following files:
+M PROGRESS.md
+file update:
+diff --git a/PROGRESS.md b/PROGRESS.md
+index 11f763e2dbb4256baeb84ecbe0f89f7a55bf2222..c38966ab59b9b77fc51cbe298f3a391482c0564e
+--- a/PROGRESS.md
++++ b/PROGRESS.md
+@@ -8,3 +8,4 @@
+ - 2026-02-24: Completed Stage-1 ExecPlan item 1 by defining versioned `EventSpec`/`DescriptorSpec` in `src/tokens/schema.py` (`remi_tab_v1`, `tpq=24`) and added `tests/test_schema.py`.
+ - 2026-02-24: Completed Stage-1 ExecPlan item 2 by adding `src/tokens/intervals.py` (melodic/harmonic helpers with QA vs production behavior), wiring repairs into `eventize_musicxml`, updating harmonic validation to shared math helpers, and adding `tests/test_intervals.py`; verify run: `53 passed, 1 skipped`.
+ - 2026-02-24: Completed Stage-1 ExecPlan item 3 by adding `src/tokens/tokenizer.py` (voice-event parsing/serialization, stream canonicalization helpers), wiring `eventize_musicxml` pitched-onset emission through tokenizer serialization for canonical ordering, and adding `tests/test_tokenizer.py`; verify run: `59 passed, 1 skipped`.
++- 2026-02-24: Completed Stage-1 ExecPlan item 4 by adding `tests/test_roundtrip_pitch.py` with random-bar pitch reconstruction round-trip checks (anchors + `MEL_INT12`) and sustained-reference `HARM_*` consistency assertions; verify run: `63 passed, 1 skipped`.
+diff --git a/TODO.md b/TODO.md
+index f34ae3002cbb8b57163085ffe73aebe53b830893..1bb5aaf5722a90e458248dd07c4b684eeed5f712
+--- a/TODO.md
++++ b/TODO.md
+@@ -4,6 +4,7 @@
+ - [x] Implement `src/tokens/schema.py` (EventSpec + DescriptorSpec, versioned)
+ - [x] Implement tokenizer interval math + round-trip tests
+ - [x] Implement event parsing/serialization in `src/tokens/tokenizer.py` with canonical ordering
++- [x] Add round-trip tests for pitch reconstruction and `HARM_*` consistency
+ - [ ] Implement `scripts/make_dataset.py` basic pipeline
+ - [ ] Produce `data/processed/{events.parquet,barplans.parquet,stats.json}`
+ - [x] CI: `pytest -q` passes
+diff --git a/docs/exec/EXECPLAN_stage1.md b/docs/exec/EXECPLAN_stage1.md
+index b8ee585fca521d0ea892fa6b21d13bb879078f5d..5804cb1423e039105830941eb6e393ebe9d0a4f6
+--- a/docs/exec/EXECPLAN_stage1.md
++++ b/docs/exec/EXECPLAN_stage1.md
+@@ -12,7 +12,7 @@
+ - [x] Define EventSpec + DescriptorSpec in `src/tokens/schema.py` with version `remi_tab_v1` and `tpq=24`.
+ - [x] Implement interval math helpers (melodic + harmonic ref) with QA vs production behavior.
+ - [x] Implement event parsing/serialization in `src/tokens/tokenizer.py` with canonical ordering.
+-- [ ] Add round-trip tests for pitch reconstruction and `HARM_*` consistency.
++- [x] Add round-trip tests for pitch reconstruction and `HARM_*` consistency.
+ - [ ] Implement `scripts/make_dataset.py` basic pipeline (parse, normalize, collapse doublings, track assignment, tokenize, stats).
+ - [ ] Produce dataset artifacts in `data/processed/` and document counts in `stats.json`.
+ - [ ] Verify `bash docs/skills/python-test-env/scripts/run_tests.sh` passes.
+diff --git a/tests/test_roundtrip_pitch.py b/tests/test_roundtrip_pitch.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..b6fbfef56a9df3df629ed8135abb4b79c3e98a39
+--- /dev/null
++++ b/tests/test_roundtrip_pitch.py
+@@ -0,0 +1,141 @@
++import random
++import sys
++from pathlib import Path
++from typing import Dict, List, Tuple
++
++import pytest
++from music21 import meter, note, stream
++
++sys.path.insert(0, str(Path(__file__).parents[1]))
++
++from src.tokens.eventizer import eventize_musicxml
++from src.tokens.roundtrip import tokens_to_score
++from src.tokens.tokenizer import parse_voice_event
++from src.tokens.validator import validate_harm_tokens
++
++TPQ = 24
++
++
++def _note_events_by_voice(score: stream.Score) -> Dict[int, List[Tuple[int, int, int]]]:
++    by_voice: Dict[int, List[Tuple[int, int, int]]] = {}
++    for voice_idx, part in enumerate(score.parts):
++        events: List[Tuple[int, int, int]] = []
++        flat_part = part.flatten()
++        for el in flat_part.notesAndRests:
++            if el.isRest:
++                continue
++            if el.isChord:
++                pitch = max(p.midi for p in el.pitches)
++            else:
++                pitch = el.pitch.midi
++            onset = int(round(el.offset * TPQ))
++            duration = int(round(el.duration.quarterLength * TPQ))
++            events.append((onset, duration, pitch))
++        by_voice[voice_idx] = events
++    return by_voice
++
++
++def _assert_events_match_with_tick_tolerance(
++    expected: Dict[int, List[Tuple[int, int, int]]],
++    actual: Dict[int, List[Tuple[int, int, int]]],
++    *,
++    tick_tolerance: int = 1,
++) -> None:
++    assert set(expected.keys()) == set(actual.keys())
++    for voice_idx in expected:
++        exp_events = expected[voice_idx]
++        got_events = actual[voice_idx]
++        assert len(exp_events) == len(got_events)
++        for (exp_onset, exp_dur, exp_pitch), (got_onset, got_dur, got_pitch) in zip(
++            exp_events, got_events
++        ):
++            assert got_pitch == exp_pitch
++            assert abs(got_onset - exp_onset) <= tick_tolerance
++            assert abs(got_dur - exp_dur) <= tick_tolerance
++
++
++def _build_random_score(seed: int, *, bars: int = 3, voices: int = 3) -> stream.Score:
++    rng = random.Random(seed)
++    score = stream.Score()
++    for voice_idx in range(voices):
++        part = stream.Part(id=f"Voice{voice_idx}")
++        part.append(meter.TimeSignature("4/4"))
++        base_pitch = 48 + voice_idx * 7
++        for _ in range(bars):
++            remaining = 4.0
++            while remaining > 1e-9:
++                options = [dur for dur in (0.5, 1.0, 1.5, 2.0) if dur <= remaining + 1e-9]
++                quarter_len = rng.choice(options)
++                if rng.random() < 0.3:
++                    part.append(note.Rest(quarterLength=quarter_len))
++                else:
++                    pitch = base_pitch + rng.randint(0, 12)
++                    part.append(note.Note(midi=pitch, quarterLength=quarter_len))
++                remaining = round(remaining - quarter_len, 6)
++        score.insert(0, part)
++    return score
++
++
++def _write_sustained_reference_xml(tmp_path: Path) -> Path:
++    score = stream.Score()
++
++    bass = stream.Part(id="Bass")
++    bass.append(meter.TimeSignature("4/4"))
++    bass.append(note.Note("C3", quarterLength=2.0))
++    bass.append(note.Rest(quarterLength=2.0))
++
++    upper = stream.Part(id="Upper")
++    upper.append(meter.TimeSignature("4/4"))
++    upper.append(note.Note("G3", quarterLength=1.0))
++    upper.append(note.Note("A3", quarterLength=1.0))
++    upper.append(note.Rest(quarterLength=2.0))
++
++    score.insert(0, bass)
++    score.insert(0, upper)
++
++    out_path = tmp_path / "sustained_reference.xml"
++    score.write("musicxml", fp=str(out_path))
++    return out_path
++
++
++@pytest.mark.parametrize("seed", [7, 17, 27])
++def test_roundtrip_pitch_reconstruction_on_random_bars(seed: int, tmp_path: Path) -> None:
++    score = _build_random_score(seed)
++    xml_path = tmp_path / f"random_seed_{seed}.xml"
++    score.write("musicxml", fp=str(xml_path))
++
++    tokens, _ = eventize_musicxml(str(xml_path), voice_mode="parts")
++    harm_errors = validate_harm_tokens(tokens)
++    assert not harm_errors
++
++    reconstructed = tokens_to_score(tokens, tpq=TPQ)
++    _assert_events_match_with_tick_tolerance(
++        _note_events_by_voice(score),
++        _note_events_by_voice(reconstructed),
++        tick_tolerance=1,
++    )
++
++
++def test_harm_consistency_uses_lowest_active_reference_pitch(tmp_path: Path) -> None:
++    xml_path = _write_sustained_reference_xml(tmp_path)
++    tokens, _ = eventize_musicxml(str(xml_path), voice_mode="parts")
++
++    harm_errors = validate_harm_tokens(tokens)
++    assert not harm_errors
++
++    pos_idx = tokens.index("POS_24")
++    found_upper = False
++    idx = pos_idx + 1
++    while idx < len(tokens) and tokens[idx] != "BAR" and not tokens[idx].startswith("POS_"):
++        if not tokens[idx].startswith("VOICE_"):
++            idx += 1
++            continue
++        event, next_idx = parse_voice_event(tokens, idx)
++        if event.voice == 1:
++            found_upper = True
++            assert event.mel_int == 2
++            assert event.harm_oct == 0
++            assert event.harm_class == 9
++        idx = next_idx
++
++    assert found_upper
+
+file update:
+diff --git a/PROGRESS.md b/PROGRESS.md
+index 11f763e2dbb4256baeb84ecbe0f89f7a55bf2222..c38966ab59b9b77fc51cbe298f3a391482c0564e
+--- a/PROGRESS.md
++++ b/PROGRESS.md
+@@ -8,3 +8,4 @@
+ - 2026-02-24: Completed Stage-1 ExecPlan item 1 by defining versioned `EventSpec`/`DescriptorSpec` in `src/tokens/schema.py` (`remi_tab_v1`, `tpq=24`) and added `tests/test_schema.py`.
+ - 2026-02-24: Completed Stage-1 ExecPlan item 2 by adding `src/tokens/intervals.py` (melodic/harmonic helpers with QA vs production behavior), wiring repairs into `eventize_musicxml`, updating harmonic validation to shared math helpers, and adding `tests/test_intervals.py`; verify run: `53 passed, 1 skipped`.
+ - 2026-02-24: Completed Stage-1 ExecPlan item 3 by adding `src/tokens/tokenizer.py` (voice-event parsing/serialization, stream canonicalization helpers), wiring `eventize_musicxml` pitched-onset emission through tokenizer serialization for canonical ordering, and adding `tests/test_tokenizer.py`; verify run: `59 passed, 1 skipped`.
++- 2026-02-24: Completed Stage-1 ExecPlan item 4 by adding `tests/test_roundtrip_pitch.py` with random-bar pitch reconstruction round-trip checks (anchors + `MEL_INT12`) and sustained-reference `HARM_*` consistency assertions; verify run: `63 passed, 1 skipped`.
+diff --git a/TODO.md b/TODO.md
+index f34ae3002cbb8b57163085ffe73aebe53b830893..1bb5aaf5722a90e458248dd07c4b684eeed5f712
+--- a/TODO.md
++++ b/TODO.md
+@@ -4,6 +4,7 @@
+ - [x] Implement `src/tokens/schema.py` (EventSpec + DescriptorSpec, versioned)
+ - [x] Implement tokenizer interval math + round-trip tests
+ - [x] Implement event parsing/serialization in `src/tokens/tokenizer.py` with canonical ordering
++- [x] Add round-trip tests for pitch reconstruction and `HARM_*` consistency
+ - [ ] Implement `scripts/make_dataset.py` basic pipeline
+ - [ ] Produce `data/processed/{events.parquet,barplans.parquet,stats.json}`
+ - [x] CI: `pytest -q` passes
+diff --git a/docs/exec/EXECPLAN_stage1.md b/docs/exec/EXECPLAN_stage1.md
+index b8ee585fca521d0ea892fa6b21d13bb879078f5d..5804cb1423e039105830941eb6e393ebe9d0a4f6
+--- a/docs/exec/EXECPLAN_stage1.md
++++ b/docs/exec/EXECPLAN_stage1.md
+@@ -12,7 +12,7 @@
+ - [x] Define EventSpec + DescriptorSpec in `src/tokens/schema.py` with version `remi_tab_v1` and `tpq=24`.
+ - [x] Implement interval math helpers (melodic + harmonic ref) with QA vs production behavior.
+ - [x] Implement event parsing/serialization in `src/tokens/tokenizer.py` with canonical ordering.
+-- [ ] Add round-trip tests for pitch reconstruction and `HARM_*` consistency.
++- [x] Add round-trip tests for pitch reconstruction and `HARM_*` consistency.
+ - [ ] Implement `scripts/make_dataset.py` basic pipeline (parse, normalize, collapse doublings, track assignment, tokenize, stats).
+ - [ ] Produce dataset artifacts in `data/processed/` and document counts in `stats.json`.
+ - [ ] Verify `bash docs/skills/python-test-env/scripts/run_tests.sh` passes.
+diff --git a/tests/test_roundtrip_pitch.py b/tests/test_roundtrip_pitch.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..b6fbfef56a9df3df629ed8135abb4b79c3e98a39
+--- /dev/null
++++ b/tests/test_roundtrip_pitch.py
+@@ -0,0 +1,141 @@
++import random
++import sys
++from pathlib import Path
++from typing import Dict, List, Tuple
++
++import pytest
++from music21 import meter, note, stream
++
++sys.path.insert(0, str(Path(__file__).parents[1]))
++
++from src.tokens.eventizer import eventize_musicxml
++from src.tokens.roundtrip import tokens_to_score
++from src.tokens.tokenizer import parse_voice_event
++from src.tokens.validator import validate_harm_tokens
++
++TPQ = 24
++
++
++def _note_events_by_voice(score: stream.Score) -> Dict[int, List[Tuple[int, int, int]]]:
++    by_voice: Dict[int, List[Tuple[int, int, int]]] = {}
++    for voice_idx, part in enumerate(score.parts):
++        events: List[Tuple[int, int, int]] = []
++        flat_part = part.flatten()
++        for el in flat_part.notesAndRests:
++            if el.isRest:
++                continue
++            if el.isChord:
++                pitch = max(p.midi for p in el.pitches)
++            else:
++                pitch = el.pitch.midi
++            onset = int(round(el.offset * TPQ))
++            duration = int(round(el.duration.quarterLength * TPQ))
++            events.append((onset, duration, pitch))
++        by_voice[voice_idx] = events
++    return by_voice
++
++
++def _assert_events_match_with_tick_tolerance(
++    expected: Dict[int, List[Tuple[int, int, int]]],
++    actual: Dict[int, List[Tuple[int, int, int]]],
++    *,
++    tick_tolerance: int = 1,
++) -> None:
++    assert set(expected.keys()) == set(actual.keys())
++    for voice_idx in expected:
++        exp_events = expected[voice_idx]
++        got_events = actual[voice_idx]
++        assert len(exp_events) == len(got_events)
++        for (exp_onset, exp_dur, exp_pitch), (got_onset, got_dur, got_pitch) in zip(
++            exp_events, got_events
++        ):
++            assert got_pitch == exp_pitch
++            assert abs(got_onset - exp_onset) <= tick_tolerance
++            assert abs(got_dur - exp_dur) <= tick_tolerance
++
++
++def _build_random_score(seed: int, *, bars: int = 3, voices: int = 3) -> stream.Score:
++    rng = random.Random(seed)
++    score = stream.Score()
++    for voice_idx in range(voices):
++        part = stream.Part(id=f"Voice{voice_idx}")
++        part.append(meter.TimeSignature("4/4"))
++        base_pitch = 48 + voice_idx * 7
++        for _ in range(bars):
++            remaining = 4.0
++            while remaining > 1e-9:
++                options = [dur for dur in (0.5, 1.0, 1.5, 2.0) if dur <= remaining + 1e-9]
++                quarter_len = rng.choice(options)
++                if rng.random() < 0.3:
++                    part.append(note.Rest(quarterLength=quarter_len))
++                else:
++                    pitch = base_pitch + rng.randint(0, 12)
++                    part.append(note.Note(midi=pitch, quarterLength=quarter_len))
++                remaining = round(remaining - quarter_len, 6)
++        score.insert(0, part)
++    return score
++
++
++def _write_sustained_reference_xml(tmp_path: Path) -> Path:
++    score = stream.Score()
++
++    bass = stream.Part(id="Bass")
++    bass.append(meter.TimeSignature("4/4"))
++    bass.append(note.Note("C3", quarterLength=2.0))
++    bass.append(note.Rest(quarterLength=2.0))
++
++    upper = stream.Part(id="Upper")
++    upper.append(meter.TimeSignature("4/4"))
++    upper.append(note.Note("G3", quarterLength=1.0))
++    upper.append(note.Note("A3", quarterLength=1.0))
++    upper.append(note.Rest(quarterLength=2.0))
++
++    score.insert(0, bass)
++    score.insert(0, upper)
++
++    out_path = tmp_path / "sustained_reference.xml"
++    score.write("musicxml", fp=str(out_path))
++    return out_path
++
++
++@pytest.mark.parametrize("seed", [7, 17, 27])
++def test_roundtrip_pitch_reconstruction_on_random_bars(seed: int, tmp_path: Path) -> None:
++    score = _build_random_score(seed)
++    xml_path = tmp_path / f"random_seed_{seed}.xml"
++    score.write("musicxml", fp=str(xml_path))
++
++    tokens, _ = eventize_musicxml(str(xml_path), voice_mode="parts")
++    harm_errors = validate_harm_tokens(tokens)
++    assert not harm_errors
++
++    reconstructed = tokens_to_score(tokens, tpq=TPQ)
++    _assert_events_match_with_tick_tolerance(
++        _note_events_by_voice(score),
++        _note_events_by_voice(reconstructed),
++        tick_tolerance=1,
++    )
++
++
++def test_harm_consistency_uses_lowest_active_reference_pitch(tmp_path: Path) -> None:
++    xml_path = _write_sustained_reference_xml(tmp_path)
++    tokens, _ = eventize_musicxml(str(xml_path), voice_mode="parts")
++
++    harm_errors = validate_harm_tokens(tokens)
++    assert not harm_errors
++
++    pos_idx = tokens.index("POS_24")
++    found_upper = False
++    idx = pos_idx + 1
++    while idx < len(tokens) and tokens[idx] != "BAR" and not tokens[idx].startswith("POS_"):
++        if not tokens[idx].startswith("VOICE_"):
++            idx += 1
++            continue
++        event, next_idx = parse_voice_event(tokens, idx)
++        if event.voice == 1:
++            found_upper = True
++            assert event.mel_int == 2
++            assert event.harm_oct == 0
++            assert event.harm_class == 9
++        idx = next_idx
++
++    assert found_upper
+
+
+thinking
+**Running standard test command**
+codex
+{"done":false,"progress_made":true,"summary":"I’ve marked the completed checklist item and synced TODO/PROGRESS. I’ll now run the standard verify command exactly (`bash docs/skills/python-test-env/scripts/run_tests.sh`) to finish this loop.","tests_ran":true,"tests_status":"pass","next_step":"Execute full verification and then report changed files/results.","stop_reason":""}
+exec
+/bin/bash -lc 'bash docs/skills/python-test-env/scripts/run_tests.sh' in /home/stephen-reilly/dev/bach_genfile update:
+diff --git a/PROGRESS.md b/PROGRESS.md
+index 11f763e2dbb4256baeb84ecbe0f89f7a55bf2222..c38966ab59b9b77fc51cbe298f3a391482c0564e
+--- a/PROGRESS.md
++++ b/PROGRESS.md
+@@ -8,3 +8,4 @@
+ - 2026-02-24: Completed Stage-1 ExecPlan item 1 by defining versioned `EventSpec`/`DescriptorSpec` in `src/tokens/schema.py` (`remi_tab_v1`, `tpq=24`) and added `tests/test_schema.py`.
+ - 2026-02-24: Completed Stage-1 ExecPlan item 2 by adding `src/tokens/intervals.py` (melodic/harmonic helpers with QA vs production behavior), wiring repairs into `eventize_musicxml`, updating harmonic validation to shared math helpers, and adding `tests/test_intervals.py`; verify run: `53 passed, 1 skipped`.
+ - 2026-02-24: Completed Stage-1 ExecPlan item 3 by adding `src/tokens/tokenizer.py` (voice-event parsing/serialization, stream canonicalization helpers), wiring `eventize_musicxml` pitched-onset emission through tokenizer serialization for canonical ordering, and adding `tests/test_tokenizer.py`; verify run: `59 passed, 1 skipped`.
++- 2026-02-24: Completed Stage-1 ExecPlan item 4 by adding `tests/test_roundtrip_pitch.py` with random-bar pitch reconstruction round-trip checks (anchors + `MEL_INT12`) and sustained-reference `HARM_*` consistency assertions; verify run: `63 passed, 1 skipped`.
+diff --git a/TODO.md b/TODO.md
+index f34ae3002cbb8b57163085ffe73aebe53b830893..1bb5aaf5722a90e458248dd07c4b684eeed5f712
+--- a/TODO.md
++++ b/TODO.md
+@@ -4,6 +4,7 @@
+ - [x] Implement `src/tokens/schema.py` (EventSpec + DescriptorSpec, versioned)
+ - [x] Implement tokenizer interval math + round-trip tests
+ - [x] Implement event parsing/serialization in `src/tokens/tokenizer.py` with canonical ordering
++- [x] Add round-trip tests for pitch reconstruction and `HARM_*` consistency
+ - [ ] Implement `scripts/make_dataset.py` basic pipeline
+ - [ ] Produce `data/processed/{events.parquet,barplans.parquet,stats.json}`
+ - [x] CI: `pytest -q` passes
+diff --git a/docs/exec/EXECPLAN_stage1.md b/docs/exec/EXECPLAN_stage1.md
+index b8ee585fca521d0ea892fa6b21d13bb879078f5d..5804cb1423e039105830941eb6e393ebe9d0a4f6
+--- a/docs/exec/EXECPLAN_stage1.md
++++ b/docs/exec/EXECPLAN_stage1.md
+@@ -12,7 +12,7 @@
+ - [x] Define EventSpec + DescriptorSpec in `src/tokens/schema.py` with version `remi_tab_v1` and `tpq=24`.
+ - [x] Implement interval math helpers (melodic + harmonic ref) with QA vs production behavior.
+ - [x] Implement event parsing/serialization in `src/tokens/tokenizer.py` with canonical ordering.
+-- [ ] Add round-trip tests for pitch reconstruction and `HARM_*` consistency.
++- [x] Add round-trip tests for pitch reconstruction and `HARM_*` consistency.
+ - [ ] Implement `scripts/make_dataset.py` basic pipeline (parse, normalize, collapse doublings, track assignment, tokenize, stats).
+ - [ ] Produce dataset artifacts in `data/processed/` and document counts in `stats.json`.
+ - [ ] Verify `bash docs/skills/python-test-env/scripts/run_tests.sh` passes.
+diff --git a/tests/test_roundtrip_pitch.py b/tests/test_roundtrip_pitch.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..b6fbfef56a9df3df629ed8135abb4b79c3e98a39
+--- /dev/null
++++ b/tests/test_roundtrip_pitch.py
+@@ -0,0 +1,141 @@
++import random
++import sys
++from pathlib import Path
++from typing import Dict, List, Tuple
++
++import pytest
++from music21 import meter, note, stream
++
++sys.path.insert(0, str(Path(__file__).parents[1]))
++
++from src.tokens.eventizer import eventize_musicxml
++from src.tokens.roundtrip import tokens_to_score
++from src.tokens.tokenizer import parse_voice_event
++from src.tokens.validator import validate_harm_tokens
++
++TPQ = 24
++
++
++def _note_events_by_voice(score: stream.Score) -> Dict[int, List[Tuple[int, int, int]]]:
++    by_voice: Dict[int, List[Tuple[int, int, int]]] = {}
++    for voice_idx, part in enumerate(score.parts):
++        events: List[Tuple[int, int, int]] = []
++        flat_part = part.flatten()
++        for el in flat_part.notesAndRests:
++            if el.isRest:
++                continue
++            if el.isChord:
++                pitch = max(p.midi for p in el.pitches)
++            else:
++                pitch = el.pitch.midi
++            onset = int(round(el.offset * TPQ))
++            duration = int(round(el.duration.quarterLength * TPQ))
++            events.append((onset, duration, pitch))
++        by_voice[voice_idx] = events
++    return by_voice
++
++
++def _assert_events_match_with_tick_tolerance(
++    expected: Dict[int, List[Tuple[int, int, int]]],
++    actual: Dict[int, List[Tuple[int, int, int]]],
++    *,
++    tick_tolerance: int = 1,
++) -> None:
++    assert set(expected.keys()) == set(actual.keys())
++    for voice_idx in expected:
++        exp_events = expected[voice_idx]
++        got_events = actual[voice_idx]
++        assert len(exp_events) == len(got_events)
++        for (exp_onset, exp_dur, exp_pitch), (got_onset, got_dur, got_pitch) in zip(
++            exp_events, got_events
++        ):
++            assert got_pitch == exp_pitch
++            assert abs(got_onset - exp_onset) <= tick_tolerance
++            assert abs(got_dur - exp_dur) <= tick_tolerance
++
++
++def _build_random_score(seed: int, *, bars: int = 3, voices: int = 3) -> stream.Score:
++    rng = random.Random(seed)
++    score = stream.Score()
++    for voice_idx in range(voices):
++        part = stream.Part(id=f"Voice{voice_idx}")
++        part.append(meter.TimeSignature("4/4"))
++        base_pitch = 48 + voice_idx * 7
++        for _ in range(bars):
++            remaining = 4.0
++            while remaining > 1e-9:
++                options = [dur for dur in (0.5, 1.0, 1.5, 2.0) if dur <= remaining + 1e-9]
++                quarter_len = rng.choice(options)
++                if rng.random() < 0.3:
++                    part.append(note.Rest(quarterLength=quarter_len))
++                else:
++                    pitch = base_pitch + rng.randint(0, 12)
++                    part.append(note.Note(midi=pitch, quarterLength=quarter_len))
++                remaining = round(remaining - quarter_len, 6)
++        score.insert(0, part)
++    return score
++
++
++def _write_sustained_reference_xml(tmp_path: Path) -> Path:
++    score = stream.Score()
++
++    bass = stream.Part(id="Bass")
++    bass.append(meter.TimeSignature("4/4"))
++    bass.append(note.Note("C3", quarterLength=2.0))
++    bass.append(note.Rest(quarterLength=2.0))
++
++    upper = stream.Part(id="Upper")
++    upper.append(meter.TimeSignature("4/4"))
++    upper.append(note.Note("G3", quarterLength=1.0))
++    upper.append(note.Note("A3", quarterLength=1.0))
++    upper.append(note.Rest(quarterLength=2.0))
++
++    score.insert(0, bass)
++    score.insert(0, upper)
++
++    out_path = tmp_path / "sustained_reference.xml"
++    score.write("musicxml", fp=str(out_path))
++    return out_path
++
++
++@pytest.mark.parametrize("seed", [7, 17, 27])
++def test_roundtrip_pitch_reconstruction_on_random_bars(seed: int, tmp_path: Path) -> None:
++    score = _build_random_score(seed)
++    xml_path = tmp_path / f"random_seed_{seed}.xml"
++    score.write("musicxml", fp=str(xml_path))
++
++    tokens, _ = eventize_musicxml(str(xml_path), voice_mode="parts")
++    harm_errors = validate_harm_tokens(tokens)
++    assert not harm_errors
++
++    reconstructed = tokens_to_score(tokens, tpq=TPQ)
++    _assert_events_match_with_tick_tolerance(
++        _note_events_by_voice(score),
++        _note_events_by_voice(reconstructed),
++        tick_tolerance=1,
++    )
++
++
++def test_harm_consistency_uses_lowest_active_reference_pitch(tmp_path: Path) -> None:
++    xml_path = _write_sustained_reference_xml(tmp_path)
++    tokens, _ = eventize_musicxml(str(xml_path), voice_mode="parts")
++
++    harm_errors = validate_harm_tokens(tokens)
++    assert not harm_errors
++
++    pos_idx = tokens.index("POS_24")
++    found_upper = False
++    idx = pos_idx + 1
++    while idx < len(tokens) and tokens[idx] != "BAR" and not tokens[idx].startswith("POS_"):
++        if not tokens[idx].startswith("VOICE_"):
++            idx += 1
++            continue
++        event, next_idx = parse_voice_event(tokens, idx)
++        if event.voice == 1:
++            found_upper = True
++            assert event.mel_int == 2
++            assert event.harm_oct == 0
++            assert event.harm_class == 9
++        idx = next_idx
++
++    assert found_upper
+
+file update:
+diff --git a/PROGRESS.md b/PROGRESS.md
+index 11f763e2dbb4256baeb84ecbe0f89f7a55bf2222..c38966ab59b9b77fc51cbe298f3a391482c0564e
+--- a/PROGRESS.md
++++ b/PROGRESS.md
+@@ -8,3 +8,4 @@
+ - 2026-02-24: Completed Stage-1 ExecPlan item 1 by defining versioned `EventSpec`/`DescriptorSpec` in `src/tokens/schema.py` (`remi_tab_v1`, `tpq=24`) and added `tests/test_schema.py`.
+ - 2026-02-24: Completed Stage-1 ExecPlan item 2 by adding `src/tokens/intervals.py` (melodic/harmonic helpers with QA vs production behavior), wiring repairs into `eventize_musicxml`, updating harmonic validation to shared math helpers, and adding `tests/test_intervals.py`; verify run: `53 passed, 1 skipped`.
+ - 2026-02-24: Completed Stage-1 ExecPlan item 3 by adding `src/tokens/tokenizer.py` (voice-event parsing/serialization, stream canonicalization helpers), wiring `eventize_musicxml` pitched-onset emission through tokenizer serialization for canonical ordering, and adding `tests/test_tokenizer.py`; verify run: `59 passed, 1 skipped`.
++- 2026-02-24: Completed Stage-1 ExecPlan item 4 by adding `tests/test_roundtrip_pitch.py` with random-bar pitch reconstruction round-trip checks (anchors + `MEL_INT12`) and sustained-reference `HARM_*` consistency assertions; verify run: `63 passed, 1 skipped`.
+diff --git a/TODO.md b/TODO.md
+index f34ae3002cbb8b57163085ffe73aebe53b830893..1bb5aaf5722a90e458248dd07c4b684eeed5f712
+--- a/TODO.md
++++ b/TODO.md
+@@ -4,6 +4,7 @@
+ - [x] Implement `src/tokens/schema.py` (EventSpec + DescriptorSpec, versioned)
+ - [x] Implement tokenizer interval math + round-trip tests
+ - [x] Implement event parsing/serialization in `src/tokens/tokenizer.py` with canonical ordering
++- [x] Add round-trip tests for pitch reconstruction and `HARM_*` consistency
+ - [ ] Implement `scripts/make_dataset.py` basic pipeline
+ - [ ] Produce `data/processed/{events.parquet,barplans.parquet,stats.json}`
+ - [x] CI: `pytest -q` passes
+diff --git a/docs/exec/EXECPLAN_stage1.md b/docs/exec/EXECPLAN_stage1.md
+index b8ee585fca521d0ea892fa6b21d13bb879078f5d..5804cb1423e039105830941eb6e393ebe9d0a4f6
+--- a/docs/exec/EXECPLAN_stage1.md
++++ b/docs/exec/EXECPLAN_stage1.md
+@@ -12,7 +12,7 @@
+ - [x] Define EventSpec + DescriptorSpec in `src/tokens/schema.py` with version `remi_tab_v1` and `tpq=24`.
+ - [x] Implement interval math helpers (melodic + harmonic ref) with QA vs production behavior.
+ - [x] Implement event parsing/serialization in `src/tokens/tokenizer.py` with canonical ordering.
+-- [ ] Add round-trip tests for pitch reconstruction and `HARM_*` consistency.
++- [x] Add round-trip tests for pitch reconstruction and `HARM_*` consistency.
+ - [ ] Implement `scripts/make_dataset.py` basic pipeline (parse, normalize, collapse doublings, track assignment, tokenize, stats).
+ - [ ] Produce dataset artifacts in `data/processed/` and document counts in `stats.json`.
+ - [ ] Verify `bash docs/skills/python-test-env/scripts/run_tests.sh` passes.
+diff --git a/tests/test_roundtrip_pitch.py b/tests/test_roundtrip_pitch.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..b6fbfef56a9df3df629ed8135abb4b79c3e98a39
+--- /dev/null
++++ b/tests/test_roundtrip_pitch.py
+@@ -0,0 +1,141 @@
++import random
++import sys
++from pathlib import Path
++from typing import Dict, List, Tuple
++
++import pytest
++from music21 import meter, note, stream
++
++sys.path.insert(0, str(Path(__file__).parents[1]))
++
++from src.tokens.eventizer import eventize_musicxml
++from src.tokens.roundtrip import tokens_to_score
++from src.tokens.tokenizer import parse_voice_event
++from src.tokens.validator import validate_harm_tokens
++
++TPQ = 24
++
++
++def _note_events_by_voice(score: stream.Score) -> Dict[int, List[Tuple[int, int, int]]]:
++    by_voice: Dict[int, List[Tuple[int, int, int]]] = {}
++    for voice_idx, part in enumerate(score.parts):
++        events: List[Tuple[int, int, int]] = []
++        flat_part = part.flatten()
++        for el in flat_part.notesAndRests:
++            if el.isRest:
++                continue
++            if el.isChord:
++                pitch = max(p.midi for p in el.pitches)
++            else:
++                pitch = el.pitch.midi
++            onset = int(round(el.offset * TPQ))
++            duration = int(round(el.duration.quarterLength * TPQ))
++            events.append((onset, duration, pitch))
++        by_voice[voice_idx] = events
++    return by_voice
++
++
++def _assert_events_match_with_tick_tolerance(
++    expected: Dict[int, List[Tuple[int, int, int]]],
++    actual: Dict[int, List[Tuple[int, int, int]]],
++    *,
++    tick_tolerance: int = 1,
++) -> None:
++    assert set(expected.keys()) == set(actual.keys())
++    for voice_idx in expected:
++        exp_events = expected[voice_idx]
++        got_events = actual[voice_idx]
++        assert len(exp_events) == len(got_events)
++        for (exp_onset, exp_dur, exp_pitch), (got_onset, got_dur, got_pitch) in zip(
++            exp_events, got_events
++        ):
++            assert got_pitch == exp_pitch
++            assert abs(got_onset - exp_onset) <= tick_tolerance
++            assert abs(got_dur - exp_dur) <= tick_tolerance
++
++
++def _build_random_score(seed: int, *, bars: int = 3, voices: int = 3) -> stream.Score:
++    rng = random.Random(seed)
++    score = stream.Score()
++    for voice_idx in range(voices):
++        part = stream.Part(id=f"Voice{voice_idx}")
++        part.append(meter.TimeSignature("4/4"))
++        base_pitch = 48 + voice_idx * 7
++        for _ in range(bars):
++            remaining = 4.0
++            while remaining > 1e-9:
++                options = [dur for dur in (0.5, 1.0, 1.5, 2.0) if dur <= remaining + 1e-9]
++                quarter_len = rng.choice(options)
++                if rng.random() < 0.3:
++                    part.append(note.Rest(quarterLength=quarter_len))
++                else:
++                    pitch = base_pitch + rng.randint(0, 12)
++                    part.append(note.Note(midi=pitch, quarterLength=quarter_len))
++                remaining = round(remaining - quarter_len, 6)
++        score.insert(0, part)
++    return score
++
++
++def _write_sustained_reference_xml(tmp_path: Path) -> Path:
++    score = stream.Score()
++
++    bass = stream.Part(id="Bass")
++    bass.append(meter.TimeSignature("4/4"))
++    bass.append(note.Note("C3", quarterLength=2.0))
++    bass.append(note.Rest(quarterLength=2.0))
++
++    upper = stream.Part(id="Upper")
++    upper.append(meter.TimeSignature("4/4"))
++    upper.append(note.Note("G3", quarterLength=1.0))
++    upper.append(note.Note("A3", quarterLength=1.0))
++    upper.append(note.Rest(quarterLength=2.0))
++
++    score.insert(0, bass)
++    score.insert(0, upper)
++
++    out_path = tmp_path / "sustained_reference.xml"
++    score.write("musicxml", fp=str(out_path))
++    return out_path
++
++
++@pytest.mark.parametrize("seed", [7, 17, 27])
++def test_roundtrip_pitch_reconstruction_on_random_bars(seed: int, tmp_path: Path) -> None:
++    score = _build_random_score(seed)
++    xml_path = tmp_path / f"random_seed_{seed}.xml"
++    score.write("musicxml", fp=str(xml_path))
++
++    tokens, _ = eventize_musicxml(str(xml_path), voice_mode="parts")
++    harm_errors = validate_harm_tokens(tokens)
++    assert not harm_errors
++
++    reconstructed = tokens_to_score(tokens, tpq=TPQ)
++    _assert_events_match_with_tick_tolerance(
++        _note_events_by_voice(score),
++        _note_events_by_voice(reconstructed),
++        tick_tolerance=1,
++    )
++
++
++def test_harm_consistency_uses_lowest_active_reference_pitch(tmp_path: Path) -> None:
++    xml_path = _write_sustained_reference_xml(tmp_path)
++    tokens, _ = eventize_musicxml(str(xml_path), voice_mode="parts")
++
++    harm_errors = validate_harm_tokens(tokens)
++    assert not harm_errors
++
++    pos_idx = tokens.index("POS_24")
++    found_upper = False
++    idx = pos_idx + 1
++    while idx < len(tokens) and tokens[idx] != "BAR" and not tokens[idx].startswith("POS_"):
++        if not tokens[idx].startswith("VOICE_"):
++            idx += 1
++            continue
++        event, next_idx = parse_voice_event(tokens, idx)
++        if event.voice == 1:
++            found_upper = True
++            assert event.mel_int == 2
++            assert event.harm_oct == 0
++            assert event.harm_class == 9
++        idx = next_idx
++
++    assert found_upper
+
+ succeeded in 49.52s:
+...............s................................................         [100%]
+63 passed, 1 skipped in 47.24s
+
+
+thinking
+**Reviewing git changes**
+exec
+/bin/bash -lc 'git status --short' in /home/stephen-reilly/dev/bach_genexec
+/bin/bash -lc 'nl -ba PROGRESS.md | tail -n 30' in /home/stephen-reilly/dev/bach_genexec
+/bin/bash -lc "nl -ba docs/exec/EXECPLAN_stage1.md | sed -n '1,120p'" in /home/stephen-reilly/dev/bach_genexec
+/bin/bash -lc "nl -ba tests/test_roundtrip_pitch.py | sed -n '1,260p'" in /home/stephen-reilly/dev/bach_genexec
+/bin/bash -lc "nl -ba TODO.md | sed -n '1,120p'" in /home/stephen-reilly/dev/bach_gen succeeded in 50ms:
+     1	# ExecPlan — Stage-1 Tokenizer & Dataset
+     2	
+     3	## Rules
+     4	- One task per run.
+     5	- Run `bash docs/skills/python-test-env/scripts/run_tests.sh` and do not weaken tests.
+     6	- If you add a new feature without tests, add tests in the same run.
+     7	- Do not hard-code tests; test real behavior.
+     8	- If tests fail, fix the underlying code issue before proceeding.
+     9	- Update `TODO.md` and append to `PROGRESS.md`.
+    10	
+    11	## Checklist (one item per loop)
+    12	- [x] Define EventSpec + DescriptorSpec in `src/tokens/schema.py` with version `remi_tab_v1` and `tpq=24`.
+    13	- [x] Implement interval math helpers (melodic + harmonic ref) with QA vs production behavior.
+    14	- [x] Implement event parsing/serialization in `src/tokens/tokenizer.py` with canonical ordering.
+    15	- [x] Add round-trip tests for pitch reconstruction and `HARM_*` consistency.
+    16	- [ ] Implement `scripts/make_dataset.py` basic pipeline (parse, normalize, collapse doublings, track assignment, tokenize, stats).
+    17	- [ ] Produce dataset artifacts in `data/processed/` and document counts in `stats.json`.
+    18	- [ ] Verify `bash docs/skills/python-test-env/scripts/run_tests.sh` passes.
+ succeeded in 51ms:
+ M PROGRESS.md
+ M TODO.md
+ M docs/exec/EXECPLAN_stage1.md
+?? .codex/loop_runs/20260224_030212/context_4.md
+?? .codex/loop_runs/20260224_030212/iter_4.err
+?? .codex/loop_runs/20260224_030212/iter_4.out
+?? .codex/loop_runs/20260224_030212/prompt_4.md
+?? tests/test_roundtrip_pitch.py
+ succeeded in 51ms:
+     1	# PROGRESS
+     2	
+     3	- 2026-02-24: Initialized AGENTS.md, SPEC.md, TODO.md, and PROGRESS.md for Stage-1 loop setup.
+     4	- 2026-02-24: Added ExecPlan, Codex loop script, config, and schema for structured loop output.
+     5	- 2026-02-24: Added python-test-env skill and test helper script; loop now defaults to conda env `bach` and includes environment precheck in prompt.
+     6	- 2026-02-24: Fixed loop compatibility with installed Codex CLI (removed hard dependency on `-a`, added auto-detect for approval flags, and fail-fast on CLI usage errors).
+     7	- 2026-02-24: Updated loop to use `--full-auto` on newer Codex CLI builds where explicit approval flags are unavailable.
+     8	- 2026-02-24: Completed Stage-1 ExecPlan item 1 by defining versioned `EventSpec`/`DescriptorSpec` in `src/tokens/schema.py` (`remi_tab_v1`, `tpq=24`) and added `tests/test_schema.py`.
+     9	- 2026-02-24: Completed Stage-1 ExecPlan item 2 by adding `src/tokens/intervals.py` (melodic/harmonic helpers with QA vs production behavior), wiring repairs into `eventize_musicxml`, updating harmonic validation to shared math helpers, and adding `tests/test_intervals.py`; verify run: `53 passed, 1 skipped`.
+    10	- 2026-02-24: Completed Stage-1 ExecPlan item 3 by adding `src/tokens/tokenizer.py` (voice-event parsing/serialization, stream canonicalization helpers), wiring `eventize_musicxml` pitched-onset emission through tokenizer serialization for canonical ordering, and adding `tests/test_tokenizer.py`; verify run: `59 passed, 1 skipped`.
+    11	- 2026-02-24: Completed Stage-1 ExecPlan item 4 by adding `tests/test_roundtrip_pitch.py` with random-bar pitch reconstruction round-trip checks (anchors + `MEL_INT12`) and sustained-reference `HARM_*` consistency assertions; verify run: `63 passed, 1 skipped`.
+ succeeded in 50ms:
+     1	import random
+     2	import sys
+     3	from pathlib import Path
+     4	from typing import Dict, List, Tuple
+     5	
+     6	import pytest
+     7	from music21 import meter, note, stream
+     8	
+     9	sys.path.insert(0, str(Path(__file__).parents[1]))
+    10	
+    11	from src.tokens.eventizer import eventize_musicxml
+    12	from src.tokens.roundtrip import tokens_to_score
+    13	from src.tokens.tokenizer import parse_voice_event
+    14	from src.tokens.validator import validate_harm_tokens
+    15	
+    16	TPQ = 24
+    17	
+    18	
+    19	def _note_events_by_voice(score: stream.Score) -> Dict[int, List[Tuple[int, int, int]]]:
+    20	    by_voice: Dict[int, List[Tuple[int, int, int]]] = {}
+ succeeded in 50ms:
+     1	# TODO
+     2	
+     3	## Milestone: Stage-1 Tokenizer & Dataset
+     4	- [x] Implement `src/tokens/schema.py` (EventSpec + DescriptorSpec, versioned)
+     5	- [x] Implement tokenizer interval math + round-trip tests
+     6	- [x] Implement event parsing/serialization in `src/tokens/tokenizer.py` with canonical ordering
+     7	- [x] Add round-trip tests for pitch reconstruction and `HARM_*` consistency
+     8	- [ ] Implement `scripts/make_dataset.py` basic pipeline
+     9	- [ ] Produce `data/processed/{events.parquet,barplans.parquet,stats.json}`
+    10	- [x] CI: `pytest -q` passes
+file update:
+diff --git a/PROGRESS.md b/PROGRESS.md
+index 11f763e2dbb4256baeb84ecbe0f89f7a55bf2222..c38966ab59b9b77fc51cbe298f3a391482c0564e
+--- a/PROGRESS.md
++++ b/PROGRESS.md
+@@ -8,3 +8,4 @@
+ - 2026-02-24: Completed Stage-1 ExecPlan item 1 by defining versioned `EventSpec`/`DescriptorSpec` in `src/tokens/schema.py` (`remi_tab_v1`, `tpq=24`) and added `tests/test_schema.py`.
+ - 2026-02-24: Completed Stage-1 ExecPlan item 2 by adding `src/tokens/intervals.py` (melodic/harmonic helpers with QA vs production behavior), wiring repairs into `eventize_musicxml`, updating harmonic validation to shared math helpers, and adding `tests/test_intervals.py`; verify run: `53 passed, 1 skipped`.
+ - 2026-02-24: Completed Stage-1 ExecPlan item 3 by adding `src/tokens/tokenizer.py` (voice-event parsing/serialization, stream canonicalization helpers), wiring `eventize_musicxml` pitched-onset emission through tokenizer serialization for canonical ordering, and adding `tests/test_tokenizer.py`; verify run: `59 passed, 1 skipped`.
++- 2026-02-24: Completed Stage-1 ExecPlan item 4 by adding `tests/test_roundtrip_pitch.py` with random-bar pitch reconstruction round-trip checks (anchors + `MEL_INT12`) and sustained-reference `HARM_*` consistency assertions; verify run: `63 passed, 1 skipped`.
+diff --git a/TODO.md b/TODO.md
+index f34ae3002cbb8b57163085ffe73aebe53b830893..1bb5aaf5722a90e458248dd07c4b684eeed5f712
+--- a/TODO.md
++++ b/TODO.md
+@@ -4,6 +4,7 @@
+ - [x] Implement `src/tokens/schema.py` (EventSpec + DescriptorSpec, versioned)
+ - [x] Implement tokenizer interval math + round-trip tests
+ - [x] Implement event parsing/serialization in `src/tokens/tokenizer.py` with canonical ordering
++- [x] Add round-trip tests for pitch reconstruction and `HARM_*` consistency
+ - [ ] Implement `scripts/make_dataset.py` basic pipeline
+ - [ ] Produce `data/processed/{events.parquet,barplans.parquet,stats.json}`
+ - [x] CI: `pytest -q` passes
+diff --git a/docs/exec/EXECPLAN_stage1.md b/docs/exec/EXECPLAN_stage1.md
+index b8ee585fca521d0ea892fa6b21d13bb879078f5d..5804cb1423e039105830941eb6e393ebe9d0a4f6
+--- a/docs/exec/EXECPLAN_stage1.md
++++ b/docs/exec/EXECPLAN_stage1.md
+@@ -12,7 +12,7 @@
+ - [x] Define EventSpec + DescriptorSpec in `src/tokens/schema.py` with version `remi_tab_v1` and `tpq=24`.
+ - [x] Implement interval math helpers (melodic + harmonic ref) with QA vs production behavior.
+ - [x] Implement event parsing/serialization in `src/tokens/tokenizer.py` with canonical ordering.
+-- [ ] Add round-trip tests for pitch reconstruction and `HARM_*` consistency.
++- [x] Add round-trip tests for pitch reconstruction and `HARM_*` consistency.
+ - [ ] Implement `scripts/make_dataset.py` basic pipeline (parse, normalize, collapse doublings, track assignment, tokenize, stats).
+ - [ ] Produce dataset artifacts in `data/processed/` and document counts in `stats.json`.
+ - [ ] Verify `bash docs/skills/python-test-env/scripts/run_tests.sh` passes.
+diff --git a/tests/test_roundtrip_pitch.py b/tests/test_roundtrip_pitch.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..b6fbfef56a9df3df629ed8135abb4b79c3e98a39
+--- /dev/null
++++ b/tests/test_roundtrip_pitch.py
+@@ -0,0 +1,141 @@
++import random
++import sys
++from pathlib import Path
++from typing import Dict, List, Tuple
++
++import pytest
++from music21 import meter, note, stream
++
++sys.path.insert(0, str(Path(__file__).parents[1]))
++
++from src.tokens.eventizer import eventize_musicxml
++from src.tokens.roundtrip import tokens_to_score
++from src.tokens.tokenizer import parse_voice_event
++from src.tokens.validator import validate_harm_tokens
++
++TPQ = 24
++
++
++def _note_events_by_voice(score: stream.Score) -> Dict[int, List[Tuple[int, int, int]]]:
++    by_voice: Dict[int, List[Tuple[int, int, int]]] = {}
++    for voice_idx, part in enumerate(score.parts):
++        events: List[Tuple[int, int, int]] = []
++        flat_part = part.flatten()
++        for el in flat_part.notesAndRests:
++            if el.isRest:
++                continue
++            if el.isChord:
++                pitch = max(p.midi for p in el.pitches)
++            else:
++                pitch = el.pitch.midi
++            onset = int(round(el.offset * TPQ))
++            duration = int(round(el.duration.quarterLength * TPQ))
++            events.append((onset, duration, pitch))
++        by_voice[voice_idx] = events
++    return by_voice
++
++
++def _assert_events_match_with_tick_tolerance(
++    expected: Dict[int, List[Tuple[int, int, int]]],
++    actual: Dict[int, List[Tuple[int, int, int]]],
++    *,
++    tick_tolerance: int = 1,
++) -> None:
++    assert set(expected.keys()) == set(actual.keys())
++    for voice_idx in expected:
++        exp_events = expected[voice_idx]
++        got_events = actual[voice_idx]
++        assert len(exp_events) == len(got_events)
++        for (exp_onset, exp_dur, exp_pitch), (got_onset, got_dur, got_pitch) in zip(
++            exp_events, got_events
++        ):
++            assert got_pitch == exp_pitch
++            assert abs(got_onset - exp_onset) <= tick_tolerance
++            assert abs(got_dur - exp_dur) <= tick_tolerance
++
++
++def _build_random_score(seed: int, *, bars: int = 3, voices: int = 3) -> stream.Score:
++    rng = random.Random(seed)
++    score = stream.Score()
++    for voice_idx in range(voices):
++        part = stream.Part(id=f"Voice{voice_idx}")
++        part.append(meter.TimeSignature("4/4"))
++        base_pitch = 48 + voice_idx * 7
++        for _ in range(bars):
++            remaining = 4.0
++            while remaining > 1e-9:
++                options = [dur for dur in (0.5, 1.0, 1.5, 2.0) if dur <= remaining + 1e-9]
++                quarter_len = rng.choice(options)
++                if rng.random() < 0.3:
++                    part.append(note.Rest(quarterLength=quarter_len))
++                else:
++                    pitch = base_pitch + rng.randint(0, 12)
++                    part.append(note.Note(midi=pitch, quarterLength=quarter_len))
++                remaining = round(remaining - quarter_len, 6)
++        score.insert(0, part)
++    return score
++
++
++def _write_sustained_reference_xml(tmp_path: Path) -> Path:
++    score = stream.Score()
++
++    bass = stream.Part(id="Bass")
++    bass.append(meter.TimeSignature("4/4"))
++    bass.append(note.Note("C3", quarterLength=2.0))
++    bass.append(note.Rest(quarterLength=2.0))
++
++    upper = stream.Part(id="Upper")
++    upper.append(meter.TimeSignature("4/4"))
++    upper.append(note.Note("G3", quarterLength=1.0))
++    upper.append(note.Note("A3", quarterLength=1.0))
++    upper.append(note.Rest(quarterLength=2.0))
++
++    score.insert(0, bass)
++    score.insert(0, upper)
++
++    out_path = tmp_path / "sustained_reference.xml"
++    score.write("musicxml", fp=str(out_path))
++    return out_path
++
++
++@pytest.mark.parametrize("seed", [7, 17, 27])
++def test_roundtrip_pitch_reconstruction_on_random_bars(seed: int, tmp_path: Path) -> None:
++    score = _build_random_score(seed)
++    xml_path = tmp_path / f"random_seed_{seed}.xml"
++    score.write("musicxml", fp=str(xml_path))
++
++    tokens, _ = eventize_musicxml(str(xml_path), voice_mode="parts")
++    harm_errors = validate_harm_tokens(tokens)
++    assert not harm_errors
++
++    reconstructed = tokens_to_score(tokens, tpq=TPQ)
++    _assert_events_match_with_tick_tolerance(
++        _note_events_by_voice(score),
++        _note_events_by_voice(reconstructed),
++        tick_tolerance=1,
++    )
++
++
++def test_harm_consistency_uses_lowest_active_reference_pitch(tmp_path: Path) -> None:
++    xml_path = _write_sustained_reference_xml(tmp_path)
++    tokens, _ = eventize_musicxml(str(xml_path), voice_mode="parts")
++
++    harm_errors = validate_harm_tokens(tokens)
++    assert not harm_errors
++
++    pos_idx = tokens.index("POS_24")
++    found_upper = False
++    idx = pos_idx + 1
++    while idx < len(tokens) and tokens[idx] != "BAR" and not tokens[idx].startswith("POS_"):
++        if not tokens[idx].startswith("VOICE_"):
++            idx += 1
++            continue
++        event, next_idx = parse_voice_event(tokens, idx)
++        if event.voice == 1:
++            found_upper = True
++            assert event.mel_int == 2
++            assert event.harm_oct == 0
++            assert event.harm_class == 9
++        idx = next_idx
++
++    assert found_upper
+
+
+thinking
+**Confirming schema for final output**
+codex
+{"done":false,"progress_made":true,"summary":"I’ve finished the code and docs updates and verified tests pass. I’ll quickly check `loop_output.schema.json` so the final response matches the required JSON schema exactly.","tests_ran":true,"tests_status":"pass","next_step":"Read loop output schema and then return final JSON only.","stop_reason":""}
+
+thinking
+**Locating schema file**
+exec
+/bin/bash -lc "rg --files | rg 'loop_output\\.schema\\.json"'$'"'" in /home/stephen-reilly/dev/bach_gen succeeded in 51ms:
+loop_output.schema.json
+file update:
+diff --git a/PROGRESS.md b/PROGRESS.md
+index 11f763e2dbb4256baeb84ecbe0f89f7a55bf2222..c38966ab59b9b77fc51cbe298f3a391482c0564e
+--- a/PROGRESS.md
++++ b/PROGRESS.md
+@@ -8,3 +8,4 @@
+ - 2026-02-24: Completed Stage-1 ExecPlan item 1 by defining versioned `EventSpec`/`DescriptorSpec` in `src/tokens/schema.py` (`remi_tab_v1`, `tpq=24`) and added `tests/test_schema.py`.
+ - 2026-02-24: Completed Stage-1 ExecPlan item 2 by adding `src/tokens/intervals.py` (melodic/harmonic helpers with QA vs production behavior), wiring repairs into `eventize_musicxml`, updating harmonic validation to shared math helpers, and adding `tests/test_intervals.py`; verify run: `53 passed, 1 skipped`.
+ - 2026-02-24: Completed Stage-1 ExecPlan item 3 by adding `src/tokens/tokenizer.py` (voice-event parsing/serialization, stream canonicalization helpers), wiring `eventize_musicxml` pitched-onset emission through tokenizer serialization for canonical ordering, and adding `tests/test_tokenizer.py`; verify run: `59 passed, 1 skipped`.
++- 2026-02-24: Completed Stage-1 ExecPlan item 4 by adding `tests/test_roundtrip_pitch.py` with random-bar pitch reconstruction round-trip checks (anchors + `MEL_INT12`) and sustained-reference `HARM_*` consistency assertions; verify run: `63 passed, 1 skipped`.
+diff --git a/TODO.md b/TODO.md
+index f34ae3002cbb8b57163085ffe73aebe53b830893..1bb5aaf5722a90e458248dd07c4b684eeed5f712
+--- a/TODO.md
++++ b/TODO.md
+@@ -4,6 +4,7 @@
+ - [x] Implement `src/tokens/schema.py` (EventSpec + DescriptorSpec, versioned)
+ - [x] Implement tokenizer interval math + round-trip tests
+ - [x] Implement event parsing/serialization in `src/tokens/tokenizer.py` with canonical ordering
++- [x] Add round-trip tests for pitch reconstruction and `HARM_*` consistency
+ - [ ] Implement `scripts/make_dataset.py` basic pipeline
+ - [ ] Produce `data/processed/{events.parquet,barplans.parquet,stats.json}`
+ - [x] CI: `pytest -q` passes
+diff --git a/docs/exec/EXECPLAN_stage1.md b/docs/exec/EXECPLAN_stage1.md
+index b8ee585fca521d0ea892fa6b21d13bb879078f5d..5804cb1423e039105830941eb6e393ebe9d0a4f6
+--- a/docs/exec/EXECPLAN_stage1.md
++++ b/docs/exec/EXECPLAN_stage1.md
+@@ -12,7 +12,7 @@
+ - [x] Define EventSpec + DescriptorSpec in `src/tokens/schema.py` with version `remi_tab_v1` and `tpq=24`.
+ - [x] Implement interval math helpers (melodic + harmonic ref) with QA vs production behavior.
+ - [x] Implement event parsing/serialization in `src/tokens/tokenizer.py` with canonical ordering.
+-- [ ] Add round-trip tests for pitch reconstruction and `HARM_*` consistency.
++- [x] Add round-trip tests for pitch reconstruction and `HARM_*` consistency.
+ - [ ] Implement `scripts/make_dataset.py` basic pipeline (parse, normalize, collapse doublings, track assignment, tokenize, stats).
+ - [ ] Produce dataset artifacts in `data/processed/` and document counts in `stats.json`.
+ - [ ] Verify `bash docs/skills/python-test-env/scripts/run_tests.sh` passes.
+diff --git a/tests/test_roundtrip_pitch.py b/tests/test_roundtrip_pitch.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..b6fbfef56a9df3df629ed8135abb4b79c3e98a39
+--- /dev/null
++++ b/tests/test_roundtrip_pitch.py
+@@ -0,0 +1,141 @@
++import random
++import sys
++from pathlib import Path
++from typing import Dict, List, Tuple
++
++import pytest
++from music21 import meter, note, stream
++
++sys.path.insert(0, str(Path(__file__).parents[1]))
++
++from src.tokens.eventizer import eventize_musicxml
++from src.tokens.roundtrip import tokens_to_score
++from src.tokens.tokenizer import parse_voice_event
++from src.tokens.validator import validate_harm_tokens
++
++TPQ = 24
++
++
++def _note_events_by_voice(score: stream.Score) -> Dict[int, List[Tuple[int, int, int]]]:
++    by_voice: Dict[int, List[Tuple[int, int, int]]] = {}
++    for voice_idx, part in enumerate(score.parts):
++        events: List[Tuple[int, int, int]] = []
++        flat_part = part.flatten()
++        for el in flat_part.notesAndRests:
++            if el.isRest:
++                continue
++            if el.isChord:
++                pitch = max(p.midi for p in el.pitches)
++            else:
++                pitch = el.pitch.midi
++            onset = int(round(el.offset * TPQ))
++            duration = int(round(el.duration.quarterLength * TPQ))
++            events.append((onset, duration, pitch))
++        by_voice[voice_idx] = events
++    return by_voice
++
++
++def _assert_events_match_with_tick_tolerance(
++    expected: Dict[int, List[Tuple[int, int, int]]],
++    actual: Dict[int, List[Tuple[int, int, int]]],
++    *,
++    tick_tolerance: int = 1,
++) -> None:
++    assert set(expected.keys()) == set(actual.keys())
++    for voice_idx in expected:
++        exp_events = expected[voice_idx]
++        got_events = actual[voice_idx]
++        assert len(exp_events) == len(got_events)
++        for (exp_onset, exp_dur, exp_pitch), (got_onset, got_dur, got_pitch) in zip(
++            exp_events, got_events
++        ):
++            assert got_pitch == exp_pitch
++            assert abs(got_onset - exp_onset) <= tick_tolerance
++            assert abs(got_dur - exp_dur) <= tick_tolerance
++
++
++def _build_random_score(seed: int, *, bars: int = 3, voices: int = 3) -> stream.Score:
++    rng = random.Random(seed)
++    score = stream.Score()
++    for voice_idx in range(voices):
++        part = stream.Part(id=f"Voice{voice_idx}")
++        part.append(meter.TimeSignature("4/4"))
++        base_pitch = 48 + voice_idx * 7
++        for _ in range(bars):
++            remaining = 4.0
++            while remaining > 1e-9:
++                options = [dur for dur in (0.5, 1.0, 1.5, 2.0) if dur <= remaining + 1e-9]
++                quarter_len = rng.choice(options)
++                if rng.random() < 0.3:
++                    part.append(note.Rest(quarterLength=quarter_len))
++                else:
++                    pitch = base_pitch + rng.randint(0, 12)
++                    part.append(note.Note(midi=pitch, quarterLength=quarter_len))
++                remaining = round(remaining - quarter_len, 6)
++        score.insert(0, part)
++    return score
++
++
++def _write_sustained_reference_xml(tmp_path: Path) -> Path:
++    score = stream.Score()
++
++    bass = stream.Part(id="Bass")
++    bass.append(meter.TimeSignature("4/4"))
++    bass.append(note.Note("C3", quarterLength=2.0))
++    bass.append(note.Rest(quarterLength=2.0))
++
++    upper = stream.Part(id="Upper")
++    upper.append(meter.TimeSignature("4/4"))
++    upper.append(note.Note("G3", quarterLength=1.0))
++    upper.append(note.Note("A3", quarterLength=1.0))
++    upper.append(note.Rest(quarterLength=2.0))
++
++    score.insert(0, bass)
++    score.insert(0, upper)
++
++    out_path = tmp_path / "sustained_reference.xml"
++    score.write("musicxml", fp=str(out_path))
++    return out_path
++
++
++@pytest.mark.parametrize("seed", [7, 17, 27])
++def test_roundtrip_pitch_reconstruction_on_random_bars(seed: int, tmp_path: Path) -> None:
++    score = _build_random_score(seed)
++    xml_path = tmp_path / f"random_seed_{seed}.xml"
++    score.write("musicxml", fp=str(xml_path))
++
++    tokens, _ = eventize_musicxml(str(xml_path), voice_mode="parts")
++    harm_errors = validate_harm_tokens(tokens)
++    assert not harm_errors
++
++    reconstructed = tokens_to_score(tokens, tpq=TPQ)
++    _assert_events_match_with_tick_tolerance(
++        _note_events_by_voice(score),
++        _note_events_by_voice(reconstructed),
++        tick_tolerance=1,
++    )
++
++
++def test_harm_consistency_uses_lowest_active_reference_pitch(tmp_path: Path) -> None:
++    xml_path = _write_sustained_reference_xml(tmp_path)
++    tokens, _ = eventize_musicxml(str(xml_path), voice_mode="parts")
++
++    harm_errors = validate_harm_tokens(tokens)
++    assert not harm_errors
++
++    pos_idx = tokens.index("POS_24")
++    found_upper = False
++    idx = pos_idx + 1
++    while idx < len(tokens) and tokens[idx] != "BAR" and not tokens[idx].startswith("POS_"):
++        if not tokens[idx].startswith("VOICE_"):
++            idx += 1
++            continue
++        event, next_idx = parse_voice_event(tokens, idx)
++        if event.voice == 1:
++            found_upper = True
++            assert event.mel_int == 2
++            assert event.harm_oct == 0
++            assert event.harm_class == 9
++        idx = next_idx
++
++    assert found_upper
+
+exec
+/bin/bash -lc 'cat loop_output.schema.json' in /home/stephen-reilly/dev/bach_gen succeeded in 50ms:
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "done": { "type": "boolean" },
+    "progress_made": { "type": "boolean" },
+    "summary": { "type": "string" },
+    "tests_ran": { "type": "boolean" },
+    "tests_status": { "type": "string", "enum": ["pass", "fail", "not_run"] },
+    "next_step": { "type": "string" },
+    "stop_reason": { "type": "string" }
+  },
+  "required": [
+    "done",
+    "progress_made",
+    "summary",
+    "tests_ran",
+    "tests_status",
+    "next_step",
+file update:
+diff --git a/PROGRESS.md b/PROGRESS.md
+index 11f763e2dbb4256baeb84ecbe0f89f7a55bf2222..c38966ab59b9b77fc51cbe298f3a391482c0564e
+--- a/PROGRESS.md
++++ b/PROGRESS.md
+@@ -8,3 +8,4 @@
+ - 2026-02-24: Completed Stage-1 ExecPlan item 1 by defining versioned `EventSpec`/`DescriptorSpec` in `src/tokens/schema.py` (`remi_tab_v1`, `tpq=24`) and added `tests/test_schema.py`.
+ - 2026-02-24: Completed Stage-1 ExecPlan item 2 by adding `src/tokens/intervals.py` (melodic/harmonic helpers with QA vs production behavior), wiring repairs into `eventize_musicxml`, updating harmonic validation to shared math helpers, and adding `tests/test_intervals.py`; verify run: `53 passed, 1 skipped`.
+ - 2026-02-24: Completed Stage-1 ExecPlan item 3 by adding `src/tokens/tokenizer.py` (voice-event parsing/serialization, stream canonicalization helpers), wiring `eventize_musicxml` pitched-onset emission through tokenizer serialization for canonical ordering, and adding `tests/test_tokenizer.py`; verify run: `59 passed, 1 skipped`.
++- 2026-02-24: Completed Stage-1 ExecPlan item 4 by adding `tests/test_roundtrip_pitch.py` with random-bar pitch reconstruction round-trip checks (anchors + `MEL_INT12`) and sustained-reference `HARM_*` consistency assertions; verify run: `63 passed, 1 skipped`.
+diff --git a/TODO.md b/TODO.md
+index f34ae3002cbb8b57163085ffe73aebe53b830893..1bb5aaf5722a90e458248dd07c4b684eeed5f712
+--- a/TODO.md
++++ b/TODO.md
+@@ -4,6 +4,7 @@
+ - [x] Implement `src/tokens/schema.py` (EventSpec + DescriptorSpec, versioned)
+ - [x] Implement tokenizer interval math + round-trip tests
+ - [x] Implement event parsing/serialization in `src/tokens/tokenizer.py` with canonical ordering
++- [x] Add round-trip tests for pitch reconstruction and `HARM_*` consistency
+ - [ ] Implement `scripts/make_dataset.py` basic pipeline
+ - [ ] Produce `data/processed/{events.parquet,barplans.parquet,stats.json}`
+ - [x] CI: `pytest -q` passes
+diff --git a/docs/exec/EXECPLAN_stage1.md b/docs/exec/EXECPLAN_stage1.md
+index b8ee585fca521d0ea892fa6b21d13bb879078f5d..5804cb1423e039105830941eb6e393ebe9d0a4f6
+--- a/docs/exec/EXECPLAN_stage1.md
++++ b/docs/exec/EXECPLAN_stage1.md
+@@ -12,7 +12,7 @@
+ - [x] Define EventSpec + DescriptorSpec in `src/tokens/schema.py` with version `remi_tab_v1` and `tpq=24`.
+ - [x] Implement interval math helpers (melodic + harmonic ref) with QA vs production behavior.
+ - [x] Implement event parsing/serialization in `src/tokens/tokenizer.py` with canonical ordering.
+-- [ ] Add round-trip tests for pitch reconstruction and `HARM_*` consistency.
++- [x] Add round-trip tests for pitch reconstruction and `HARM_*` consistency.
+ - [ ] Implement `scripts/make_dataset.py` basic pipeline (parse, normalize, collapse doublings, track assignment, tokenize, stats).
+ - [ ] Produce dataset artifacts in `data/processed/` and document counts in `stats.json`.
+ - [ ] Verify `bash docs/skills/python-test-env/scripts/run_tests.sh` passes.
+diff --git a/tests/test_roundtrip_pitch.py b/tests/test_roundtrip_pitch.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..b6fbfef56a9df3df629ed8135abb4b79c3e98a39
+--- /dev/null
++++ b/tests/test_roundtrip_pitch.py
+@@ -0,0 +1,141 @@
++import random
++import sys
++from pathlib import Path
++from typing import Dict, List, Tuple
++
++import pytest
++from music21 import meter, note, stream
++
++sys.path.insert(0, str(Path(__file__).parents[1]))
++
++from src.tokens.eventizer import eventize_musicxml
++from src.tokens.roundtrip import tokens_to_score
++from src.tokens.tokenizer import parse_voice_event
++from src.tokens.validator import validate_harm_tokens
++
++TPQ = 24
++
++
++def _note_events_by_voice(score: stream.Score) -> Dict[int, List[Tuple[int, int, int]]]:
++    by_voice: Dict[int, List[Tuple[int, int, int]]] = {}
++    for voice_idx, part in enumerate(score.parts):
++        events: List[Tuple[int, int, int]] = []
++        flat_part = part.flatten()
++        for el in flat_part.notesAndRests:
++            if el.isRest:
++                continue
++            if el.isChord:
++                pitch = max(p.midi for p in el.pitches)
++            else:
++                pitch = el.pitch.midi
++            onset = int(round(el.offset * TPQ))
++            duration = int(round(el.duration.quarterLength * TPQ))
++            events.append((onset, duration, pitch))
++        by_voice[voice_idx] = events
++    return by_voice
++
++
++def _assert_events_match_with_tick_tolerance(
++    expected: Dict[int, List[Tuple[int, int, int]]],
++    actual: Dict[int, List[Tuple[int, int, int]]],
++    *,
++    tick_tolerance: int = 1,
++) -> None:
++    assert set(expected.keys()) == set(actual.keys())
++    for voice_idx in expected:
++        exp_events = expected[voice_idx]
++        got_events = actual[voice_idx]
++        assert len(exp_events) == len(got_events)
++        for (exp_onset, exp_dur, exp_pitch), (got_onset, got_dur, got_pitch) in zip(
++            exp_events, got_events
++        ):
++            assert got_pitch == exp_pitch
++            assert abs(got_onset - exp_onset) <= tick_tolerance
++            assert abs(got_dur - exp_dur) <= tick_tolerance
++
++
++def _build_random_score(seed: int, *, bars: int = 3, voices: int = 3) -> stream.Score:
++    rng = random.Random(seed)
++    score = stream.Score()
++    for voice_idx in range(voices):
++        part = stream.Part(id=f"Voice{voice_idx}")
++        part.append(meter.TimeSignature("4/4"))
++        base_pitch = 48 + voice_idx * 7
++        for _ in range(bars):
++            remaining = 4.0
++            while remaining > 1e-9:
++                options = [dur for dur in (0.5, 1.0, 1.5, 2.0) if dur <= remaining + 1e-9]
++                quarter_len = rng.choice(options)
++                if rng.random() < 0.3:
++                    part.append(note.Rest(quarterLength=quarter_len))
++                else:
++                    pitch = base_pitch + rng.randint(0, 12)
++                    part.append(note.Note(midi=pitch, quarterLength=quarter_len))
++                remaining = round(remaining - quarter_len, 6)
++        score.insert(0, part)
++    return score
++
++
++def _write_sustained_reference_xml(tmp_path: Path) -> Path:
++    score = stream.Score()
++
++    bass = stream.Part(id="Bass")
++    bass.append(meter.TimeSignature("4/4"))
++    bass.append(note.Note("C3", quarterLength=2.0))
++    bass.append(note.Rest(quarterLength=2.0))
++
++    upper = stream.Part(id="Upper")
++    upper.append(meter.TimeSignature("4/4"))
++    upper.append(note.Note("G3", quarterLength=1.0))
++    upper.append(note.Note("A3", quarterLength=1.0))
++    upper.append(note.Rest(quarterLength=2.0))
++
++    score.insert(0, bass)
++    score.insert(0, upper)
++
++    out_path = tmp_path / "sustained_reference.xml"
++    score.write("musicxml", fp=str(out_path))
++    return out_path
++
++
++@pytest.mark.parametrize("seed", [7, 17, 27])
++def test_roundtrip_pitch_reconstruction_on_random_bars(seed: int, tmp_path: Path) -> None:
++    score = _build_random_score(seed)
++    xml_path = tmp_path / f"random_seed_{seed}.xml"
++    score.write("musicxml", fp=str(xml_path))
++
++    tokens, _ = eventize_musicxml(str(xml_path), voice_mode="parts")
++    harm_errors = validate_harm_tokens(tokens)
++    assert not harm_errors
++
++    reconstructed = tokens_to_score(tokens, tpq=TPQ)
++    _assert_events_match_with_tick_tolerance(
++        _note_events_by_voice(score),
++        _note_events_by_voice(reconstructed),
++        tick_tolerance=1,
++    )
++
++
++def test_harm_consistency_uses_lowest_active_reference_pitch(tmp_path: Path) -> None:
++    xml_path = _write_sustained_reference_xml(tmp_path)
++    tokens, _ = eventize_musicxml(str(xml_path), voice_mode="parts")
++
++    harm_errors = validate_harm_tokens(tokens)
++    assert not harm_errors
++
++    pos_idx = tokens.index("POS_24")
++    found_upper = False
++    idx = pos_idx + 1
++    while idx < len(tokens) and tokens[idx] != "BAR" and not tokens[idx].startswith("POS_"):
++        if not tokens[idx].startswith("VOICE_"):
++            idx += 1
++            continue
++        event, next_idx = parse_voice_event(tokens, idx)
++        if event.voice == 1:
++            found_upper = True
++            assert event.mel_int == 2
++            assert event.harm_oct == 0
++            assert event.harm_class == 9
++        idx = next_idx
++
++    assert found_upper
+
+
+thinking
+**Finalizing JSON summary output**
+codex
+{"done":true,"progress_made":true,"summary":"Completed the next unchecked ExecPlan item by adding round-trip pitch reconstruction and HARM consistency tests in tests/test_roundtrip_pitch.py, checking that item in docs/exec/EXECPLAN_stage1.md, syncing TODO.md, and appending PROGRESS.md. Ran the required precheck and full verify command; tests pass (63 passed, 1 skipped).","tests_ran":true,"tests_status":"pass","next_step":"Proceed to the next unchecked ExecPlan item: implement scripts/make_dataset.py basic pipeline.","stop_reason":"completed"}
+file update:
+diff --git a/PROGRESS.md b/PROGRESS.md
+index 11f763e2dbb4256baeb84ecbe0f89f7a55bf2222..c38966ab59b9b77fc51cbe298f3a391482c0564e
+--- a/PROGRESS.md
++++ b/PROGRESS.md
+@@ -8,3 +8,4 @@
+ - 2026-02-24: Completed Stage-1 ExecPlan item 1 by defining versioned `EventSpec`/`DescriptorSpec` in `src/tokens/schema.py` (`remi_tab_v1`, `tpq=24`) and added `tests/test_schema.py`.
+ - 2026-02-24: Completed Stage-1 ExecPlan item 2 by adding `src/tokens/intervals.py` (melodic/harmonic helpers with QA vs production behavior), wiring repairs into `eventize_musicxml`, updating harmonic validation to shared math helpers, and adding `tests/test_intervals.py`; verify run: `53 passed, 1 skipped`.
+ - 2026-02-24: Completed Stage-1 ExecPlan item 3 by adding `src/tokens/tokenizer.py` (voice-event parsing/serialization, stream canonicalization helpers), wiring `eventize_musicxml` pitched-onset emission through tokenizer serialization for canonical ordering, and adding `tests/test_tokenizer.py`; verify run: `59 passed, 1 skipped`.
++- 2026-02-24: Completed Stage-1 ExecPlan item 4 by adding `tests/test_roundtrip_pitch.py` with random-bar pitch reconstruction round-trip checks (anchors + `MEL_INT12`) and sustained-reference `HARM_*` consistency assertions; verify run: `63 passed, 1 skipped`.
+diff --git a/TODO.md b/TODO.md
+index f34ae3002cbb8b57163085ffe73aebe53b830893..1bb5aaf5722a90e458248dd07c4b684eeed5f712
+--- a/TODO.md
++++ b/TODO.md
+@@ -4,6 +4,7 @@
+ - [x] Implement `src/tokens/schema.py` (EventSpec + DescriptorSpec, versioned)
+ - [x] Implement tokenizer interval math + round-trip tests
+ - [x] Implement event parsing/serialization in `src/tokens/tokenizer.py` with canonical ordering
++- [x] Add round-trip tests for pitch reconstruction and `HARM_*` consistency
+ - [ ] Implement `scripts/make_dataset.py` basic pipeline
+ - [ ] Produce `data/processed/{events.parquet,barplans.parquet,stats.json}`
+ - [x] CI: `pytest -q` passes
+diff --git a/docs/exec/EXECPLAN_stage1.md b/docs/exec/EXECPLAN_stage1.md
+index b8ee585fca521d0ea892fa6b21d13bb879078f5d..5804cb1423e039105830941eb6e393ebe9d0a4f6
+--- a/docs/exec/EXECPLAN_stage1.md
++++ b/docs/exec/EXECPLAN_stage1.md
+@@ -12,7 +12,7 @@
+ - [x] Define EventSpec + DescriptorSpec in `src/tokens/schema.py` with version `remi_tab_v1` and `tpq=24`.
+ - [x] Implement interval math helpers (melodic + harmonic ref) with QA vs production behavior.
+ - [x] Implement event parsing/serialization in `src/tokens/tokenizer.py` with canonical ordering.
+-- [ ] Add round-trip tests for pitch reconstruction and `HARM_*` consistency.
++- [x] Add round-trip tests for pitch reconstruction and `HARM_*` consistency.
+ - [ ] Implement `scripts/make_dataset.py` basic pipeline (parse, normalize, collapse doublings, track assignment, tokenize, stats).
+ - [ ] Produce dataset artifacts in `data/processed/` and document counts in `stats.json`.
+ - [ ] Verify `bash docs/skills/python-test-env/scripts/run_tests.sh` passes.
+diff --git a/tests/test_roundtrip_pitch.py b/tests/test_roundtrip_pitch.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..b6fbfef56a9df3df629ed8135abb4b79c3e98a39
+--- /dev/null
++++ b/tests/test_roundtrip_pitch.py
+@@ -0,0 +1,141 @@
++import random
++import sys
++from pathlib import Path
++from typing import Dict, List, Tuple
++
++import pytest
++from music21 import meter, note, stream
++
++sys.path.insert(0, str(Path(__file__).parents[1]))
++
++from src.tokens.eventizer import eventize_musicxml
++from src.tokens.roundtrip import tokens_to_score
++from src.tokens.tokenizer import parse_voice_event
++from src.tokens.validator import validate_harm_tokens
++
++TPQ = 24
++
++
++def _note_events_by_voice(score: stream.Score) -> Dict[int, List[Tuple[int, int, int]]]:
++    by_voice: Dict[int, List[Tuple[int, int, int]]] = {}
++    for voice_idx, part in enumerate(score.parts):
++        events: List[Tuple[int, int, int]] = []
++        flat_part = part.flatten()
++        for el in flat_part.notesAndRests:
++            if el.isRest:
++                continue
++            if el.isChord:
++                pitch = max(p.midi for p in el.pitches)
++            else:
++                pitch = el.pitch.midi
++            onset = int(round(el.offset * TPQ))
++            duration = int(round(el.duration.quarterLength * TPQ))
++            events.append((onset, duration, pitch))
++        by_voice[voice_idx] = events
++    return by_voice
++
++
++def _assert_events_match_with_tick_tolerance(
++    expected: Dict[int, List[Tuple[int, int, int]]],
++    actual: Dict[int, List[Tuple[int, int, int]]],
++    *,
++    tick_tolerance: int = 1,
++) -> None:
++    assert set(expected.keys()) == set(actual.keys())
++    for voice_idx in expected:
++        exp_events = expected[voice_idx]
++        got_events = actual[voice_idx]
++        assert len(exp_events) == len(got_events)
++        for (exp_onset, exp_dur, exp_pitch), (got_onset, got_dur, got_pitch) in zip(
++            exp_events, got_events
++        ):
++            assert got_pitch == exp_pitch
++            assert abs(got_onset - exp_onset) <= tick_tolerance
++            assert abs(got_dur - exp_dur) <= tick_tolerance
++
++
++def _build_random_score(seed: int, *, bars: int = 3, voices: int = 3) -> stream.Score:
++    rng = random.Random(seed)
++    score = stream.Score()
++    for voice_idx in range(voices):
++        part = stream.Part(id=f"Voice{voice_idx}")
++        part.append(meter.TimeSignature("4/4"))
++        base_pitch = 48 + voice_idx * 7
++        for _ in range(bars):
++            remaining = 4.0
++            while remaining > 1e-9:
++                options = [dur for dur in (0.5, 1.0, 1.5, 2.0) if dur <= remaining + 1e-9]
++                quarter_len = rng.choice(options)
++                if rng.random() < 0.3:
++                    part.append(note.Rest(quarterLength=quarter_len))
++                else:
++                    pitch = base_pitch + rng.randint(0, 12)
++                    part.append(note.Note(midi=pitch, quarterLength=quarter_len))
++                remaining = round(remaining - quarter_len, 6)
++        score.insert(0, part)
++    return score
++
++
++def _write_sustained_reference_xml(tmp_path: Path) -> Path:
++    score = stream.Score()
++
++    bass = stream.Part(id="Bass")
++    bass.append(meter.TimeSignature("4/4"))
++    bass.append(note.Note("C3", quarterLength=2.0))
++    bass.append(note.Rest(quarterLength=2.0))
++
++    upper = stream.Part(id="Upper")
++    upper.append(meter.TimeSignature("4/4"))
++    upper.append(note.Note("G3", quarterLength=1.0))
++    upper.append(note.Note("A3", quarterLength=1.0))
++    upper.append(note.Rest(quarterLength=2.0))
++
++    score.insert(0, bass)
++    score.insert(0, upper)
++
++    out_path = tmp_path / "sustained_reference.xml"
++    score.write("musicxml", fp=str(out_path))
++    return out_path
++
++
++@pytest.mark.parametrize("seed", [7, 17, 27])
++def test_roundtrip_pitch_reconstruction_on_random_bars(seed: int, tmp_path: Path) -> None:
++    score = _build_random_score(seed)
++    xml_path = tmp_path / f"random_seed_{seed}.xml"
++    score.write("musicxml", fp=str(xml_path))
++
++    tokens, _ = eventize_musicxml(str(xml_path), voice_mode="parts")
++    harm_errors = validate_harm_tokens(tokens)
++    assert not harm_errors
++
++    reconstructed = tokens_to_score(tokens, tpq=TPQ)
++    _assert_events_match_with_tick_tolerance(
++        _note_events_by_voice(score),
++        _note_events_by_voice(reconstructed),
++        tick_tolerance=1,
++    )
++
++
++def test_harm_consistency_uses_lowest_active_reference_pitch(tmp_path: Path) -> None:
++    xml_path = _write_sustained_reference_xml(tmp_path)
++    tokens, _ = eventize_musicxml(str(xml_path), voice_mode="parts")
++
++    harm_errors = validate_harm_tokens(tokens)
++    assert not harm_errors
++
++    pos_idx = tokens.index("POS_24")
++    found_upper = False
++    idx = pos_idx + 1
++    while idx < len(tokens) and tokens[idx] != "BAR" and not tokens[idx].startswith("POS_"):
++        if not tokens[idx].startswith("VOICE_"):
++            idx += 1
++            continue
++        event, next_idx = parse_voice_event(tokens, idx)
++        if event.voice == 1:
++            found_upper = True
++            assert event.mel_int == 2
++            assert event.harm_oct == 0
++            assert event.harm_class == 9
++        idx = next_idx
++
++    assert found_upper
+
+tokens used
+93,077
