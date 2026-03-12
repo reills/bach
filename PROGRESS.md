@@ -297,3 +297,15 @@
 - Added `tests/test_api_fingering.py` to cover a valid carry-note lookup that only resolves correctly via the exported hit map and a missing-hit-key `404` case, keeping the route contract focused on the frontend click flow.
 - Updated `frontend/src/api/types.ts` and `frontend/src/api/client.ts` with a concrete `AltPositionsResponse` type for the picker API.
 - Ran the exact task command `bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_api_fingering.py` and confirmed it passes with `2 passed in 1.15s`.
+
+## 2026-03-12 - P32
+
+- Rewrote `README.md` as an MVP operator guide instead of the original long-range project plan, with concrete sections for environment checks, dataset build, vocab build, NoteLM training, example generation, backend startup, frontend startup, and the currently supported ways to exercise compose, inpaint, and fingering without reading source first.
+- Rewrote `frontend/README.md` as a practical browser workflow guide covering API mode, local test-data mode, demo mode, the current inpaint/fingering behavior, and the distinction between backend-backed flows and backend-free local smoke testing.
+- Added a new `frontend-readme.md` as the current architecture contract for canonical score shape, MusicXML/export invariants, measure and hit-key identity, window-mode inpaint semantics, and backend-driven fingering updates. Kept the `goal-*` historical docs untouched.
+- Replaced the stale task text in `TODO.md` with a post-MVP backlog focused on the real remaining gaps: environment lockfiles, a supported `/compose` backend launcher, repair-mode follow-through, persistent storage, and stronger release/onboarding artifacts.
+- Ran `bash docs/skills/python-test-env/scripts/run_tests.sh --check` to verify the expected Python environment imports are present.
+- Ran `bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_train_v1_smoke.py` and confirmed `6 passed in 301.61s`.
+- Ran `bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_compose_service.py tests/test_api_scores.py tests/test_api_fingering.py` and confirmed `8 passed in 53.42s`.
+- Ran `npm test -- --run src/App.test.ts src/state/types.test.ts` in `frontend/` and confirmed `30 passed` across `2` files in `2.52s`.
+- Ran `.venv/bin/python scripts/generate_example.py --out-dir /tmp/bach_gen_docs_example --quiet` as a manual compose-pipeline smoke check to confirm the documented example-generation path still works end to end in the current shell.
