@@ -150,3 +150,10 @@
 - Re-read `TODO.md` and verified the existing inference checkpoint loader in `src/models/notelm/inference.py` still matches the task requirements without additional code changes.
 - Ran the exact targeted task command `bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_load_checkpoint.py` and confirmed it passes with `1 passed in 0.73s`.
 - Wrote the required `finished.md` handoff for this run.
+
+## 2026-03-12 - P15
+
+- Added a minimal autoregressive generation entry point in `src/inference/generate_v1.py` that loads a NoteLM checkpoint, resolves string or integer seed tokens against the checkpoint vocab, steps the model one token at a time, and stops on `max_length` or an inferred/configured EOS token.
+- Reused the existing decoding helpers by building either `Sampler` or `SCGSampler` from the requested decoding settings instead of introducing a separate generation-specific sampling path.
+- Added focused coverage in `tests/test_generate_v1.py` with a tiny mocked autoregressive model to verify EOS termination, SCG-guided sampling, and context cropping to the model `max_seq_len` without requiring training.
+- Ran the exact task command `bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_generate_v1.py tests/test_load_checkpoint.py` and confirmed it passes with `3 passed in 0.76s`.
