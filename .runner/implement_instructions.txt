@@ -4,11 +4,13 @@ Read TODO.md carefully. It contains the complete task specification.
 
 Your job:
 1. Work only on what TODO.md describes. Make minimal, focused changes.
-2. Follow all rules in AGENTS.md without exception. 
+2. Follow all rules in AGENTS.md without exception.
 4. Do not refactor unrelated code.
 5. Do not weaken, skip, or remove tests.
-6. SKIP TESTS NOT POSSIBLE TO RUN THEM HERE BUT DOCUMENT TESTS YOU ADD.
-7. If you add a new feature, add tests in the same run.
+6. If you add a new feature, add tests in the same run.
+7. After implementation, run the test command listed in the "Test Command" section of TODO.md.
+   This runs only the tests relevant to this task. Do NOT run the full test suite.
+   Tests should complete in under 30 seconds. Fix any test failures before writing finished.md.
 
 When you are done, write finished.md with EXACTLY this structure
 (preserve the headings verbatim so the runner can archive it):

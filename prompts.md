@@ -38,6 +38,7 @@ These parts already exist and should usually be reused, not rewritten:
 - Dependency: `Independent`
 - Goal: add a minimal FastAPI app entrypoint and health check so the backend has a stable place to grow.
 - Files: `src/api/__init__.py`, `src/api/app.py`, `src/api/routes/health.py`, optional `scripts/run_api.py`, `tests/test_api_health.py`
+- Tests: `tests/test_api_health.py`
 - Prompt:
 
 ```text
@@ -48,6 +49,7 @@ Add a minimal FastAPI service skeleton under src/api with an app factory and a /
 - Dependency: `Dependent on P02`
 - Goal: implement the backend canonical score model described in frontend-readme.md.
 - Files: `src/api/canonical/types.py`, `src/api/canonical/__init__.py`, `tests/test_canonical_types.py`, `frontend-readme.md`
+- Tests: `tests/test_canonical_types.py`
 - Prompt:
 
 ```text
@@ -58,6 +60,7 @@ Implement canonical score data structures under src/api/canonical/types.py using
 - Dependency: `Dependent on P03`
 - Goal: convert the existing token/event stream into canonical score objects with stable measure and event IDs.
 - Files: `src/api/canonical/from_tokens.py`, `src/tokens/roundtrip.py`, `tests/test_tokens_to_canonical.py`
+- Tests: `tests/test_tokens_to_canonical.py` `tests/test_canonical_types.py`
 - Prompt:
 
 ```text
@@ -68,6 +71,7 @@ Add a converter from the existing token stream to the canonical score model. Reu
 - Dependency: `Dependent on P03`
 - Goal: centralize bar lookup, event lookup, and revision-safe mutation helpers.
 - Files: `src/api/canonical/ops.py`, `tests/test_canonical_ops.py`
+- Tests: `tests/test_canonical_ops.py`
 - Prompt:
 
 ```text
@@ -78,6 +82,7 @@ Implement small canonical score utility functions for looking up measures by mea
 - Dependency: `Dependent on P04`
 - Goal: produce MusicXML from canonical score, including stable IDs and barline tie splitting.
 - Files: `src/api/render/musicxml.py`, `src/api/render/__init__.py`, `tests/test_musicxml_export.py`
+- Tests: `tests/test_musicxml_export.py`
 - Prompt:
 
 ```text
@@ -88,6 +93,7 @@ Implement canonical score to MusicXML export in src/api/render/musicxml.py. Supp
 - Dependency: `Dependent on P04`
 - Goal: generate MIDI directly from canonical score so API routes can return playable output without depending on the frontend.
 - Files: `src/api/render/midi.py`, `tests/test_midi_export.py`
+- Tests: `tests/test_midi_export.py`
 - Prompt:
 
 ```text
@@ -98,6 +104,7 @@ Add a canonical score to MIDI exporter. Reuse music21 if that is the shortest pa
 - Dependency: `Dependent on P10`
 - Goal: satisfy the root README deliverable for ASCII tab output.
 - Files: `src/api/render/ascii_tab.py`, `tests/test_ascii_tab.py`, `README.md`
+- Tests: `tests/test_ascii_tab.py`
 - Prompt:
 
 ```text
@@ -108,6 +115,7 @@ Implement a simple ASCII tab renderer that consumes canonical events with assign
 - Dependency: `Dependent on P06`
 - Goal: lock down the specific frontend-readme.md invariants before API work expands.
 - Files: `tests/test_musicxml_golden.py`, optional fixtures under `tests/fixtures/`
+- Tests: `tests/test_musicxml_golden.py` `tests/test_musicxml_export.py`
 - Prompt:
 
 ```text
@@ -118,6 +126,7 @@ Add golden-style tests for the canonical-to-MusicXML bridge. Cover measure IDs, 
 - Dependency: `Independent`
 - Goal: assign playable string/fret positions to symbolic pitches using a deterministic heuristic.
 - Files: `src/tabber/__init__.py`, `src/tabber/heuristic.py`, `tests/test_tabber_heuristic.py`, `README.md`
+- Tests: `tests/test_tabber_heuristic.py`
 - Prompt:
 
 ```text
@@ -128,6 +137,7 @@ Implement a first-pass heuristic tabber in src/tabber/heuristic.py. Input should
 - Dependency: `Dependent on P06 and P10`
 - Goal: ensure rendered MusicXML includes `<technical><string>/<fret>` for fretted notes.
 - Files: `src/api/render/musicxml.py`, `tests/test_musicxml_tab_encoding.py`, `frontend-readme.md`
+- Tests: `tests/test_musicxml_tab_encoding.py` `tests/test_musicxml_export.py`
 - Prompt:
 
 ```text
@@ -138,6 +148,7 @@ Extend the MusicXML exporter so canonical events with fingering data emit <techn
 - Dependency: `Dependent on P10`
 - Goal: return alternate same-pitch string/fret positions for one event.
 - Files: `src/tabber/alternates.py`, `tests/test_tabber_alternates.py`
+- Tests: `tests/test_tabber_alternates.py`
 - Prompt:
 
 ```text
@@ -148,6 +159,7 @@ Add a helper that returns alternate guitar positions for a single pitch event wh
 - Dependency: `Dependent on P03 and P12`
 - Goal: safely apply selected fingering changes without altering pitch or timing.
 - Files: `src/api/canonical/fingering.py`, `tests/test_canonical_fingering.py`
+- Tests: `tests/test_canonical_fingering.py`
 - Prompt:
 
 ```text
@@ -158,6 +170,7 @@ Implement a canonical score helper that applies fingering selections to events b
 - Dependency: `Independent`
 - Goal: load a trained NoteLM checkpoint and associated vocab cleanly for generation scripts and API routes.
 - Files: `src/inference/__init__.py`, `src/inference/load_checkpoint.py`, `tests/test_load_checkpoint.py`
+- Tests: `tests/test_load_checkpoint.py`
 - Prompt:
 
 ```text
@@ -168,6 +181,7 @@ Add a small inference helper that loads a NoteLM checkpoint plus vocab and retur
 - Dependency: `Dependent on P14`
 - Goal: turn the existing NoteLM model and sampler utilities into a working token generator.
 - Files: `src/inference/generate_v1.py`, `src/utils/decoding/sampler.py`, `src/utils/decoding/scg.py`, `tests/test_generate_v1.py`
+- Tests: `tests/test_generate_v1.py` `tests/test_load_checkpoint.py`
 - Prompt:
 
 ```text
@@ -178,6 +192,7 @@ Implement a minimal autoregressive generation loop for NoteLM in src/inference/g
 - Dependency: `Dependent on P15`
 - Goal: map user-facing compose options into control tokens the generator can consume.
 - Files: `src/inference/controls.py`, `tests/test_controls.py`, `README.md`
+- Tests: `tests/test_controls.py`
 - Prompt:
 
 ```text
@@ -188,6 +203,7 @@ Implement a thin control-token layer that maps compose inputs like key, style, d
 - Dependency: `Dependent on P04, P07, P11, P15, and P16`
 - Goal: build the backend compose service path from model output to canonical score to XML and MIDI.
 - Files: `src/api/services/compose.py`, `tests/test_compose_service.py`
+- Tests: `tests/test_compose_service.py`
 - Prompt:
 
 ```text
@@ -198,6 +214,7 @@ Implement a compose service that calls the generation loop, converts generated t
 - Dependency: `Dependent on P03`
 - Goal: manage score revisions and inpaint drafts server-side.
 - Files: `src/api/store.py`, `tests/test_store.py`
+- Tests: `tests/test_store.py`
 - Prompt:
 
 ```text
@@ -208,6 +225,7 @@ Implement a small in-memory repository for scores and drafts. It should create s
 - Dependency: `Dependent on P05, P11, and P18`
 - Goal: implement the core inpaint_preview behavior for one measure while preserving carry-in notes.
 - Files: `src/api/services/inpaint.py`, `tests/test_inpaint_service.py`, `frontend-readme.md`
+- Tests: `tests/test_inpaint_service.py` `tests/test_canonical_ops.py`
 - Prompt:
 
 ```text
@@ -218,6 +236,7 @@ Implement an MVP inpaint service for window mode. It should accept a canonical s
 - Dependency: `Dependent on P02, P17, P18, and P19`
 - Goal: expose the core backend API expected by the frontend.
 - Files: `src/api/routes/scores.py`, `src/api/app.py`, `tests/test_api_scores.py`, `frontend/src/api/types.ts`
+- Tests: `tests/test_api_scores.py` `tests/test_api_health.py`
 - Prompt:
 
 ```text
@@ -228,6 +247,7 @@ Add FastAPI routes for /compose, /inpaint_preview, /commit_draft, and /discard_d
 - Dependency: `Dependent on P06`
 - Goal: generate deterministic `measureMap` and `eventHitMap` payloads for AlphaTab click resolution.
 - Files: `src/api/render/hit_map.py`, `tests/test_hit_map.py`, `frontend-readme.md`
+- Tests: `tests/test_hit_map.py`
 - Prompt:
 
 ```text
@@ -238,6 +258,7 @@ Implement deterministic measureMap and eventHitMap generation for the exported s
 - Dependency: `Dependent on P20 and P21`
 - Goal: complete the backend contract the frontend already expects.
 - Files: `src/api/services/compose.py`, `src/api/services/inpaint.py`, `src/api/routes/scores.py`, `tests/test_api_scores.py`
+- Tests: `tests/test_api_scores.py` `tests/test_hit_map.py`
 - Prompt:
 
 ```text
@@ -248,6 +269,7 @@ Update the compose and inpaint service/route responses so they always include me
 - Dependency: `Dependent on P12, P18, and P22`
 - Goal: implement the backend endpoint for note-level fingering alternatives.
 - Files: `src/api/routes/fingering.py`, `src/api/services/fingering.py`, `tests/test_api_fingering.py`, `frontend/src/api/types.ts`
+- Tests: `tests/test_api_fingering.py`
 - Prompt:
 
 ```text
@@ -258,6 +280,7 @@ Implement the /alt_positions endpoint. It should resolve the frontend eventHitKe
 - Dependency: `Dependent on P13, P18, and P23`
 - Goal: implement server-side fingering edits that only update technical positions.
 - Files: `src/api/routes/fingering.py`, `src/api/services/fingering.py`, `tests/test_api_fingering.py`
+- Tests: `tests/test_api_fingering.py`
 - Prompt:
 
 ```text
@@ -298,6 +321,7 @@ Add lightweight frontend tests for the main workflow: load a score response, sel
 - Dependency: `Independent`
 - Goal: make `scripts/train_v1.py` practical for producing a real checkpoint.
 - Files: `scripts/train_v1.py`, optional `tests/test_train_v1_smoke.py`, `README.md`
+- Tests: `tests/test_train_v1_smoke.py`
 - Prompt:
 
 ```text
@@ -308,6 +332,7 @@ Review scripts/train_v1.py and harden it for actual use. Add missing basics only
 - Dependency: `Dependent on P15`
 - Goal: fill the missing evaluation/reporting path referenced in the root README.
 - Files: `scripts/eval_basic.py`, `tests/test_eval_basic.py`, `README.md`
+- Tests: `tests/test_eval_basic.py`
 - Prompt:
 
 ```text
@@ -318,6 +343,7 @@ Implement a small evaluation script that can score generated token streams or ex
 - Dependency: `Dependent on P17, P20, and P29`
 - Goal: provide one reproducible command that creates example outputs for demos and manual QA.
 - Files: `scripts/generate_example.py`, `README.md`, optional fixture paths under `out/examples/`
+- Tests: `tests/test_compose_service.py` `tests/test_eval_basic.py`
 - Prompt:
 
 ```text
@@ -328,6 +354,7 @@ Add a small end-to-end example generation script that exercises the compose pipe
 - Dependency: `Dependent on P20, P23, and P24`
 - Goal: make backend failures predictable for the frontend and tests.
 - Files: `src/api/routes/`, `tests/test_api_errors.py`, `frontend/src/api/client.ts`
+- Tests: `tests/test_api_errors.py` `tests/test_api_scores.py` `tests/test_api_fingering.py`
 - Prompt:
 
 ```text

@@ -8,10 +8,11 @@ Build around a server-side Canonical Score (one source of truth). Use MusicXML o
 
 Minimal schema (v0):
 
+- Backend object shape: `CanonicalScore { header, measures[], parts[] }`
 - Header: `tpq`, `keySigMap`, `timeSigMap`, `tempoMap`, optional `pickupTicks`
-- Parts: `instrument`, `tuning`, `capo`, `midiProgram`
+- Parts: `{ id, instrument, tuning, capo, midiProgram, events[] }`
 - Measures: `measures[]` with `id` (UUID), `index` (0-based), `startTick`, `lengthTicks`
-- Events: `{ id, startTick, durTick, pitchMidi | null, velocity?, voiceId }`
+- Events: `{ id, startTick, durTick, pitchMidi | null, velocity?, voiceId, fingering? }`
 
 Invariants:
 - Timing quantized to `tpq`
@@ -22,6 +23,7 @@ Invariants:
 - Canonical score is stored in sounding pitch (concert pitch)
 - MusicXML ties are derived on export by splitting sustained events at barlines
 - For generated output, `voiceId` defaults to the NoteLM track index (`VOICE_v`); imported scores may map part/voice indices into `VOICE_v` during eventization
+- Guitar fingering is optional backend metadata: `{ stringIndex, fret }`, where `stringIndex` is a 0-based backend index that is converted to MusicXML string numbers on export
 
 Event IDs are stable unless replaced. Inpainting a measure creates new IDs only inside that measure.
 `index` is derived from order; `measure.id` is the stable identity.

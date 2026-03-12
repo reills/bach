@@ -1,7 +1,7 @@
 # AGENTS.md — bach-gen
 
 ## How to run
-- Preferred runtime: `conda run -n bach-gen python`
+- Preferred runtime: `conda run -n bach python`
 - Optional venv fallback: `python -m venv .venv && source .venv/bin/activate`
 - Environment/test helper: `bash docs/skills/python-test-env/scripts/run_tests.sh --check`
 - Tests: `bash docs/skills/python-test-env/scripts/run_tests.sh`

@@ -73,7 +73,7 @@ set -euo pipefail
 # Defaults (override with environment variables)
 # ─────────────────────────────────────────────────────────────────────────────
 IMPLEMENT_CMD="${IMPLEMENT_CMD:-codex exec --full-auto -C . -}"
-REVIEW_CMD="${REVIEW_CMD:-codex exec -C . -}"
+REVIEW_CMD="${REVIEW_CMD:-codex exec --full-auto -C . -}"
 MAX_RETRIES="${MAX_RETRIES:-3}"
 AUTO_COMMIT="${AUTO_COMMIT:-0}"
 STOP_ON_BLOCKED="${STOP_ON_BLOCKED:-1}"
@@ -194,6 +194,17 @@ get_task_deps() {
   # Extract every PXX token from the dep value, one per line
   # Handles: "P02", "P06 and P10", "P04, P07, P11, P15, and P16"
   printf '%s\n' "$dep_val" | grep -oE 'P[0-9]+'
+}
+
+# get_task_tests TASKID: print the test file paths from "- Tests:" line
+# Returns space-separated test paths, or empty if none specified
+get_task_tests() {
+  local id="$1"
+  local tests_line
+  tests_line=$(_extract_section "$id" | grep -m1 -e '- Tests:' || true)
+  [[ -z "$tests_line" ]] && return
+  # Extract backtick-delimited paths: `tests/foo.py`, `tests/bar.py`
+  printf '%s' "$tests_line" | grep -oE '`[^`]+`' | tr -d '`' | tr '\n' ' '
 }
 
 # get_task_prompt TASKID: print the body between ```text ... ``` in this section
@@ -432,8 +443,9 @@ run_task() {
   set_task_status "$task_id" "in_progress"
 
   # ── Write TODO.md ──────────────────────────────────────────────────────────
-  local task_prompt
+  local task_prompt task_tests
   task_prompt=$(get_task_prompt "$task_id")
+  task_tests=$(get_task_tests "$task_id")
   if [[ -z "$task_prompt" ]]; then
     die "Could not extract prompt body for $task_id from $PROMPT_FILE"
   fi
@@ -442,6 +454,11 @@ run_task() {
     printf '# TODO — Active Task: %s\n\n' "$task_id"
     printf '## %s — %s\n\n' "$task_id" "$task_title"
     printf '%s\n' "$task_prompt"
+    if [[ -n "$task_tests" ]]; then
+      printf '\n## Test Command\n\n'
+      printf 'Run ONLY these targeted tests (do NOT run the full suite):\n\n'
+      printf '```bash\nbash docs/skills/python-test-env/scripts/run_tests.sh %s\n```\n' "$task_tests"
+    fi
   } > "$TODO_FILE"
   info "Wrote $TODO_FILE"
 

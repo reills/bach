@@ -1,6 +1,6 @@
 P02 summary:
-- Confirmed the existing FastAPI backend skeleton already satisfies the task requirements.
-- `src/api/app.py` exposes `create_app()` and registers the `/healthz` route.
-- `src/api/routes/health.py` returns `{"status": "ok"}` for `GET /healthz`.
-- `tests/test_api_health.py` already covers the health check with `TestClient`.
-- Added `PROGRESS.md` and documented that tests were intentionally not run in this environment.
+- Kept the existing FastAPI backend skeleton in `src/api`, with `create_app()` registering the `/healthz` router.
+- Updated `src/api/routes/health.py` so the health endpoint is an async route returning `{\"status\": \"ok\"}`.
+- Reworked `tests/test_api_health.py` to hit the app through `httpx.ASGITransport` after reproducing a `fastapi.testclient.TestClient` deadlock in the installed Starlette/AnyIO stack.
+- Appended a new `PROGRESS.md` entry with the real verification result.
+- Ran `bash docs/skills/python-test-env/scripts/run_tests.sh -- tests/test_api_health.py` and got `1 passed in 0.20s`.

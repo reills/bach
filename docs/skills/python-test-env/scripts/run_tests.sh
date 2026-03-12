@@ -5,8 +5,8 @@ ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$ROOT"
 
 pick_python() {
-  if CONDA_NO_PLUGINS=true conda run -n bach-gen python -V >/dev/null 2>&1; then
-    echo "CONDA_NO_PLUGINS=true conda run -n bach-gen python"
+  if CONDA_NO_PLUGINS=true conda run -n bach python -V >/dev/null 2>&1; then
+    echo "CONDA_NO_PLUGINS=true conda run -n bach python"
     return 0
   fi
 

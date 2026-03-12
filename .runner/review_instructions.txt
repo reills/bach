@@ -7,7 +7,10 @@ Read these files carefully before writing your verdict:
 
 Your job:
 1. Verify that finished.md accurately describes what was actually done in the repo.
-2. Verify that the implementation satisfies every requirement in TODO.md.  
+2. Verify that the implementation satisfies every requirement in TODO.md.
+3. Run the test command listed in the "Test Command" section of TODO.md.
+   This runs only the tests relevant to this task. Do NOT run the full test suite.
+   Tests should complete in under 30 seconds. Any test failures should result in a FAIL verdict.
 4. Identify any concrete gaps, regressions.
 
 Write review.md with EXACTLY this format (the runner parses it literally):
