@@ -1,16 +1,15 @@
+---
 ## Task ID
 P14
 
 ## Files Changed
-src/models/notelm/inference.py
-src/models/notelm/__init__.py
-src/models/__init__.py
-tests/test_load_checkpoint.py
 PROGRESS.md
+finished.md
 
 ## Behavior Implemented
-Added a minimal NoteLM inference checkpoint loader that restores the saved model config and weights, resolves and loads the associated vocab, and returns an eval-mode model on CPU by default. Added a focused round-trip test that writes a tiny synthetic checkpoint plus vocab and verifies the reloaded model produces the same logits.
+Verified that the existing NoteLM inference checkpoint loader already loads checkpoint config, model weights, and vocab metadata into an eval-mode model on CPU by default, with focused save-and-reload coverage in `tests/test_load_checkpoint.py`. No implementation changes were needed for this run.
  
 
 ## Remaining Known Issues
 None
+---

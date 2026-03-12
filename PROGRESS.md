@@ -138,3 +138,15 @@
 - Re-read `TODO.md` and confirmed the existing checkpoint loader in `src/models/notelm/inference.py` still matches the task: it restores `NoteLM` weights plus vocab metadata and returns an eval-mode CPU model by default.
 - Re-verified `tests/test_load_checkpoint.py` covers the required synthetic save-and-reload path with a tiny checkpoint and `vocab.json`, checking restored config, vocab path, step metadata, and logits.
 - Ran the exact task command `bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_load_checkpoint.py` and confirmed it passes with `1 passed in 0.73s`.
+
+## 2026-03-12 - P14
+
+- Re-read `TODO.md` carefully and verified the existing `load_notelm_checkpoint()` helper in `src/models/notelm/inference.py` already satisfies the task requirements without further code changes.
+- Re-ran the exact targeted task command `bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_load_checkpoint.py` and confirmed it passes with `1 passed in 0.74s`.
+- Wrote the required handoff file for this run and left the implementation unchanged because the task was already complete in the workspace.
+
+## 2026-03-12 - P14
+
+- Re-read `TODO.md` and verified the existing inference checkpoint loader in `src/models/notelm/inference.py` still matches the task requirements without additional code changes.
+- Ran the exact targeted task command `bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_load_checkpoint.py` and confirmed it passes with `1 passed in 0.73s`.
+- Wrote the required `finished.md` handoff for this run.
