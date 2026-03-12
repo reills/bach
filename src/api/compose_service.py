@@ -46,8 +46,8 @@ def compose_baseline(
         score=score,
         score_xml=canonical_score_to_musicxml(score),
         midi=canonical_score_to_midi(score),
-        measure_map=_build_measure_map(score),
-        event_hit_map=_build_event_hit_map(score),
+        measure_map=build_measure_map(score),
+        event_hit_map=build_event_hit_map(score),
     )
 
 
@@ -67,7 +67,7 @@ def _tab_score(score: CanonicalScore, *, max_fret: int) -> CanonicalScore:
     return replace(score, parts=[tabbed_part])
 
 
-def _build_measure_map(score: CanonicalScore) -> dict[str, str]:
+def build_measure_map(score: CanonicalScore) -> dict[str, str]:
     return {str(measure.index): measure.id for measure in score.measures}
 
 
@@ -80,7 +80,7 @@ class _EventSlice:
     ordinal: int
 
 
-def _build_event_hit_map(score: CanonicalScore) -> dict[str, str]:
+def build_event_hit_map(score: CanonicalScore) -> dict[str, str]:
     if len(score.parts) != 1:
         raise ValueError("compose service supports exactly one part")
 

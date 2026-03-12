@@ -194,3 +194,21 @@
 - Updated `src/api/services/inpaint.py` so `changed_measure_ids` is derived from the actual replacement-event spans instead of always reporting only the selected measure; cross-bar replacements now mark every downstream measure they overlap.
 - Extended `tests/test_inpaint_service.py` with a focused regression case for a replacement event that starts in the selected measure and sustains into the next measure, while keeping the existing carry-in preservation and single-measure replacement coverage intact.
 - Ran the exact task command `bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_inpaint_service.py tests/test_canonical_ops.py` and confirmed it passes with `6 passed in 1.17s`.
+
+## 2026-03-12 - P20
+
+- Added `src/api/routes/scores.py` and updated `src/api/app.py` so FastAPI now exposes `/compose`, `/inpaint_preview`, `/commit_draft`, and `/discard_draft`, with payloads matching the existing frontend camelCase API types and `409` responses for stale revision conflicts.
+- Reused the existing compose and inpaint services by storing composed scores in the in-memory draft repository, returning frontend `measureMap` and `eventHitMap` metadata from canonical scores, and validating score/draft ownership on commit or discard.
+- Added `tests/test_api_scores.py` to cover one compose request, one full preview-to-commit flow, and a stale draft commit conflict; ran `bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_api_scores.py tests/test_api_health.py` and confirmed it passes with `4 passed in 1.18s`.
+
+## 2026-03-12 - P20
+
+- Re-read `TODO.md` and verified the current workspace already contains the requested FastAPI compose and draft routes in `src/api/routes/scores.py`, wired through `src/api/app.py` with frontend-aligned camelCase payload fields and `409` handling for stale revisions.
+- Verified the existing route coverage in `tests/test_api_scores.py` still matches the task requirements: one compose request, one preview-to-commit flow, and a stale draft commit conflict, alongside the existing `tests/test_api_health.py` health check.
+- Re-ran the exact task command `bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_api_scores.py tests/test_api_health.py` and confirmed it passes with `4 passed in 1.21s`.
+
+## 2026-03-12 - P20
+
+- Re-validated the existing P20 FastAPI implementation against `TODO.md`: `/compose`, `/inpaint_preview`, `/commit_draft`, and `/discard_draft` are already wired through the app factory with frontend-aligned camelCase payloads and stale-revision conflicts mapped to HTTP `409`.
+- Confirmed the focused route coverage remains in place in `tests/test_api_scores.py` for one compose request, one preview-to-commit draft flow, and a stale draft conflict, with `tests/test_api_health.py` still covering `/healthz`.
+- Ran the exact task test command `bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_api_scores.py tests/test_api_health.py` and confirmed it passes with `4 passed in 1.17s`.
