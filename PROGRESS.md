@@ -83,3 +83,9 @@
 - Added an isolated canonical-score MIDI adapter in `src/api/render/midi.py` that converts canonical header metadata and per-part note events into a `music21` score, then emits MIDI bytes with the canonical `tpq` preserved in the MIDI header.
 - Exported the new MIDI renderer from `src/api/render/__init__.py` and added focused coverage in `tests/test_midi_export.py` that builds a simple canonical score, exports MIDI bytes, and verifies the payload is parseable with a valid MIDI header and track chunk.
 - Ran `bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_midi_export.py` and confirmed the targeted test passes with `1 passed in 0.27s`.
+
+## 2026-03-12 - P09
+
+- Extended `src/api/render/musicxml.py` so pitched canonical events with `fingering` metadata emit MusicXML `<notations><technical><string>/<fret></technical></notations>` using the frontend contract’s high-E=`1` to low-E=`6` numbering derived from the part tuning.
+- Added a small hand-authored golden fixture at `tests/fixtures/musicxml/canonical_bridge.xml` plus `tests/test_musicxml_golden.py`, covering measure `xml:id`, note `xml:id`, technical string/fret tags, and cross-bar tie splitting in one backend contract example.
+- Ran `bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_musicxml_golden.py tests/test_musicxml_export.py` and confirmed the targeted tests pass with `3 passed in 0.27s`.

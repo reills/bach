@@ -99,8 +99,9 @@ def _append_measure_content(measure_el: ET.Element, score: CanonicalScore, measu
                         start_tick=cursor,
                         dur_tick=slice_.start_tick - cursor,
                     ),
+                    string_count=len(part.info.tuning),
                 )
-            _append_note(measure_el, slice_)
+            _append_note(measure_el, slice_, string_count=len(part.info.tuning))
             cursor = slice_.start_tick + slice_.dur_tick
 
         if cursor < measure.end_tick:
@@ -112,6 +113,7 @@ def _append_measure_content(measure_el: ET.Element, score: CanonicalScore, measu
                     start_tick=cursor,
                     dur_tick=measure.end_tick - cursor,
                 ),
+                string_count=len(part.info.tuning),
             )
 
 
@@ -131,7 +133,7 @@ def _slice_for_measure(event: Event, measure: Measure) -> _RenderedSlice | None:
     )
 
 
-def _append_note(measure_el: ET.Element, slice_: _RenderedSlice) -> None:
+def _append_note(measure_el: ET.Element, slice_: _RenderedSlice, string_count: int) -> None:
     note_el = ET.SubElement(measure_el, "note")
 
     if slice_.event is None or slice_.event.pitch_midi is None:
@@ -148,7 +150,9 @@ def _append_note(measure_el: ET.Element, slice_: _RenderedSlice) -> None:
     ET.SubElement(note_el, "duration").text = str(slice_.dur_tick)
     ET.SubElement(note_el, "voice").text = str(slice_.voice_id + 1)
 
-    if slice_.tie_stop or slice_.tie_start:
+    if slice_.tie_stop or slice_.tie_start or (
+        slice_.event is not None and slice_.event.pitch_midi is not None and slice_.event.fingering is not None
+    ):
         notations_el = ET.SubElement(note_el, "notations")
         if slice_.tie_stop:
             ET.SubElement(note_el, "tie", type="stop")
@@ -156,6 +160,21 @@ def _append_note(measure_el: ET.Element, slice_: _RenderedSlice) -> None:
         if slice_.tie_start:
             ET.SubElement(note_el, "tie", type="start")
             ET.SubElement(notations_el, "tied", type="start")
+        if slice_.event is not None and slice_.event.pitch_midi is not None and slice_.event.fingering is not None:
+            technical_el = ET.SubElement(notations_el, "technical")
+            ET.SubElement(technical_el, "string").text = str(_musicxml_string_number(slice_.event, string_count))
+            ET.SubElement(technical_el, "fret").text = str(slice_.event.fingering.fret)
+
+
+def _musicxml_string_number(event: Event, string_count: int) -> int:
+    if event.fingering is None:
+        raise ValueError("musicxml string conversion requires fingering data")
+    if string_count <= 0:
+        raise ValueError("musicxml exporter requires part tuning when fingering data is present")
+    string_number = string_count - event.fingering.string_index
+    if not 1 <= string_number <= string_count:
+        raise ValueError(f"fingering string_index {event.fingering.string_index} out of range for tuning size {string_count}")
+    return string_number
 
 
 def _pitch_to_musicxml(midi_pitch: int) -> tuple[str, int | None, int]:

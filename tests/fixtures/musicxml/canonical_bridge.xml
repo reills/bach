@@ -1,0 +1,78 @@
+<score-partwise version="4.0">
+  <part-list>
+    <score-part id="guitar">
+      <part-name>classical_guitar</part-name>
+    </score-part>
+  </part-list>
+  <part id="guitar">
+    <measure number="1" xml:id="measure-intro">
+      <attributes>
+        <divisions>24</divisions>
+        <time>
+          <beats>1</beats>
+          <beat-type>4</beat-type>
+        </time>
+      </attributes>
+      <note xml:id="note-open-high-e">
+        <pitch>
+          <step>E</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>12</duration>
+        <voice>1</voice>
+        <notations>
+          <technical>
+            <string>1</string>
+            <fret>0</fret>
+          </technical>
+        </notations>
+      </note>
+      <note xml:id="note-tied-low-e">
+        <pitch>
+          <step>G</step>
+          <octave>2</octave>
+        </pitch>
+        <duration>12</duration>
+        <voice>1</voice>
+        <notations>
+          <tied type="start" />
+          <technical>
+            <string>6</string>
+            <fret>3</fret>
+          </technical>
+        </notations>
+        <tie type="start" />
+      </note>
+    </measure>
+    <measure number="2" xml:id="measure-outro">
+      <attributes>
+        <divisions>24</divisions>
+        <time>
+          <beats>1</beats>
+          <beat-type>4</beat-type>
+        </time>
+      </attributes>
+      <note xml:id="note-tied-low-e">
+        <pitch>
+          <step>G</step>
+          <octave>2</octave>
+        </pitch>
+        <duration>12</duration>
+        <voice>1</voice>
+        <notations>
+          <tied type="stop" />
+          <technical>
+            <string>6</string>
+            <fret>3</fret>
+          </technical>
+        </notations>
+        <tie type="stop" />
+      </note>
+      <note>
+        <rest />
+        <duration>12</duration>
+        <voice>1</voice>
+      </note>
+    </measure>
+  </part>
+</score-partwise>

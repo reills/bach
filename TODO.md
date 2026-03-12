@@ -1,13 +1,13 @@
-# TODO — Active Task: P09
+# TODO — Active Task: P10
 
-## P09 — Golden tests for canonical -> MusicXML behavior
+## P10 — Heuristic guitar tabber core
 
-Add golden-style tests for the canonical-to-MusicXML bridge. Cover measure IDs, event IDs, string/fret technical tags for fretted notes, and cross-bar tie splitting. Keep fixtures small and hand-authored. The goal is to protect the backend contract expected by the frontend, not to build a large snapshot suite. Append a PROGRESS.md entry and run bash docs/skills/python-test-env/scripts/run_tests.sh.
+Implement a first-pass heuristic tabber in src/tabber/heuristic.py. Input should be canonical score events or a narrow intermediate structure with pitch, onset, duration, and voice information. Output should assign string/fret positions for standard six-string guitar tuning. Use a pragmatic heuristic first: prefer lower fret movement, keep notes within playable fret range, and reject impossible duplicate string use at the same onset. Add focused tests for open-string preference, basic chord assignment, and an impossible voicing case. Append a PROGRESS.md entry and run bash docs/skills/python-test-env/scripts/run_tests.sh.
 
 ## Test Command
 
 Run ONLY these targeted tests (do NOT run the full suite):
 
 ```bash
-bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_musicxml_golden.py tests/test_musicxml_export.py 
+bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_tabber_heuristic.py 
 ```
