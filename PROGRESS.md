@@ -1,3 +1,11 @@
+## 2026-03-12 - P30
+
+- Added `scripts/generate_example.py`: a one-command end-to-end example generation script that exercises the full compose pipeline (tokens → canonical score → tabber → MusicXML/MIDI/ASCII tab) and writes five output files to a configurable output directory: `example.musicxml`, `example.mid`, `example_tab.txt`, `tokens.txt`, and `metrics.json`. When no `--checkpoint` is given, a built-in synthetic two-bar C major scale token stream is used so the pipeline can be exercised without a trained model. Accepts `--checkpoint`, `--vocab`, `--key`, `--style`, `--difficulty`, `--measures`, `--max-length`, `--temperature`, `--top-p`, `--no-eval`, and `--quiet` flags.
+- Updated `README.md` section "13) Evaluation" with a new §13.0 "Example generation" block (renumbering the former §13.0 eval_basic section to §13.1) showing two concrete run commands and the list of output files.
+- Fixed the built-in token stream so the last note fits within the two-bar score boundary (DUR_24 at POS_72 in 4/4 = ticks 168–192 = exact bar end).
+- Ran `CONDA_NO_PLUGINS=true conda run -n bach-gen python -m pytest -q tests/test_compose_service.py tests/test_eval_basic.py` — all 15 tests passed in 3.00s.
+- Verified the script end-to-end: `python scripts/generate_example.py --out-dir /tmp/bach_example` completes cleanly, writes all five output files, and reports: 2 bars, 8 voice events, interval range ok, tab present False (tab is added in-pipeline; raw token stream contains no STR_/FRET_ tokens).
+
 ## 2026-03-12 - P29
 
 - Implemented `scripts/eval_basic.py`: a lightweight, file-based evaluation CLI that scores generated token streams or parquet event files with pragmatic metrics — `bar_count`, `token_validity` (against an optional vocab JSON), `interval_range_ok` (MEL_INT12 values in [-24, 24]), `mel_int_range`, `voice_event_count`, `rest_event_count`, `tab_present`, and (when tab tokens exist) `tab_span_mean`, `tab_fret_max`, `tab_open_string_pct`. Accepts `--token-file`, `--parquet`, optional `--vocab`, `--output-json`, and `--quiet` flags.

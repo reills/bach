@@ -601,7 +601,34 @@ generation:
 
 ## 13) Evaluation
 
-### 13.0 Quick evaluation (`scripts/eval_basic.py`)
+### 13.0 Example generation (`scripts/generate_example.py`)
+
+A one-command script that exercises the full compose pipeline and writes MusicXML,
+MIDI, and ASCII tab output to an output directory.  Intended for manual QA and demo
+preparation.
+
+```bash
+# Demo with the built-in synthetic token stream (no model required):
+python scripts/generate_example.py --out-dir out/examples
+
+# Generate with a trained checkpoint:
+python scripts/generate_example.py \
+    --checkpoint out/notelm_v1/notelm_step1000.pt \
+    --vocab      data/processed/vocab.json \
+    --key C --style baroque --measures 8 \
+    --out-dir    out/examples
+```
+
+**Output files written to `out/examples/`:**
+`example.musicxml`, `example.mid`, `example_tab.txt`, `tokens.txt`, `metrics.json`
+
+Pass `tokens.txt` to `eval_basic.py` for a detailed metrics report:
+
+```bash
+python scripts/eval_basic.py --token-file out/examples/tokens.txt
+```
+
+### 13.1 Quick evaluation (`scripts/eval_basic.py`)
 
 A lightweight, file-based script that scores a generated token stream without extra infrastructure.
 
