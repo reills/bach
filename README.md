@@ -735,3 +735,81 @@ build_control_prefix_tokens(
 - Not implemented in this repo yet (no `scripts/train_bpe.py`).
 - Base vocab (no BPE): `python scripts/build_vocab.py --events data/processed/events.parquet`
 - If you add BPE later, follow the constraints in **4.9 BPE (Stage-2, optional)**.
+
+---
+
+## Stage-3: Train NoteLM v1
+
+### Minimal first run
+
+```bash
+python scripts/train_v1.py \
+  --events data/processed/events.parquet \
+  --vocab  data/processed/vocab.json \
+  --output-dir out/notelm_v1 \
+  --batch-size 8 \
+  --max-seq-len 2048 \
+  --bars-per-seq 1 \
+  --allow-truncate \
+  --shuffle \
+  --epochs 10 \
+  --lr 3e-4 \
+  --log-every 50 \
+  --save-every 500
+```
+
+Checkpoints are written to `out/notelm_v1/notelm_step<N>.pt`.  Each checkpoint contains the model weights, optimizer state, config, vocab path, a UTC timestamp, and the training args so a run is fully reproducible.
+
+### Smoke-test / dry run (no real data needed)
+
+Run two batches to confirm the pipeline is wired correctly before committing GPU time:
+
+```bash
+python scripts/train_v1.py \
+  --events data/processed/events.parquet \
+  --vocab  data/processed/vocab.json \
+  --output-dir /tmp/notelm_dry \
+  --d-model 64 --n-heads 4 --n-layers 2 \
+  --batch-size 2 --max-seq-len 128 --bars-per-seq 1 --allow-truncate \
+  --dry-run-batches 2 \
+  --device cpu
+```
+
+### Resuming from a checkpoint
+
+```bash
+python scripts/train_v1.py \
+  --events data/processed/events.parquet \
+  --vocab  data/processed/vocab.json \
+  --output-dir out/notelm_v1 \
+  --resume out/notelm_v1/notelm_step500.pt \
+  --epochs 20
+```
+
+The step counter and optimizer state are restored; training continues from where it left off.
+
+### Validation split
+
+Hold out 10 % of sequences and log validation loss every 200 steps:
+
+```bash
+python scripts/train_v1.py \
+  --events data/processed/events.parquet \
+  --vocab  data/processed/vocab.json \
+  --output-dir out/notelm_v1 \
+  --val-split 0.1 \
+  --val-every 200 \
+  --epochs 10
+```
+
+### Key flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--dry-run-batches N` | 0 (off) | Exit after N batches; useful for CI/smoke checks |
+| `--resume PATH` | — | Resume from checkpoint `.pt` file |
+| `--val-split F` | 0.0 (off) | Fraction of sequences held out for validation |
+| `--val-every N` | 500 | Steps between validation loss reports |
+| `--save-every N` | 500 | Steps between mid-run checkpoint saves (0 = final only) |
+| `--max-steps N` | 0 (off) | Hard step limit across all epochs |
+| `--mask-prefix-loss` | off | Ignore loss on control-prefix tokens |

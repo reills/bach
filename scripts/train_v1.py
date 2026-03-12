@@ -1,15 +1,17 @@
 import argparse
 import json
+import logging
 import random
 import re
 import time
 from dataclasses import asdict
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional
 
 import torch
 import torch.nn.functional as F
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 
 # Ensure project root is in path
 import sys
@@ -24,6 +26,8 @@ from src.dataio.collate_miditok import (
     PrefixControlConfig,
 )
 from src.models.notelm.model import NoteLM, NoteLMConfig
+
+log = logging.getLogger(__name__)
 
 
 def _load_vocab(path: Path) -> Dict[str, int]:
@@ -88,6 +92,7 @@ def _save_checkpoint(
     optimizer: torch.optim.Optimizer,
     config: NoteLMConfig,
     vocab_path: Path,
+    args: argparse.Namespace,
 ) -> Path:
     ckpt = {
         "step": step,
@@ -95,10 +100,59 @@ def _save_checkpoint(
         "optimizer_state": optimizer.state_dict(),
         "config": asdict(config),
         "vocab_path": str(vocab_path),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "args": vars(args),
     }
     path = output_dir / f"notelm_step{step}.pt"
     torch.save(ckpt, path)
     return path
+
+
+def _load_resume_checkpoint(
+    resume_path: Path,
+    model: NoteLM,
+    optimizer: torch.optim.Optimizer,
+    device: torch.device,
+) -> int:
+    ckpt = torch.load(resume_path, map_location=device)
+    model.load_state_dict(ckpt["model_state"])
+    optimizer.load_state_dict(ckpt["optimizer_state"])
+    resumed_step = int(ckpt.get("step", 0))
+    log.info("Resumed from %s at step %d", resume_path, resumed_step)
+    return resumed_step
+
+
+def _compute_val_loss(
+    model: NoteLM,
+    loader: DataLoader,
+    device: torch.device,
+    pad_id: int,
+    label_smoothing: float,
+    max_batches: int = 0,
+) -> float:
+    model.eval()
+    total_loss = 0.0
+    n_batches = 0
+    with torch.no_grad():
+        for batch in loader:
+            ids = batch.ids.to(device)
+            attn_mask = batch.attn_mask.to(device)
+            inputs = ids[:, :-1].contiguous()
+            labels = ids[:, 1:].contiguous()
+            attn_mask = attn_mask[:, :-1]
+            logits = model(inputs, attn_mask=attn_mask)
+            loss = F.cross_entropy(
+                logits.reshape(-1, logits.size(-1)),
+                labels.reshape(-1),
+                ignore_index=pad_id,
+                label_smoothing=label_smoothing,
+            )
+            total_loss += loss.item()
+            n_batches += 1
+            if max_batches > 0 and n_batches >= max_batches:
+                break
+    model.train()
+    return total_loss / n_batches if n_batches > 0 else float("nan")
 
 
 def parse_args() -> argparse.Namespace:
@@ -134,6 +188,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--log-every", type=int, default=50)
     parser.add_argument("--save-every", type=int, default=500)
 
+    parser.add_argument("--val-split", type=float, default=0.0,
+                        help="Fraction of packed sequences to hold out for validation (0=disabled).")
+    parser.add_argument("--val-every", type=int, default=500,
+                        help="Compute validation loss every N steps (requires --val-split > 0).")
+
+    parser.add_argument("--resume", default=None,
+                        help="Path to a checkpoint .pt file to resume training from.")
+
+    parser.add_argument("--dry-run-batches", type=int, default=0,
+                        help="Run this many batches then exit; 0=disabled. Useful for smoke-testing.")
+
     parser.add_argument("--key", default=None)
     parser.add_argument("--style", default=None)
     parser.add_argument("--difficulty", default=None)
@@ -160,6 +225,12 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(message)s",
+        datefmt="%Y-%m-%dT%H:%M:%S",
+    )
+
     args = parse_args()
 
     output_dir = Path(args.output_dir)
@@ -203,7 +274,7 @@ def main() -> None:
         vocab_path = output_dir / "vocab.json"
         _save_vocab(vocab_path, vocab)
         if added:
-            print(f"Extended vocab with {len(added)} tokens.")
+            log.info("Extended vocab with %d tokens.", len(added))
     else:
         missing = [tok for tok in required_tokens if tok not in vocab]
         if missing:
@@ -232,6 +303,26 @@ def main() -> None:
     if len(packed) == 0:
         raise SystemExit("No sequences were built; check max_seq_len or dataset.")
 
+    # Optional validation split
+    val_loader: Optional[DataLoader] = None
+    if args.val_split > 0.0:
+        n_total = len(packed)
+        n_val = max(1, int(n_total * args.val_split))
+        n_train = n_total - n_val
+        if n_train < 1:
+            raise SystemExit(
+                f"val_split={args.val_split} leaves no training sequences ({n_total} total)."
+            )
+        indices = list(range(n_total))
+        train_indices = indices[:n_train]
+        val_indices = indices[n_train:]
+        train_packed = Subset(packed, train_indices)
+        val_packed = Subset(packed, val_indices)
+        log.info("Train sequences: %d  Val sequences: %d", n_train, n_val)
+    else:
+        train_packed = packed
+        val_packed = None
+
     prefix_config = PrefixControlConfig(
         style=args.style,
         difficulty=args.difficulty,
@@ -251,13 +342,23 @@ def main() -> None:
     )
 
     loader = DataLoader(
-        packed,
+        train_packed,
         batch_size=args.batch_size,
         shuffle=args.shuffle,
         num_workers=args.num_workers,
         drop_last=args.drop_last,
         collate_fn=collator,
     )
+
+    if val_packed is not None:
+        val_loader = DataLoader(
+            val_packed,
+            batch_size=args.batch_size,
+            shuffle=False,
+            num_workers=args.num_workers,
+            drop_last=False,
+            collate_fn=collator,
+        )
 
     config = NoteLMConfig(
         vocab_size=len(vocab),
@@ -280,6 +381,10 @@ def main() -> None:
         model.parameters(), lr=args.lr, weight_decay=args.weight_decay
     )
 
+    step = 0
+    if args.resume:
+        step = _load_resume_checkpoint(Path(args.resume), model, optimizer, device)
+
     harm_class_ids = _collect_harm_class_ids(vocab)
     harm_class_ids_tensor = (
         torch.tensor(harm_class_ids, device=device) if harm_class_ids else None
@@ -294,9 +399,18 @@ def main() -> None:
         json.dumps(vars(args), indent=2), encoding="utf-8"
     )
 
-    step = 0
+    log.info(
+        "Starting training: device=%s vocab_size=%d params=%d",
+        device,
+        len(vocab),
+        sum(p.numel() for p in model.parameters()),
+    )
+    if args.dry_run_batches > 0:
+        log.info("Dry-run mode: will exit after %d batches.", args.dry_run_batches)
+
     start_time = time.time()
     model.train()
+    dry_run_count = 0
 
     for epoch in range(args.epochs):
         for batch in loader:
@@ -338,25 +452,37 @@ def main() -> None:
 
             if step % args.log_every == 0:
                 elapsed = time.time() - start_time
-                print(
-                    f"epoch {epoch} step {step} loss {loss.item():.4f} "
-                    f"elapsed {elapsed:.1f}s"
+                log.info(
+                    "epoch %d  step %d  loss %.4f  elapsed %.1fs",
+                    epoch, step, loss.item(), elapsed,
                 )
 
             if args.save_every > 0 and step > 0 and step % args.save_every == 0:
                 path = _save_checkpoint(
-                    output_dir, step, model, optimizer, config, vocab_path
+                    output_dir, step, model, optimizer, config, vocab_path, args
                 )
-                print(f"Saved checkpoint to {path}")
+                log.info("Saved checkpoint: %s", path)
+
+            if val_loader is not None and args.val_every > 0 and step > 0 and step % args.val_every == 0:
+                val_loss = _compute_val_loss(
+                    model, val_loader, device, pad_id, args.label_smoothing
+                )
+                log.info("step %d  val_loss %.4f", step, val_loss)
 
             step += 1
+            dry_run_count += 1
+
+            if args.dry_run_batches > 0 and dry_run_count >= args.dry_run_batches:
+                log.info("Dry-run complete after %d batches.", dry_run_count)
+                return
+
             if args.max_steps and step >= args.max_steps:
                 break
         if args.max_steps and step >= args.max_steps:
             break
 
-    path = _save_checkpoint(output_dir, step, model, optimizer, config, vocab_path)
-    print(f"Saved final checkpoint to {path}")
+    path = _save_checkpoint(output_dir, step, model, optimizer, config, vocab_path, args)
+    log.info("Saved final checkpoint: %s", path)
 
 
 if __name__ == "__main__":

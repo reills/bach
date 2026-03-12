@@ -1,4 +1,4 @@
-# windows_runner.ps1 — Windows-native automated coding-agent task loop for bach-gen
+# windows_runner.ps1 - Windows-native automated coding-agent task loop for bach-gen
 #
 # Usage:
 #   powershell -ExecutionPolicy Bypass -File .\windows_runner.ps1 [OPTIONS]
@@ -319,7 +319,7 @@ function Find-EligibleTask([string[]]$TaskIds, [hashtable]$TaskMap, [hashtable]$
     }
 
     $allMet = $true
-    foreach ($dep in Get-TaskDeps (Get-TaskById -TaskMap $TaskMap -TaskId $id)) {
+    foreach ($dep in @(Get-TaskDeps (Get-TaskById -TaskMap $TaskMap -TaskId $id))) {
       if ($StateMap[$dep].Status -ne "completed") {
         $allMet = $false
         break
@@ -385,16 +385,80 @@ function Split-CommandLine([string]$CommandLine) {
   }
 }
 
+function Format-WindowsArgument([string]$Argument) {
+  if ($null -eq $Argument) {
+    return '""'
+  }
+
+  if ($Argument.Length -eq 0) {
+    return '""'
+  }
+
+  if ($Argument -notmatch '[\s"]') {
+    return $Argument
+  }
+
+  $builder = New-Object System.Text.StringBuilder
+  [void]$builder.Append('"')
+  $backslashCount = 0
+
+  foreach ($char in $Argument.ToCharArray()) {
+    if ($char -eq '\') {
+      $backslashCount++
+      continue
+    }
+
+    if ($char -eq '"') {
+      [void]$builder.Append('\' * ($backslashCount * 2 + 1))
+      [void]$builder.Append('"')
+      $backslashCount = 0
+      continue
+    }
+
+    if ($backslashCount -gt 0) {
+      [void]$builder.Append('\' * $backslashCount)
+      $backslashCount = 0
+    }
+
+    [void]$builder.Append($char)
+  }
+
+  if ($backslashCount -gt 0) {
+    [void]$builder.Append('\' * ($backslashCount * 2))
+  }
+
+  [void]$builder.Append('"')
+  return $builder.ToString()
+}
+
 function Invoke-ExternalCommand([string[]]$CommandParts, [string]$WorkingDirectory, [string]$StdinText = $null) {
   $psi = New-Object System.Diagnostics.ProcessStartInfo
   $psi.FileName = $CommandParts[0]
   $psi.WorkingDirectory = $WorkingDirectory
   $psi.UseShellExecute = $false
   $psi.RedirectStandardInput = ($null -ne $StdinText)
+  $psi.Arguments = (($CommandParts | Select-Object -Skip 1) | ForEach-Object { Format-WindowsArgument $_ }) -join " "
 
-  for ($i = 1; $i -lt $CommandParts.Count; $i++) {
-    [void]$psi.ArgumentList.Add($CommandParts[$i])
+  $process = New-Object System.Diagnostics.Process
+  $process.StartInfo = $psi
+  [void]$process.Start()
+
+  if ($null -ne $StdinText) {
+    $process.StandardInput.Write($StdinText)
+    $process.StandardInput.Close()
   }
+
+  $process.WaitForExit()
+  return $process.ExitCode
+}
+
+function Invoke-CommandLine([string]$CommandLine, [string]$WorkingDirectory, [string]$StdinText = $null) {
+  $psi = New-Object System.Diagnostics.ProcessStartInfo
+  $psi.FileName = "cmd.exe"
+  $psi.WorkingDirectory = $WorkingDirectory
+  $psi.UseShellExecute = $false
+  $psi.RedirectStandardInput = ($null -ne $StdinText)
+  $psi.Arguments = "/d /s /c `"$CommandLine`""
 
   $process = New-Object System.Diagnostics.Process
   $process.StartInfo = $psi
@@ -446,17 +510,19 @@ function Get-BashExecutable {
   return $null
 }
 
-function Run-Agent(
-  [string]$Mode,
-  [string]$Prompt,
-  [string]$RunnerDir,
-  [bool]$DryRun,
-  [string]$ImplementModel,
-  [string]$ReviewModel,
-  [string]$ImplementCommand,
-  [string]$ReviewCommand,
-  [string]$WorkingDirectory
-) {
+function Run-Agent {
+  param(
+    [string]$Mode,
+    [string]$Prompt,
+    [string]$RunnerDir,
+    [bool]$DryRun,
+    [string]$ImplementModel,
+    [string]$ReviewModel,
+    [string]$ImplementCommand,
+    [string]$ReviewCommand,
+    [string]$WorkingDirectory
+  )
+
   $activePromptFile = Join-Path $RunnerDir ("{0}_active_prompt.txt" -f $Mode)
   [System.IO.File]::WriteAllText($activePromptFile, $Prompt + "`n")
 
@@ -471,16 +537,16 @@ function Run-Agent(
   }
 
   Write-Info ("Running {0} agent ({1})..." -f $Mode, $agentModel)
-  $commandParts = Split-CommandLine $commandText
   $exitCode = 0
 
   if ($agentModel -eq "codex") {
     $stdinText = Get-Content -Path $activePromptFile -Raw
-    $exitCode = Invoke-ExternalCommand -CommandParts $commandParts -WorkingDirectory $WorkingDirectory -StdinText $stdinText
+    $exitCode = Invoke-CommandLine -CommandLine $commandText -WorkingDirectory $WorkingDirectory -StdinText $stdinText
   }
   else {
-    $claudeParts = @($commandParts + (Get-Content -Path $activePromptFile -Raw))
-    $exitCode = Invoke-ExternalCommand -CommandParts $claudeParts -WorkingDirectory $WorkingDirectory
+    $promptText = Get-Content -Path $activePromptFile -Raw
+    $claudeCommand = $commandText + " " + (Format-WindowsArgument $promptText)
+    $exitCode = Invoke-CommandLine -CommandLine $claudeCommand -WorkingDirectory $WorkingDirectory
   }
 
   return $exitCode -eq 0
@@ -536,19 +602,21 @@ function Invoke-Git([string[]]$Args, [string]$WorkingDirectory) {
     Die "git was not found on PATH"
   }
 
-  $exitCode = Invoke-ExternalCommand -CommandParts @($git.Source) + $Args -WorkingDirectory $WorkingDirectory
+  $exitCode = Invoke-ExternalCommand -CommandParts (@($git.Source) + $Args) -WorkingDirectory $WorkingDirectory
   if ($exitCode -ne 0) {
     Die ("git command failed: git {0}" -f ($Args -join " "))
   }
 }
 
-function Do-Commit(
-  [string]$TaskId,
-  [string]$TaskTitle,
-  [int]$AutoCommit,
-  [bool]$DryRun,
-  [string]$WorkingDirectory
-) {
+function Do-Commit {
+  param(
+    [string]$TaskId,
+    [string]$TaskTitle,
+    [int]$AutoCommit,
+    [bool]$DryRun,
+    [string]$WorkingDirectory
+  )
+
   if ($AutoCommit -ne 1) {
     return
   }
@@ -561,11 +629,7 @@ function Do-Commit(
   Write-Info ("Auto-committing for {0}" -f $TaskId)
   Invoke-Git -Args @("add", "-A") -WorkingDirectory $WorkingDirectory
 
-  $message = @"
-${TaskId}: $TaskTitle
-
-Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
-"@
+  $message = "${TaskId}: $TaskTitle`n`nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
   Invoke-Git -Args @("commit", "-m", $message) -WorkingDirectory $WorkingDirectory
 }
 
@@ -593,36 +657,38 @@ function Print-State([string[]]$TaskIds, [hashtable]$StateMap) {
   Write-Host ""
 }
 
-function Run-Task(
-  [string]$TaskId,
-  [hashtable]$TaskMap,
-  [string[]]$TaskIds,
-  [hashtable]$StateMap,
-  [string]$StateFile,
-  [string]$RunnerDir,
-  [string]$ArchiveDir,
-  [string]$TodoFile,
-  [string]$FinishedFile,
-  [string]$ReviewFile,
-  [int]$MaxRetries,
-  [int]$AutoCommit,
-  [bool]$DryRun,
-  [string]$ImplementModel,
-  [string]$ReviewModel,
-  [string]$ImplementCommand,
-  [string]$ReviewCommand,
-  [string]$WorkingDirectory
-) {
+function Run-Task {
+  param(
+    [string]$TaskId,
+    [hashtable]$TaskMap,
+    [string[]]$TaskIds,
+    [hashtable]$StateMap,
+    [string]$StateFile,
+    [string]$RunnerDir,
+    [string]$ArchiveDir,
+    [string]$TodoFile,
+    [string]$FinishedFile,
+    [string]$ReviewFile,
+    [int]$MaxRetries,
+    [int]$AutoCommit,
+    [bool]$DryRun,
+    [string]$ImplementModel,
+    [string]$ReviewModel,
+    [string]$ImplementCommand,
+    [string]$ReviewCommand,
+    [string]$WorkingDirectory
+  )
+
   $task = Get-TaskById -TaskMap $TaskMap -TaskId $TaskId
   $taskTitle = $task.Title
   $retries = $StateMap[$TaskId].Retries
   $attempt = $retries + 1
   $originalStatus = $StateMap[$TaskId].Status
 
-  Write-Info "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  Write-Info ("Task {0} — attempt {1} / max {2}" -f $TaskId, $attempt, $MaxRetries)
+  Write-Info "-----------------------------------------"
+  Write-Info ("Task {0} - attempt {1} / max {2}" -f $TaskId, $attempt, $MaxRetries)
   Write-Info ("Title: {0}" -f $taskTitle)
-  Write-Info "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  Write-Info "-----------------------------------------"
 
   if ($attempt -gt $MaxRetries) {
     Write-Warn ("Task {0} exceeded max retries ({1}). Marking blocked." -f $TaskId, $MaxRetries)
@@ -637,11 +703,11 @@ function Run-Task(
     Die ("Could not extract prompt body for {0}" -f $TaskId)
   }
 
-  $taskTests = Get-TaskTests $task
+  $taskTests = @(Get-TaskTests $task)
   $todoLines = New-Object System.Collections.Generic.List[string]
-  $todoLines.Add("# TODO — Active Task: $TaskId")
+  $todoLines.Add("# TODO - Active Task: $TaskId")
   $todoLines.Add("")
-  $todoLines.Add("## $TaskId — $taskTitle")
+  $todoLines.Add("## $TaskId - $taskTitle")
   $todoLines.Add("")
   $todoLines.AddRange(($taskPrompt -split "`n"))
   if ($taskTests.Count -gt 0) {
@@ -650,9 +716,9 @@ function Run-Task(
     $todoLines.Add("")
     $todoLines.Add("Run ONLY these targeted tests (do NOT run the full suite):")
     $todoLines.Add("")
-    $todoLines.Add("```bash")
+    $todoLines.Add('```bash')
     $todoLines.Add(("bash docs/skills/python-test-env/scripts/run_tests.sh {0}" -f ($taskTests -join " ")))
-    $todoLines.Add("```")
+    $todoLines.Add('```')
   }
   [System.IO.File]::WriteAllLines((Join-Path $WorkingDirectory $TodoFile), $todoLines)
   Write-Info ("Wrote {0}" -f $TodoFile)
@@ -660,7 +726,7 @@ function Run-Task(
   if ((-not $DryRun) -and $taskTests.Count -gt 0 -and $attempt -gt 1) {
     Write-Info "Pre-flight: running targeted tests to check if work is already done..."
     if (Invoke-TargetedTests -Tests $taskTests -WorkingDirectory $WorkingDirectory) {
-      Write-Info ("Pre-flight PASS — tests already green. Marking {0} completed." -f $TaskId)
+      Write-Info ("Pre-flight PASS - tests already green. Marking {0} completed." -f $TaskId)
       Set-TaskStatus -StateMap $StateMap -StateFile $StateFile -TaskIds $TaskIds -TaskId $TaskId -Status "completed"
       Do-Commit -TaskId $TaskId -TaskTitle $taskTitle -AutoCommit $AutoCommit -DryRun $DryRun -WorkingDirectory $WorkingDirectory
       [System.IO.File]::WriteAllText((Join-Path $WorkingDirectory $TodoFile), "")
@@ -717,14 +783,14 @@ function Run-Task(
 
   switch ($verdict) {
     "PASS" {
-      Write-Info ("PASS — marking {0} completed" -f $TaskId)
+      Write-Info ("PASS - marking {0} completed" -f $TaskId)
       Set-TaskStatus -StateMap $StateMap -StateFile $StateFile -TaskIds $TaskIds -TaskId $TaskId -Status "completed"
       Do-Commit -TaskId $TaskId -TaskTitle $taskTitle -AutoCommit $AutoCommit -DryRun $DryRun -WorkingDirectory $WorkingDirectory
       [System.IO.File]::WriteAllText((Join-Path $WorkingDirectory $TodoFile), "")
       return 0
     }
     "FAIL" {
-      Write-Warn ("FAIL — preparing remediation for {0}" -f $TaskId)
+      Write-Warn ("FAIL - preparing remediation for {0}" -f $TaskId)
       Increment-TaskRetries -StateMap $StateMap -StateFile $StateFile -TaskIds $TaskIds -TaskId $TaskId
       $newRetries = $StateMap[$TaskId].Retries
 
@@ -736,9 +802,9 @@ function Run-Task(
 
       $remaining = Parse-RemainingWork -ReviewFile $ReviewFile
       $remediation = @(
-        "# TODO — Remediation: $TaskId (attempt $($newRetries + 1))",
+        "# TODO - Remediation: $TaskId (attempt $($newRetries + 1))",
         "",
-        "## Original Task: $TaskId — $taskTitle",
+        "## Original Task: $TaskId - $taskTitle",
         "",
         "This is a remediation run. The previous attempt received a FAIL verdict.",
         "Address ONLY the remaining work items listed below. Do not redo work that passed.",
@@ -806,10 +872,10 @@ if (-not (Test-Path -LiteralPath $promptFile)) {
   Die ("Prompt file not found: {0}" -f $promptFile)
 }
 if (-not (Test-Path -LiteralPath (Join-Path $runnerDir "implement_instructions.txt"))) {
-  Die ("Missing {0} — run from repo root after setup" -f (Join-Path $runnerDir "implement_instructions.txt"))
+  Die ("Missing {0} - run from repo root after setup" -f (Join-Path $runnerDir "implement_instructions.txt"))
 }
 if (-not (Test-Path -LiteralPath (Join-Path $runnerDir "review_instructions.txt"))) {
-  Die ("Missing {0} — run from repo root after setup" -f (Join-Path $runnerDir "review_instructions.txt"))
+  Die ("Missing {0} - run from repo root after setup" -f (Join-Path $runnerDir "review_instructions.txt"))
 }
 
 New-Item -ItemType Directory -Path $archiveDir -Force | Out-Null

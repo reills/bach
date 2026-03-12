@@ -1,3 +1,10 @@
+## 2026-03-12 - P28
+
+- Hardened `scripts/train_v1.py` without redesigning it: replaced bare `print()` calls with structured `logging` (timestamps via `%(asctime)s`); added `--resume PATH` to restore model + optimizer state and step counter from a `.pt` checkpoint; added `--val-split FLOAT` + `--val-every N` to hold out a validation subset and log val loss periodically; added `--dry-run-batches N` to exit after N batches (useful for CI/smoke checks); enriched checkpoint metadata with `timestamp` (UTC ISO) and `args` dict.
+- Added `tests/test_train_v1_smoke.py` (6 tests) using a tiny 6-bar synthetic parquet dataset built in `tmp_path`: dry-run completes and logs "Dry-run complete"; dry-run does not write a final checkpoint; full run writes exactly one checkpoint; resumed run advances the step counter past the resume point; val-split run logs `val_loss`; checkpoint contains all required metadata keys including `timestamp` (parseable as ISO datetime) and `args`.
+- Updated `README.md` section "Stage-3: Train NoteLM v1" with concrete run commands for minimal first run, dry-run, resume, and val-split, plus a flag reference table.
+- Ran `bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_train_v1_smoke.py` — all 6 tests passed.
+
 ## 2026-03-12 - P27
 
 - Added `frontend/src/App.test.ts` with 15 vitest integration tests covering the full compose/inpaint workflow: compose response loading, measure selection, inpaint preview, commit draft, and discard draft.
