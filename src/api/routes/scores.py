@@ -6,7 +6,7 @@ from typing import Any, Callable, Literal
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
 
-from src.api.canonical import CanonicalScore
+from src.api.canonical import CanonicalScore, Event, Part, get_measure_by_id
 from src.api.compose_service import ComposeServiceResult, export_score
 from src.api.services import preview_window_inpaint
 from src.api.store import (
@@ -16,6 +16,7 @@ from src.api.store import (
     ScoreNotFoundError,
     StaleRevisionError,
 )
+from src.tabber import alternate_fingerings_for_event
 
 ComposeHandler = Callable[[BaseModel], ComposeServiceResult]
 
@@ -92,6 +93,30 @@ class DiscardDraftRequest(BaseModel):
 
 class DiscardDraftResponse(BaseModel):
     ok: bool
+
+
+class EventHitKeyRequest(BaseModel):
+    barIndex: int
+    voiceIndex: int | None = None
+    beatIndex: int | None = None
+    noteIndex: int | None = None
+
+
+class AltPositionsRequest(BaseModel):
+    scoreId: str
+    measureId: str
+    eventHitKey: EventHitKeyRequest | None = None
+
+
+class AltPositionOption(BaseModel):
+    stringIndex: int
+    fret: int
+    selected: bool
+
+
+class AltPositionsResponse(BaseModel):
+    eventId: str
+    options: list[AltPositionOption]
 
 
 def create_router(
@@ -178,6 +203,64 @@ def create_router(
         score_repository.discard_draft(request.draftId)
         return DiscardDraftResponse(ok=True)
 
+    @router.post("/alt_positions", response_model=AltPositionsResponse)
+    async def alt_positions(request: AltPositionsRequest) -> AltPositionsResponse:
+        if request.eventHitKey is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="eventHitKey is required",
+            )
+
+        try:
+            stored_score = score_repository.get_score(request.scoreId)
+        except ScoreNotFoundError as exc:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+        try:
+            get_measure_by_id(stored_score.score, request.measureId)
+        except ValueError as exc:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+        exported = export_score(stored_score.score)
+        resolved_measure_id = exported.measure_map.get(str(request.eventHitKey.barIndex))
+        if resolved_measure_id != request.measureId:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=(
+                    f"event hit key bar {request.eventHitKey.barIndex} does not belong "
+                    f"to measure {request.measureId!r}"
+                ),
+            )
+
+        hit_key = _to_request_hit_key(request.eventHitKey)
+        event_id = exported.event_hit_map.get(hit_key)
+        if event_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"unknown event hit key: {hit_key}",
+            )
+
+        try:
+            part, event = _find_event_with_part(stored_score.score, event_id)
+            alternates = alternate_fingerings_for_event(
+                event,
+                tuning=part.info.tuning,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+        return AltPositionsResponse(
+            eventId=event.id,
+            options=[
+                AltPositionOption(
+                    stringIndex=option.string_index,
+                    fret=option.fret,
+                    selected=option == event.fingering,
+                )
+                for option in alternates
+            ],
+        )
+
     return router
 
 
@@ -196,3 +279,18 @@ def _validate_draft_belongs_to_score(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"draft {draft_id!r} does not belong to score {score_id!r}",
         )
+
+
+def _find_event_with_part(score: CanonicalScore, event_id: str) -> tuple[Part, Event]:
+    for part in score.parts:
+        for event in part.events:
+            if event.id == event_id:
+                return part, event
+    raise ValueError(f"unknown event id: {event_id}")
+
+
+def _to_request_hit_key(hit_key: EventHitKeyRequest) -> str:
+    voice_index = -1 if hit_key.voiceIndex is None else hit_key.voiceIndex
+    beat_index = -1 if hit_key.beatIndex is None else hit_key.beatIndex
+    note_index = -1 if hit_key.noteIndex is None else hit_key.noteIndex
+    return f"{hit_key.barIndex}|{voice_index}|{beat_index}|{note_index}"

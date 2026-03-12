@@ -79,6 +79,15 @@ export interface AltPositionsRequest {
   };
 }
 
+export interface AltPositionsResponse {
+  eventId: string;
+  options: Array<{
+    stringIndex: number;
+    fret: number;
+    selected: boolean;
+  }>;
+}
+
 export interface ApplyFingeringRequest {
   scoreId: string;
   revision: number;

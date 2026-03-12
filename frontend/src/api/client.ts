@@ -1,5 +1,6 @@
 import type {
   AltPositionsRequest,
+  AltPositionsResponse,
   ApplyFingeringRequest,
   ApplyFingeringResponse,
   CommitDraftRequest,
@@ -53,8 +54,8 @@ export const discardDraft = (
 
 export const altPositions = (
   body: AltPositionsRequest,
-): Promise<Record<string, unknown>> =>
-  apiPost<Record<string, unknown>>('/alt_positions', body);
+): Promise<AltPositionsResponse> =>
+  apiPost<AltPositionsResponse>('/alt_positions', body);
 
 export const applyFingering = (
   body: ApplyFingeringRequest,

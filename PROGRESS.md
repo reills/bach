@@ -225,3 +225,10 @@
 - Updated the compose and inpaint preview flows to return those precomputed maps from their service results, and switched the draft commit route to reuse the same helper instead of rebuilding hit maps in the route layer.
 - Extended `tests/test_api_scores.py` to assert `measureMap` and `eventHitMap` are present on compose, preview, and commit responses with valid hit-key structure, and updated `tests/test_hit_map.py` to cover the shared export helper.
 - Ran the exact task command `bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_api_scores.py tests/test_hit_map.py` and confirmed it passes with `5 passed in 1.16s`.
+
+## 2026-03-12 - P23
+
+- Added `/alt_positions` to `src/api/routes/scores.py`, resolving the frontend `eventHitKey` through the current exported hit map for the stored score, then mapping that canonical `eventId` back to the score event and returning compact picker options with `stringIndex`, `fret`, and `selected`.
+- Added `tests/test_api_fingering.py` to cover a valid carry-note lookup that only resolves correctly via the exported hit map and a missing-hit-key `404` case, keeping the route contract focused on the frontend click flow.
+- Updated `frontend/src/api/types.ts` and `frontend/src/api/client.ts` with a concrete `AltPositionsResponse` type for the picker API.
+- Ran the exact task command `bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_api_fingering.py` and confirmed it passes with `2 passed in 1.15s`.
