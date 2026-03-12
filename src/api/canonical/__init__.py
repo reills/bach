@@ -10,6 +10,8 @@ from src.api.canonical.types import (
 from src.api.canonical.fingering import FingeringSelection, apply_fingering_selections
 from src.api.canonical.from_tokens import tokens_to_canonical_score
 from src.api.canonical.ops import (
+    EventNotFoundError,
+    MeasureNotFoundError,
     carry_in_events_for_measure,
     event_by_id,
     events_starting_in_measure,
@@ -22,9 +24,11 @@ from src.api.canonical.ops import (
 __all__ = [
     "CanonicalScore",
     "Event",
+    "EventNotFoundError",
     "FingeringSelection",
     "GuitarFingering",
     "Measure",
+    "MeasureNotFoundError",
     "Part",
     "PartInfo",
     "ScoreHeader",

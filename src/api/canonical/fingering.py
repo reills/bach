@@ -1,5 +1,6 @@
 from dataclasses import dataclass, replace
 
+from src.api.canonical.ops import EventNotFoundError
 from src.api.canonical.types import CanonicalScore, Event, GuitarFingering, Part
 
 
@@ -43,7 +44,7 @@ def apply_fingering_selections(
 
     if unmatched_event_ids:
         missing_event_id = sorted(unmatched_event_ids)[0]
-        raise ValueError(f"unknown event id: {missing_event_id}")
+        raise EventNotFoundError(f"unknown event id: {missing_event_id}")
 
     return CanonicalScore(
         header=score.header,

@@ -1,3 +1,15 @@
+## 2026-03-12 - P31
+
+- Added `MeasureNotFoundError(ValueError)` and `EventNotFoundError(ValueError)` to `src/api/canonical/ops.py`; updated `measure_by_id` and `event_by_id` to raise them so callers can distinguish "not found" from generic bad-request errors without fragile string matching.
+- Exported both new exception types from `src/api/canonical/__init__.py`.
+- Updated `src/api/canonical/fingering.py` to import and raise `EventNotFoundError` instead of bare `ValueError` when `apply_fingering_selections` encounters an unmatched event ID.
+- Updated `src/api/routes/scores.py`:
+  - `inpaint_preview`: added `except MeasureNotFoundError → 404` before the generic `except ValueError → 400`, so a bad `measureId` now correctly returns 404 instead of 400.
+  - `apply_fingering`: replaced the fragile `str(exc).startswith("unknown event id:")` check with explicit `except EventNotFoundError → 404` / `except ValueError → 400` handlers; updated `_find_event_with_part` to raise `EventNotFoundError` for consistency.
+- Updated `frontend/src/api/client.ts`: error handler now tries `JSON.parse` and extracts the `detail` string so the thrown `Error` message surfaces the backend reason text instead of the raw JSON blob.
+- Added `tests/test_api_errors.py` (11 tests) covering: unknown score ID on `/inpaint_preview`, `/alt_positions`, `/apply_fingering` (all 404); stale revision on `/inpaint_preview` (409); unknown measure ID on `/inpaint_preview` and `/alt_positions` (both 404); unknown draft ID on `/commit_draft` and `/discard_draft` (404); draft belonging to wrong score on `/commit_draft` (404); unknown event ID on `/apply_fingering` (404).
+- Ran `CONDA_NO_PLUGINS=true conda run -n bach-gen python -m pytest -q tests/test_api_errors.py tests/test_api_scores.py tests/test_api_fingering.py` — all 17 tests passed in 3.29s.
+
 ## 2026-03-12 - P30
 
 - Added `scripts/generate_example.py`: a one-command end-to-end example generation script that exercises the full compose pipeline (tokens → canonical score → tabber → MusicXML/MIDI/ASCII tab) and writes five output files to a configurable output directory: `example.musicxml`, `example.mid`, `example_tab.txt`, `tokens.txt`, and `metrics.json`. When no `--checkpoint` is given, a built-in synthetic two-bar C major scale token stream is used so the pipeline can be exercised without a trained model. Accepts `--checkpoint`, `--vocab`, `--key`, `--style`, `--difficulty`, `--measures`, `--max-length`, `--temperature`, `--top-p`, `--no-eval`, and `--quiet` flags.

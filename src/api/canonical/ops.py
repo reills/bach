@@ -1,11 +1,19 @@
 from src.api.canonical.types import CanonicalScore, Event, Measure, Part
 
 
+class MeasureNotFoundError(ValueError):
+    pass
+
+
+class EventNotFoundError(ValueError):
+    pass
+
+
 def measure_by_id(score: CanonicalScore, measure_id: str) -> Measure:
     for measure in score.measures:
         if measure.id == measure_id:
             return measure
-    raise ValueError(f"unknown measure id: {measure_id}")
+    raise MeasureNotFoundError(f"unknown measure id: {measure_id}")
 
 
 def get_measure_by_id(score: CanonicalScore, measure_id: str) -> Measure:
@@ -18,7 +26,7 @@ def event_by_id(score_or_part: CanonicalScore | Part, event_id: str) -> Event:
         for event in part.events:
             if event.id == event_id:
                 return event
-    raise ValueError(f"unknown event id: {event_id}")
+    raise EventNotFoundError(f"unknown event id: {event_id}")
 
 
 def get_event_by_id(score_or_part: CanonicalScore | Part, event_id: str) -> Event:

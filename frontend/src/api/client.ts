@@ -25,10 +25,17 @@ const apiPost = async <T>(path: string, body: unknown): Promise<T> => {
   });
 
   if (!response.ok) {
-    const message = await response.text();
-    throw new Error(
-      message || `POST ${path} failed with status ${response.status}`,
-    );
+    const raw = await response.text();
+    let message = raw;
+    try {
+      const json = JSON.parse(raw) as { detail?: unknown };
+      if (typeof json.detail === 'string') {
+        message = json.detail;
+      }
+    } catch {
+      // not JSON — use raw text as-is
+    }
+    throw new Error(message || `POST ${path} failed with status ${response.status}`);
   }
 
   return (await response.json()) as T;

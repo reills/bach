@@ -9,8 +9,10 @@ from pydantic import BaseModel
 from src.api.canonical import (
     CanonicalScore,
     Event,
+    EventNotFoundError,
     FingeringSelection,
     GuitarFingering,
+    MeasureNotFoundError,
     Part,
     apply_fingering_selections,
     get_event_by_id,
@@ -192,6 +194,8 @@ def create_router(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
         except StaleRevisionError as exc:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+        except MeasureNotFoundError as exc:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
         except ValueError as exc:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
@@ -312,14 +316,12 @@ def create_router(
             )
             score_repository.save_draft(draft.draft_id, updated_score)
             committed = score_repository.commit_draft(draft.draft_id)
+        except EventNotFoundError as exc:
+            score_repository.discard_draft(draft.draft_id)
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
         except ValueError as exc:
             score_repository.discard_draft(draft.draft_id)
-            status_code = (
-                status.HTTP_404_NOT_FOUND
-                if str(exc).startswith("unknown event id:")
-                else status.HTTP_400_BAD_REQUEST
-            )
-            raise HTTPException(status_code=status_code, detail=str(exc)) from exc
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
         except StaleRevisionError as exc:
             score_repository.discard_draft(draft.draft_id)
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
@@ -355,7 +357,7 @@ def _find_event_with_part(score: CanonicalScore, event_id: str) -> tuple[Part, E
         for event in part.events:
             if event.id == event_id:
                 return part, event
-    raise ValueError(f"unknown event id: {event_id}")
+    raise EventNotFoundError(f"unknown event id: {event_id}")
 
 
 def _build_fingering_selections(
