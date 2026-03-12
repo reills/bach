@@ -27,7 +27,7 @@ if ! PYTHON_CMD="$(pick_python)"; then
 fi
 
 VERIFY_CMD="${PYTHON_CMD} -m pytest -q"
-ACTION="${1:-run}"
+ACTION="${1:-}"
 
 if [[ "$ACTION" == "--print-cmd" ]]; then
   echo "$VERIFY_CMD"
@@ -51,5 +51,9 @@ PY"
   exit 0
 fi
 
-shift || true
+if [[ -n "$ACTION" && "$ACTION" == --* ]]; then
+  echo "Unknown option: $ACTION" >&2
+  exit 1
+fi
+
 eval "$VERIFY_CMD $*"

@@ -72,8 +72,26 @@ set -euo pipefail
 # ─────────────────────────────────────────────────────────────────────────────
 # Defaults (override with environment variables)
 # ─────────────────────────────────────────────────────────────────────────────
-IMPLEMENT_CMD="${IMPLEMENT_CMD:-codex exec --full-auto -C . -}"
-REVIEW_CMD="${REVIEW_CMD:-codex exec --full-auto -C . -}"
+#   AGENT_MODEL: "claude" or "codex" (default: codex)
+#     claude → claude --dangerously-skip-permissions -p "<prompt>"
+#     codex  → codex exec --full-auto -C . - < prompt_file
+AGENT_MODEL="${AGENT_MODEL:-codex}"
+
+case "$AGENT_MODEL" in
+  claude)
+    IMPLEMENT_CMD="${IMPLEMENT_CMD:-claude --dangerously-skip-permissions -p}"
+    REVIEW_CMD="${REVIEW_CMD:-claude --dangerously-skip-permissions -p}"
+    ;;
+  codex)
+    IMPLEMENT_CMD="${IMPLEMENT_CMD:-codex exec --full-auto -C . -}"
+    REVIEW_CMD="${REVIEW_CMD:-codex exec --full-auto -C . -}"
+    ;;
+  *)
+    echo "[ERROR] Unknown AGENT_MODEL: $AGENT_MODEL (expected 'claude' or 'codex')" >&2
+    exit 1
+    ;;
+esac
+
 MAX_RETRIES="${MAX_RETRIES:-3}"
 AUTO_COMMIT="${AUTO_COMMIT:-0}"
 STOP_ON_BLOCKED="${STOP_ON_BLOCKED:-1}"
@@ -357,8 +375,12 @@ run_agent() {
     return 0
   fi
 
-  info "Running $mode agent..."
-  $cmd < "$active_prompt_file"
+  info "Running $mode agent ($AGENT_MODEL)..."
+  if [[ "$AGENT_MODEL" == "codex" ]]; then
+    $cmd < "$active_prompt_file"
+  else
+    $cmd "$(cat "$active_prompt_file")"
+  fi
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
