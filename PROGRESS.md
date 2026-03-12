@@ -89,3 +89,9 @@
 - Extended `src/api/render/musicxml.py` so pitched canonical events with `fingering` metadata emit MusicXML `<notations><technical><string>/<fret></technical></notations>` using the frontend contract’s high-E=`1` to low-E=`6` numbering derived from the part tuning.
 - Added a small hand-authored golden fixture at `tests/fixtures/musicxml/canonical_bridge.xml` plus `tests/test_musicxml_golden.py`, covering measure `xml:id`, note `xml:id`, technical string/fret tags, and cross-bar tie splitting in one backend contract example.
 - Ran `bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_musicxml_golden.py tests/test_musicxml_export.py` and confirmed the targeted tests pass with `3 passed in 0.27s`.
+
+## 2026-03-12 - P10
+
+- Added `src/tabber/heuristic.py` with a first-pass guitar tabbing heuristic for standard six-string tuning, covering canonical `Event` input plus a narrow `TabNote` DTO, candidate fret generation inside a playable range, and same-onset unique-string assignment via a small brute-force search.
+- Preferred low-fret positions by cost, which naturally favors open strings when available, and raised explicit `ValueError`s when a same-onset voicing can only be realized by reusing one string.
+- Added focused coverage in `tests/test_tabber_heuristic.py` for open-string preference, a simple simultaneous chord, and an impossible voicing case, then ran `bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_tabber_heuristic.py` and confirmed it passes with `3 passed in 0.28s`.

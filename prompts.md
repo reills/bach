@@ -381,8 +381,3 @@ If the goal is to finish the project with the fewest blocked tasks, do the work 
 4. `P18` -> `P19` -> `P20` -> `P22`
 5. `P23` -> `P24` -> `P25` -> `P26` -> `P27`
 6. `P28` -> `P29` -> `P30` -> `P31` -> `P32`
-
-## Best Next Prompt
-
-If you want the highest-leverage next task, start with `P02`.
-It creates the backend entrypoint needed for nearly every unfinished feature.
