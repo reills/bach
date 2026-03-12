@@ -1,13 +1,13 @@
-# TODO — Active Task: P15
+# TODO — Active Task: P16
 
-## P15 — Autoregressive generation loop
+## P16 — Prompt/control token mapping
 
-Implement a minimal autoregressive generation loop for NoteLM in src/inference/generate_v1.py. It should load a checkpoint, accept seed tokens and decoding settings, step the model forward, sample next tokens, and stop on max length or EOS if present. Reuse existing sampler and SCG helper modules instead of rewriting them. Add tests using a tiny synthetic model or mocked logits so generation logic is exercised without expensive training. Append a PROGRESS.md entry and run bash docs/skills/python-test-env/scripts/run_tests.sh.
+Implement a thin control-token layer that maps compose inputs like key, style, difficulty, and requested measure count into token prefixes expected by the training pipeline. Reuse the token conventions already present in scripts/train_v1.py and collate_miditok.py. Add small tests for normalization and token ordering. Append a PROGRESS.md entry and run bash docs/skills/python-test-env/scripts/run_tests.sh.
 
 ## Test Command
 
 Run ONLY these targeted tests (do NOT run the full suite):
 
 ```bash
-bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_generate_v1.py tests/test_load_checkpoint.py 
+bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_controls.py 
 ```

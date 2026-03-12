@@ -681,6 +681,20 @@ python -m src.inference.generate_v1 \
   --out out/chorale_Em
 ```
 
+```python
+from src.inference.controls import ComposeControls, build_control_prefix_tokens
+
+build_control_prefix_tokens(
+    ComposeControls(
+        key="f# minor",
+        style="French overture",
+        difficulty="very hard",
+        measures=8,
+    )
+)
+# ["KEY_F#m", "STYLE_FRENCH_OVERTURE", "DIFFICULTY_VERY_HARD", "MEAS_8"]
+```
+
 ---
 
 ## 16) Implementation Sequence (no dates)
