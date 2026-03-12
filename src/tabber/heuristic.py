@@ -118,6 +118,19 @@ def tab_notes(
     ]
 
 
+def alternate_fingerings_for_event(
+    event: Event,
+    tuning: Sequence[int] = STANDARD_GUITAR_TUNING,
+    max_fret: int = DEFAULT_MAX_FRET,
+) -> list[GuitarFingering]:
+    if event.pitch_midi is None:
+        raise ValueError("alternate fingerings require a pitched event")
+
+    normalized_tuning = _normalize_tuning(tuning)
+    _validate_max_fret(max_fret)
+    return _candidate_fingerings(event.pitch_midi, normalized_tuning, max_fret)
+
+
 def _assign_fingerings(
     notes: Sequence[_IndexedNote],
     tuning: tuple[int, ...],

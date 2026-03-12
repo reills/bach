@@ -1,3 +1,10 @@
+## 2026-03-12 - P14
+
+- Added a minimal NoteLM inference loader in `src/models/notelm/inference.py` that reads the saved checkpoint config and model weights, resolves and loads the vocab file, and returns an eval-mode model on CPU by default.
+- Exported the loader from `src/models/notelm/__init__.py` and `src/models/__init__.py` without changing the existing training checkpoint format in `scripts/train_v1.py`.
+- Added `tests/test_load_checkpoint.py`, which saves a tiny synthetic checkpoint plus relative `vocab.json`, reloads it through the new helper, and confirms the restored model produces the same logits.
+- Ran the exact task command `bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_load_checkpoint.py` and confirmed it passes with `1 passed in 0.75s`.
+
 ## 2026-03-11 - P02
 
 - Verified the existing FastAPI skeleton under `src/api` already provides `create_app()` and a `/healthz` route with a simple JSON health payload.
@@ -101,3 +108,33 @@
 - Added `src/tabber/ascii.py` with a deterministic ASCII tab renderer for fingered canonical `Event` sequences, emitting labeled string rows from high string to low string and aligning each onset by the widest fret label at that onset.
 - Exported the renderer from `src/tabber/__init__.py` and added focused coverage in `tests/test_ascii_tab.py` for a short multi-string phrase plus the required fingering-validation failure path.
 - Ran `bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_ascii_tab.py` and confirmed the targeted tests pass with `2 passed in 0.28s`.
+
+## 2026-03-12 - P11
+
+- Verified `src/api/render/musicxml.py` already emits MusicXML `<notations><technical><string>/<fret></technical></notations>` from canonical `fingering` metadata using the documented high-E=`1` to low-E=`6` numbering convention.
+- Added the missing targeted coverage in `tests/test_musicxml_tab_encoding.py` to assert backend string index `5` exports as MusicXML string `1` and backend string index `0` exports as MusicXML string `6`, both with the expected fret tags.
+- Ran the exact task command `bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_musicxml_tab_encoding.py tests/test_musicxml_export.py` and confirmed it passes with `4 passed in 0.28s`.
+
+## 2026-03-12 - P12
+
+- Added `alternate_fingerings_for_event()` in `src/tabber/heuristic.py`, exposing the existing bounded per-string search as a public helper for a single pitched canonical `Event` while preserving the current deterministic low-fret ordering.
+- Exported the helper from `src/tabber/__init__.py` and added focused coverage in `tests/test_tabber_alternates.py` for a pitch with multiple valid positions plus a high pitch that is limited to one in-range position at the current fret cap.
+- Ran the exact task command `bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_tabber_alternates.py` and confirmed it passes with `2 passed in 0.27s`.
+
+## 2026-03-12 - P13
+
+- Added `src/api/canonical/fingering.py` with `FingeringSelection` plus `apply_fingering_selections()`, a pure canonical-score helper that matches updates by `event_id`, rebuilds only `fingering`, and rejects missing events or selections that change pitch or timing.
+- Exported the helper from `src/api/canonical/__init__.py` and added focused coverage in `tests/test_canonical_fingering.py` for a successful fingering change plus the required unknown-`event_id` rejection.
+- Ran the exact task command `bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_canonical_fingering.py` and confirmed it passes with `2 passed in 0.27s`.
+
+## 2026-03-12 - P14
+
+- Verified the NoteLM checkpoint inference helper in `src/models/notelm/inference.py` loads checkpoint config, model weights, and vocab metadata into an eval-mode model on CPU by default, while keeping the interface minimal.
+- Confirmed the focused regression coverage in `tests/test_load_checkpoint.py` saves a tiny synthetic checkpoint plus `vocab.json`, reloads it through `load_notelm_checkpoint()`, and checks both restored metadata and logits.
+- Re-ran the exact task command `bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_load_checkpoint.py` and confirmed it passes with `1 passed in 0.76s`.
+
+## 2026-03-12 - P14
+
+- Re-read `TODO.md` and confirmed the existing checkpoint loader in `src/models/notelm/inference.py` still matches the task: it restores `NoteLM` weights plus vocab metadata and returns an eval-mode CPU model by default.
+- Re-verified `tests/test_load_checkpoint.py` covers the required synthetic save-and-reload path with a tiny checkpoint and `vocab.json`, checking restored config, vocab path, step metadata, and logits.
+- Ran the exact task command `bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_load_checkpoint.py` and confirmed it passes with `1 passed in 0.73s`.
