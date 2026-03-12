@@ -95,3 +95,9 @@
 - Added `src/tabber/heuristic.py` with a first-pass guitar tabbing heuristic for standard six-string tuning, covering canonical `Event` input plus a narrow `TabNote` DTO, candidate fret generation inside a playable range, and same-onset unique-string assignment via a small brute-force search.
 - Preferred low-fret positions by cost, which naturally favors open strings when available, and raised explicit `ValueError`s when a same-onset voicing can only be realized by reusing one string.
 - Added focused coverage in `tests/test_tabber_heuristic.py` for open-string preference, a simple simultaneous chord, and an impossible voicing case, then ran `bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_tabber_heuristic.py` and confirmed it passes with `3 passed in 0.28s`.
+
+## 2026-03-12 - P08
+
+- Added `src/tabber/ascii.py` with a deterministic ASCII tab renderer for fingered canonical `Event` sequences, emitting labeled string rows from high string to low string and aligning each onset by the widest fret label at that onset.
+- Exported the renderer from `src/tabber/__init__.py` and added focused coverage in `tests/test_ascii_tab.py` for a short multi-string phrase plus the required fingering-validation failure path.
+- Ran `bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_ascii_tab.py` and confirmed the targeted tests pass with `2 passed in 0.28s`.

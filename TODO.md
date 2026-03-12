@@ -1,13 +1,13 @@
-# TODO — Active Task: P10
+# TODO — Active Task: P11
 
-## P10 — Heuristic guitar tabber core
+## P11 — Attach tab positions to MusicXML export
 
-Implement a first-pass heuristic tabber in src/tabber/heuristic.py. Input should be canonical score events or a narrow intermediate structure with pitch, onset, duration, and voice information. Output should assign string/fret positions for standard six-string guitar tuning. Use a pragmatic heuristic first: prefer lower fret movement, keep notes within playable fret range, and reject impossible duplicate string use at the same onset. Add focused tests for open-string preference, basic chord assignment, and an impossible voicing case. Append a PROGRESS.md entry and run bash docs/skills/python-test-env/scripts/run_tests.sh.
+Extend the MusicXML exporter so canonical events with fingering data emit <technical><string> and <fret> tags using the MusicXML and AlphaTab numbering convention documented in frontend-readme.md. Add tests that assert string numbering is correct for high-E and low-E cases. Update frontend-readme.md only if clarification is needed, not to change scope. Append a PROGRESS.md entry and run bash docs/skills/python-test-env/scripts/run_tests.sh.
 
 ## Test Command
 
 Run ONLY these targeted tests (do NOT run the full suite):
 
 ```bash
-bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_tabber_heuristic.py 
+bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_musicxml_tab_encoding.py tests/test_musicxml_export.py 
 ```
