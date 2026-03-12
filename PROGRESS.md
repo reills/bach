@@ -176,3 +176,9 @@
 - Kept the existing task-scoped compose pipeline in `src/api/compose_service.py`, which already wires generation output through canonical conversion, tab assignment, MusicXML rendering, MIDI rendering, and frontend measure/event maps.
 - Exported `compose_baseline` and `ComposeServiceResult` from `src/api/__init__.py` so the internal compose service has a clean package-level entry point without adding any HTTP route surface.
 - Re-ran the exact task command `bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_compose_service.py` and confirmed it passes with `1 passed in 1.14s`.
+
+## 2026-03-12 - P18
+
+- Added `src/api/store.py` with a small replaceable repository surface plus an in-memory implementation that creates score and draft IDs, tracks integer revisions, commits or discards drafts, and raises `StaleRevisionError` on stale base revisions or stale draft commits.
+- Exported the store types from `src/api/__init__.py` and added focused coverage in `tests/test_store.py` for the full draft lifecycle and stale revision rejection.
+- Ran the exact task command `bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_store.py` and confirmed it passes with `2 passed in 1.17s`.
