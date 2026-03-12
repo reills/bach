@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import './App.css';
 import ScoreViewer from './components/ScoreViewer';
-import { compose, inpaintPreview, commitDraft, discardDraft } from './api/client';
+import FingeringPicker from './components/FingeringPicker';
+import { compose, inpaintPreview, commitDraft, discardDraft, altPositions, applyFingering } from './api/client';
 import {
   getEventId,
   getMeasureId,
@@ -200,6 +201,11 @@ const App = () => {
   const [statusTone, setStatusTone] = useState<StatusTone>('idle');
   const [statusMessage, setStatusMessage] = useState('Ready.');
   const [busy, setBusy] = useState(false);
+  const [fingeringPicker, setFingeringPicker] = useState<{
+    eventId: string;
+    options: Array<{ stringIndex: number; fret: number; selected: boolean }>;
+  } | null>(null);
+  const [fingeringBusy, setFingeringBusy] = useState(false);
 
   const renderXml = state.draftXml ?? state.scoreXml;
   const measureCount = state.measureMap ? Object.keys(state.measureMap).length : 0;
@@ -325,12 +331,50 @@ const App = () => {
     }));
   };
 
-  const handleNoteClick = (hit: HitKey) => {
+  const handleNoteClick = async (hit: HitKey) => {
     const eventId = getEventId(state.eventHitMap, hit);
     setState((prev) => ({
       ...prev,
       lastEventId: eventId,
     }));
+
+    if (!eventId || !state.scoreId) return;
+    const measureId = getMeasureId(state.measureMap, hit.barIndex);
+    if (!measureId) return;
+
+    setFingeringBusy(true);
+    try {
+      const resp = await altPositions({ scoreId: state.scoreId, measureId, eventHitKey: hit });
+      setFingeringPicker({ eventId: resp.eventId, options: resp.options });
+    } catch {
+      // Note has no alternate positions data — silently ignore
+    } finally {
+      setFingeringBusy(false);
+    }
+  };
+
+  const handleApplyFingering = async (stringIndex: number, fret: number) => {
+    if (!fingeringPicker || !state.scoreId || state.revision === null) return;
+    setFingeringBusy(true);
+    try {
+      const resp = await applyFingering({
+        scoreId: state.scoreId,
+        revision: state.revision,
+        fingeringSelections: [{ eventId: fingeringPicker.eventId, stringIndex, fret }],
+      });
+      setState((prev) => ({
+        ...prev,
+        scoreXml: resp.scoreXML,
+        revision: resp.revision,
+      }));
+      setFingeringPicker(null);
+      setStatus('success', 'Fingering applied.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Apply fingering failed.';
+      setStatus('error', message);
+    } finally {
+      setFingeringBusy(false);
+    }
   };
 
   const handleInpaintPreview = async () => {
@@ -791,6 +835,24 @@ const App = () => {
               )}
             </div>
           </div>
+
+          {/* Fingering Picker */}
+          {fingeringPicker && (
+            <div className="panel__section">
+              <div className="panel__title">
+                <span className="panel__title-icon">🎸</span>
+                Fingering
+              </div>
+              <div className="control-card">
+                <FingeringPicker
+                  options={fingeringPicker.options}
+                  onSelect={handleApplyFingering}
+                  onClose={() => setFingeringPicker(null)}
+                  busy={fingeringBusy}
+                />
+              </div>
+            </div>
+          )}
 
           {/* Playback & Export */}
           <div className="panel__section">

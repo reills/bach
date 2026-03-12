@@ -1,3 +1,11 @@
+## 2026-03-12 - P25
+
+- Added `frontend/src/components/FingeringPicker.tsx`, a lightweight picker component that lists alternate string/fret positions, marks the currently-selected one, and delegates selection to a callback.
+- Extended `frontend/src/App.tsx`: made `handleNoteClick` async so it calls `/alt_positions` whenever an `eventHitMap` lookup succeeds; added `handleApplyFingering` which calls `/apply_fingering` and updates `scoreXml` plus `revision` from the response; renders `<FingeringPicker>` in the control panel when alt-position data is available.
+- Added `frontend/src/state/types.test.ts` (12 vitest tests) covering `toHitKey`, `getMeasureId`, and `getEventId` pure state helpers, including null/undefined guard paths.
+- Added `test` section to `frontend/vite.config.ts` so `npx vitest run` targets only `src/**/*.test.ts` files.
+- Ran `npx vitest run` inside `frontend/`: 12 passed. Ran backend `tests/test_api_fingering.py` via `conda run -n bach-gen python -m pytest -q`: 4 passed.
+
 ## 2026-03-12 - P24
 
 - Added `/apply_fingering` to `src/api/routes/scores.py`, validating the caller's `revision`, applying one or more fingering selections by `eventId` through the existing canonical fingering helper, and committing the updated score back through the repository so the response returns re-exported MusicXML plus the new revision.

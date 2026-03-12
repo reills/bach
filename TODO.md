@@ -1,13 +1,5 @@
-# TODO — Active Task: P24
+# TODO — Active Task: P25
 
-## P24 — Apply fingering API
+## P25 — Frontend fingering picker UI
 
-Implement the /apply_fingering endpoint. It should validate revision, apply one or more fingering selections by eventId, re-export MusicXML, and return the new revision. Add tests asserting the response updates fingering-related MusicXML while leaving pitch content unchanged. Append a PROGRESS.md entry and run bash docs/skills/python-test-env/scripts/run_tests.sh.
-
-## Test Command
-
-Run ONLY these targeted tests (do NOT run the full suite):
-
-```bash
-bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_api_fingering.py 
-```
+Add a small fingering picker flow to the frontend. When a note is clicked and an eventHitMap lookup succeeds, call /alt_positions, show the returned options in a lightweight picker, and on selection call /apply_fingering then refresh the displayed MusicXML and revision. Keep the UI intentionally small and reuse existing state in App.tsx where possible. Add targeted frontend tests if the repo already has a lightweight setup; otherwise add at least pure-state tests around the mapping and selection logic. Append a PROGRESS.md entry and run the relevant frontend and backend tests.
