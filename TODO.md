@@ -1,13 +1,13 @@
-# TODO — Active Task: P05
+# TODO — Active Task: P06
 
-## P05 — Canonical score utilities for measure and event lookup
+## P06 — MusicXML exporter from canonical score
 
-Implement small canonical score utility functions for looking up measures by measureId, events by eventId, events starting inside a measure, and carry-in events active at a measure start. Keep the functions pure and easy to test because later API routes will depend on them. Add tests for measure lookup, carry-in detection, and event replacement inside one measure. Append a PROGRESS.md entry and run bash docs/skills/python-test-env/scripts/run_tests.sh.
+Implement canonical score to MusicXML export in src/api/render/musicxml.py. Support measure xml:id, note xml:id, divisions derived from tpq, and tie splitting when durTick crosses a barline. Keep the exporter MVP-focused for one guitar part. Add tests that assert a cross-bar note becomes two MusicXML notes with tie start/stop and preserves the same logical event identity. Append a PROGRESS.md entry and run bash docs/skills/python-test-env/scripts/run_tests.sh.
 
 ## Test Command
 
 Run ONLY these targeted tests (do NOT run the full suite):
 
 ```bash
-bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_canonical_ops.py 
+bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_musicxml_export.py 
 ```

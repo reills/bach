@@ -64,3 +64,10 @@
 - Updated `src/api/canonical/from_tokens.py` so raw token voices are remapped onto contiguous canonical `voice_id` values before events are emitted, while still deriving measures from `BAR` and `TIME_SIG` tokens and rebuilding pitches from the existing anchor plus `MEL_INT12` semantics.
 - Tightened `tests/test_tokens_to_canonical.py` so the monophonic bridge case uses sparse token voice `3` and proves the canonical score now normalizes it to `voice_id == 0`; the cross-bar sustain coverage remains intact.
 - Ran `bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_tokens_to_canonical.py tests/test_canonical_types.py` and confirmed the targeted tests pass with `10 passed in 0.29s`.
+
+## 2026-03-12 - P05
+
+- Added pure canonical score lookup/query helpers in `src/api/canonical/ops.py` for measure ID lookup, event ID lookup, events that start inside a measure, carry-in events active at a measure boundary, and replacing just the events that start within one measure.
+- Exported the new helpers from `src/api/canonical/__init__.py` without changing the existing token-to-canonical conversion path.
+- Added focused coverage in `tests/test_canonical_ops.py` for measure/event lookup, carry-in detection versus in-measure starts, and one-measure event replacement that preserves carry-in and later-measure events.
+- Ran `bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_canonical_ops.py` and confirmed the targeted tests pass with `3 passed in 0.27s`.
