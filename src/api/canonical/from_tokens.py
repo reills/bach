@@ -28,6 +28,7 @@ def tokens_to_canonical_score(
     bars = split_bars(tokens)
     if not bars:
         raise ValueError("token stream must contain at least one BAR")
+    voice_id_map = _canonical_voice_id_map(tokens)
 
     if part_info is None:
         part_info = PartInfo(
@@ -71,6 +72,7 @@ def tokens_to_canonical_score(
                 bar_start_tick=bar_start_tick,
                 part_info=part_info,
                 prev_pitch=prev_pitch,
+                voice_id_map=voice_id_map,
             )
         )
         bar_start_tick = measure.end_tick
@@ -125,6 +127,7 @@ def _events_from_bar(
     bar_start_tick: int,
     part_info: PartInfo,
     prev_pitch: dict[int, int | None],
+    voice_id_map: dict[int, int],
 ) -> list[Event]:
     events: list[Event] = []
     event_counts: dict[tuple[int, int], int] = {}
@@ -162,18 +165,19 @@ def _events_from_bar(
                 raise ValueError(f"VOICE token before POS in bar starting at tick {bar_start_tick}")
 
             voice_event, next_idx = parse_voice_event(bar_tokens, idx)
-            event_ordinal_key = (voice_event.voice, current_pos_tick)
+            canonical_voice_id = voice_id_map[voice_event.voice]
+            event_ordinal_key = (canonical_voice_id, current_pos_tick)
             ordinal = event_counts.get(event_ordinal_key, 0)
             event_counts[event_ordinal_key] = ordinal + 1
 
             if voice_event.is_rest:
                 events.append(
                     Event(
-                        id=_stable_event_id(part_info.id, voice_event.voice, current_pos_tick, ordinal),
+                        id=_stable_event_id(part_info.id, canonical_voice_id, current_pos_tick, ordinal),
                         start_tick=current_pos_tick,
                         dur_tick=voice_event.rest_ticks,
                         pitch_midi=None,
-                        voice_id=voice_event.voice,
+                        voice_id=canonical_voice_id,
                     )
                 )
                 idx = next_idx
@@ -187,11 +191,11 @@ def _events_from_bar(
             prev_pitch[voice_event.voice] = pitch_midi
             events.append(
                 Event(
-                    id=_stable_event_id(part_info.id, voice_event.voice, current_pos_tick, ordinal),
+                    id=_stable_event_id(part_info.id, canonical_voice_id, current_pos_tick, ordinal),
                     start_tick=current_pos_tick,
                     dur_tick=voice_event.duration_ticks,
                     pitch_midi=pitch_midi,
-                    voice_id=voice_event.voice,
+                    voice_id=canonical_voice_id,
                     fingering=_to_fingering(voice_event.string, voice_event.fret, len(part_info.tuning)),
                 )
             )
@@ -211,6 +215,17 @@ def _to_fingering(string_number: int | None, fret: int | None, string_count: int
     if not 1 <= string_number <= string_count:
         raise ValueError(f"string number {string_number} out of range for tuning with {string_count} strings")
     return GuitarFingering(string_index=string_count - string_number, fret=fret)
+
+
+def _canonical_voice_id_map(tokens: list[str]) -> dict[int, int]:
+    raw_voice_ids = sorted(
+        {
+            parse_token_int(token)
+            for token in tokens
+            if token.startswith("VOICE_")
+        }
+    )
+    return {raw_voice_id: canonical_voice_id for canonical_voice_id, raw_voice_id in enumerate(raw_voice_ids)}
 
 
 def _stable_measure_id(index: int, start_tick: int) -> str:

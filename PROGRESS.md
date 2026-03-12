@@ -58,3 +58,9 @@
 - Added focused construction tests in `tests/test_canonical_types.py` for invalid nested `Part`, `ScoreHeader`, `Measure`, and `Part` container entries, keeping the existing timing, ID, and voice invariants intact.
 - Clarified `frontend-readme.md` so the documented canonical schema now notes that backend `Part` objects store `info: PartInfo` plus `events`, while describing the same logical fields for the frontend.
 - Ran `bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_canonical_types.py` and confirmed the targeted canonical types tests pass with `8 passed in 0.28s`.
+
+## 2026-03-12 - P04
+
+- Updated `src/api/canonical/from_tokens.py` so raw token voices are remapped onto contiguous canonical `voice_id` values before events are emitted, while still deriving measures from `BAR` and `TIME_SIG` tokens and rebuilding pitches from the existing anchor plus `MEL_INT12` semantics.
+- Tightened `tests/test_tokens_to_canonical.py` so the monophonic bridge case uses sparse token voice `3` and proves the canonical score now normalizes it to `voice_id == 0`; the cross-bar sustain coverage remains intact.
+- Ran `bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_tokens_to_canonical.py tests/test_canonical_types.py` and confirmed the targeted tests pass with `10 passed in 0.29s`.
