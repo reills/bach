@@ -98,6 +98,23 @@ def test_canonical_score_rejects_duplicate_event_ids():
         )
 
 
+def test_canonical_score_rejects_gapped_voice_ids_within_a_part():
+    with pytest.raises(ValueError, match="part voice_ids must be contiguous per part starting at 0"):
+        CanonicalScore(
+            header=make_header(),
+            measures=make_measures(),
+            parts=[
+                Part(
+                    info=PartInfo(id="guitar", instrument="classical_guitar"),
+                    events=[
+                        Event(id="ev-1", start_tick=0, dur_tick=24, pitch_midi=60, voice_id=0),
+                        Event(id="ev-2", start_tick=24, dur_tick=24, pitch_midi=64, voice_id=2),
+                    ],
+                )
+            ],
+        )
+
+
 def test_canonical_score_rejects_non_contiguous_measures():
     with pytest.raises(ValueError, match="measures must be contiguous"):
         CanonicalScore(
@@ -113,6 +130,14 @@ def test_canonical_score_rejects_non_contiguous_measures():
                 )
             ],
         )
+
+
+def test_header_and_events_require_integer_quantized_ticks():
+    with pytest.raises(ValueError, match="time_sig_map ticks must be an integer"):
+        ScoreHeader(tpq=24, time_sig_map={0: "4/4", 0.5: "4/4"})
+
+    with pytest.raises(ValueError, match="event start_tick must be an integer"):
+        Event(id="ev-1", start_tick=12.5, dur_tick=24, pitch_midi=60, voice_id=0)
 
 
 def test_event_rejects_fingering_on_rest():

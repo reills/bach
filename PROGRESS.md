@@ -33,3 +33,15 @@
 - Re-read `TODO.md` and confirmed the required backend service skeleton is already present under `src/api` with `create_app()` and a `/healthz` endpoint.
 - Re-ran the exact task command `bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_api_health.py`; it passed with `1 passed in 0.18s`.
 - Added this task completion entry and wrote the required handoff files for the runner.
+
+## 2026-03-12 - P03
+
+- Tightened `src/api/canonical/types.py` so canonical score timing fields are explicitly integer ticks and per-part `voice_id` values must be contiguous from `0..N-1`, matching the frontend canonical-score invariants.
+- Kept cross-bar `dur_tick` support and optional guitar fingering metadata intact, while clarifying in `frontend-readme.md` that the Python backend model uses snake_case names for the same canonical fields.
+- Ran `bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_canonical_types.py` and confirmed the targeted canonical types tests pass with `6 passed in 0.29s`.
+
+## 2026-03-12 - P02
+
+- Verified the existing FastAPI backend skeleton still matches `TODO.md`: `src/api/app.py` exposes `create_app()` and registers the `/healthz` router from `src/api/routes/health.py`.
+- Re-ran the exact targeted task command `bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_api_health.py`; it passed with `1 passed in 0.19s`.
+- Wrote the required task handoff files for this run without changing unrelated code.

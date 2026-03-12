@@ -1,0 +1,5 @@
+P03 summary:
+- Defined `src/api/canonical/types.py` as the canonical score dataclass model with validated header, part, measure, event, and optional guitar fingering fields.
+- Enforced the P03 invariants around integer-quantized timing, contiguous measures, unique IDs, per-part contiguous `voice_id` numbering, and cross-bar `dur_tick` sustains.
+- Added focused canonical-score tests for cross-bar construction, duplicate IDs, contiguous measure layout, per-part voice numbering, integer tick validation, and rest/fingering rejection.
+- Clarified `frontend-readme.md`, kept the required `PROGRESS.md` entry, and verified the task with `bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_canonical_types.py` (`6 passed in 0.26s`).

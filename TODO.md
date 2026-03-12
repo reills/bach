@@ -1,13 +1,13 @@
-# TODO — Active Task: P02
+# TODO — Active Task: P03
 
-## P02 — Create backend service skeleton
+## P03 — Define canonical score types
 
-Add a minimal FastAPI service skeleton under src/api with an app factory and a /healthz endpoint. Keep the structure small and ready for later score routes. Add a tiny test that spins up the app with TestClient and asserts /healthz returns 200 with a simple JSON payload. Reuse existing project style and keep imports straightforward. Append a PROGRESS.md entry and run bash docs/skills/python-test-env/scripts/run_tests.sh.
+Implement canonical score data structures under src/api/canonical/types.py using dataclasses or pydantic models. Include header fields, part info, measures, events, and optional fingering data needed for guitar output. Match the invariants in frontend-readme.md: quantized timing, durTick across barlines, stable measure IDs, stable event IDs, and voiceId per part. Add focused tests for construction and basic invariants. If frontend-readme.md needs a small clarification to match the final model shape, update it. Append a PROGRESS.md entry and run bash docs/skills/python-test-env/scripts/run_tests.sh.
 
 ## Test Command
 
 Run ONLY these targeted tests (do NOT run the full suite):
 
 ```bash
-bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_api_health.py 
+bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_canonical_types.py 
 ```

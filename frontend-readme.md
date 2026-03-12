@@ -9,6 +9,7 @@ Build around a server-side Canonical Score (one source of truth). Use MusicXML o
 Minimal schema (v0):
 
 - Backend object shape: `CanonicalScore { header, measures[], parts[] }`
+- Python backend types may use snake_case field names (`start_tick`, `dur_tick`, `voice_id`); the schema here names the same logical fields in frontend-style camelCase.
 - Header: `tpq`, `keySigMap`, `timeSigMap`, `tempoMap`, optional `pickupTicks`
 - Parts: `{ id, instrument, tuning, capo, midiProgram, events[] }`
 - Measures: `measures[]` with `id` (UUID), `index` (0-based), `startTick`, `lengthTicks`
