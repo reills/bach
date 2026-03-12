@@ -164,3 +164,15 @@
 - Added focused coverage in `tests/test_controls.py` for key normalization, normalized style/difficulty token labels, token ordering, and rejection of non-positive measure counts.
 - Updated `README.md` with a small example showing how compose controls map to prefix tokens.
 - Ran the exact task command `bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_controls.py` and confirmed it passes with `3 passed in 0.95s`.
+
+## 2026-03-12 - P17
+
+- Added `src/api/compose_service.py`, an internal compose pipeline that calls the generation loop, converts generated tokens into a canonical score, tabs the events, renders MusicXML and MIDI, and returns frontend-ready `measure_map` and `event_hit_map` metadata alongside the generated score.
+- Added `tests/test_compose_service.py`, which stubs the generation result and verifies the full transformation path including generator arguments, canonical measure IDs, tabbed MusicXML note IDs and technical tags, cross-bar event hit mapping, and parseable MIDI bytes.
+- Ran the exact task command `bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_compose_service.py` and confirmed it passes with `1 passed in 1.09s`.
+
+## 2026-03-12 - P17
+
+- Kept the existing task-scoped compose pipeline in `src/api/compose_service.py`, which already wires generation output through canonical conversion, tab assignment, MusicXML rendering, MIDI rendering, and frontend measure/event maps.
+- Exported `compose_baseline` and `ComposeServiceResult` from `src/api/__init__.py` so the internal compose service has a clean package-level entry point without adding any HTTP route surface.
+- Re-ran the exact task command `bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_compose_service.py` and confirmed it passes with `1 passed in 1.14s`.
