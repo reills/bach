@@ -601,6 +601,25 @@ generation:
 
 ## 13) Evaluation
 
+### 13.0 Quick evaluation (`scripts/eval_basic.py`)
+
+A lightweight, file-based script that scores a generated token stream without extra infrastructure.
+
+```bash
+# score a plain-text token file
+python scripts/eval_basic.py --token-file generated.txt
+
+# score an events parquet with vocabulary validity check
+python scripts/eval_basic.py --parquet data/processed/events.parquet --vocab data/processed/vocab.json
+
+# write JSON results
+python scripts/eval_basic.py --token-file generated.txt --output-json results.json
+```
+
+**Metrics reported:** `bar_count`, `token_validity`, `interval_range_ok`, `mel_int_range`,
+`voice_event_count`, `rest_event_count`, `tab_present` (+ `tab_span_mean`, `tab_fret_max`,
+`tab_open_string_pct` when tab tokens are present).
+
 ### 13.1 Composer
 
 * Key-profile KL to prompt key; cadence coverage; parallel 5ths/8ves rate (per voice-pair).

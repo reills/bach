@@ -1,3 +1,10 @@
+## 2026-03-12 - P29
+
+- Implemented `scripts/eval_basic.py`: a lightweight, file-based evaluation CLI that scores generated token streams or parquet event files with pragmatic metrics — `bar_count`, `token_validity` (against an optional vocab JSON), `interval_range_ok` (MEL_INT12 values in [-24, 24]), `mel_int_range`, `voice_event_count`, `rest_event_count`, `tab_present`, and (when tab tokens exist) `tab_span_mean`, `tab_fret_max`, `tab_open_string_pct`. Accepts `--token-file`, `--parquet`, optional `--vocab`, `--output-json`, and `--quiet` flags.
+- Added `tests/test_eval_basic.py` (14 tests) covering: `evaluate()` unit tests (bar count, voice/rest counts, interval range pass/fail, no-tab vs tab metrics, token validity full/partial, empty stream), and CLI tests (token file, vocab file, newline-separated input, parquet, JSON output key presence).
+- Updated `README.md` section "13) Evaluation" with a new §13.0 "Quick evaluation" block showing concrete CLI examples and the list of reported metrics.
+- Ran `CONDA_NO_PLUGINS=true conda run -n bach-gen python -m pytest -q tests/test_eval_basic.py` — all 14 tests passed in 0.82s.
+
 ## 2026-03-12 - P28
 
 - Hardened `scripts/train_v1.py` without redesigning it: replaced bare `print()` calls with structured `logging` (timestamps via `%(asctime)s`); added `--resume PATH` to restore model + optimizer state and step counter from a `.pt` checkpoint; added `--val-split FLOAT` + `--val-every N` to hold out a validation subset and log val loss periodically; added `--dry-run-batches N` to exit after N batches (useful for CI/smoke checks); enriched checkpoint metadata with `timestamp` (UTC ISO) and `args` dict.
