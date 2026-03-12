@@ -6,7 +6,16 @@ from typing import Any, Callable, Literal
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
 
-from src.api.canonical import CanonicalScore, Event, Part, get_measure_by_id
+from src.api.canonical import (
+    CanonicalScore,
+    Event,
+    FingeringSelection,
+    GuitarFingering,
+    Part,
+    apply_fingering_selections,
+    get_event_by_id,
+    get_measure_by_id,
+)
 from src.api.compose_service import ComposeServiceResult, export_score
 from src.api.services import preview_window_inpaint
 from src.api.store import (
@@ -117,6 +126,23 @@ class AltPositionOption(BaseModel):
 class AltPositionsResponse(BaseModel):
     eventId: str
     options: list[AltPositionOption]
+
+
+class ApplyFingeringSelectionRequest(BaseModel):
+    eventId: str
+    stringIndex: int
+    fret: int
+
+
+class ApplyFingeringRequest(BaseModel):
+    scoreId: str
+    revision: int
+    fingeringSelections: list[ApplyFingeringSelectionRequest]
+
+
+class ApplyFingeringResponse(BaseModel):
+    scoreXML: str
+    revision: int
 
 
 def create_router(
@@ -261,6 +287,49 @@ def create_router(
             ],
         )
 
+    @router.post("/apply_fingering", response_model=ApplyFingeringResponse)
+    async def apply_fingering(request: ApplyFingeringRequest) -> ApplyFingeringResponse:
+        if not request.fingeringSelections:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="fingeringSelections must be non-empty",
+            )
+
+        try:
+            draft = score_repository.create_draft(
+                request.scoreId,
+                base_revision=request.revision,
+            )
+        except ScoreNotFoundError as exc:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        except StaleRevisionError as exc:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+        try:
+            updated_score = apply_fingering_selections(
+                draft.score,
+                _build_fingering_selections(draft.score, request.fingeringSelections),
+            )
+            score_repository.save_draft(draft.draft_id, updated_score)
+            committed = score_repository.commit_draft(draft.draft_id)
+        except ValueError as exc:
+            score_repository.discard_draft(draft.draft_id)
+            status_code = (
+                status.HTTP_404_NOT_FOUND
+                if str(exc).startswith("unknown event id:")
+                else status.HTTP_400_BAD_REQUEST
+            )
+            raise HTTPException(status_code=status_code, detail=str(exc)) from exc
+        except StaleRevisionError as exc:
+            score_repository.discard_draft(draft.draft_id)
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+        exported = export_score(committed.score)
+        return ApplyFingeringResponse(
+            scoreXML=exported.score_xml,
+            revision=committed.revision,
+        )
+
     return router
 
 
@@ -287,6 +356,28 @@ def _find_event_with_part(score: CanonicalScore, event_id: str) -> tuple[Part, E
             if event.id == event_id:
                 return part, event
     raise ValueError(f"unknown event id: {event_id}")
+
+
+def _build_fingering_selections(
+    score: CanonicalScore,
+    selections: list[ApplyFingeringSelectionRequest],
+) -> list[FingeringSelection]:
+    canonical_selections: list[FingeringSelection] = []
+    for selection in selections:
+        event = get_event_by_id(score, selection.eventId)
+        canonical_selections.append(
+            FingeringSelection(
+                event_id=selection.eventId,
+                pitch_midi=event.pitch_midi,
+                start_tick=event.start_tick,
+                dur_tick=event.dur_tick,
+                fingering=GuitarFingering(
+                    string_index=selection.stringIndex,
+                    fret=selection.fret,
+                ),
+            )
+        )
+    return canonical_selections
 
 
 def _to_request_hit_key(hit_key: EventHitKeyRequest) -> str:

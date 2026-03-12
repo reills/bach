@@ -1,8 +1,8 @@
-# TODO — Active Task: P23
+# TODO — Active Task: P24
 
-## P23 — Alternate positions API
+## P24 — Apply fingering API
 
-Implement the /alt_positions endpoint. It should resolve the frontend eventHitKey to a canonical eventId using the stored hit map, compute alternate fingerings for that event, and return a compact response suitable for a picker UI. Add tests covering a valid request and a missing-event case. Update frontend/src/api/types.ts if a concrete response type is needed. Append a PROGRESS.md entry and run bash docs/skills/python-test-env/scripts/run_tests.sh.
+Implement the /apply_fingering endpoint. It should validate revision, apply one or more fingering selections by eventId, re-export MusicXML, and return the new revision. Add tests asserting the response updates fingering-related MusicXML while leaving pitch content unchanged. Append a PROGRESS.md entry and run bash docs/skills/python-test-env/scripts/run_tests.sh.
 
 ## Test Command
 

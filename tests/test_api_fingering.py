@@ -1,4 +1,5 @@
 import asyncio
+import xml.etree.ElementTree as ET
 
 import httpx
 from fastapi.testclient import TestClient
@@ -13,6 +14,7 @@ from src.api.canonical import (
     PartInfo,
     ScoreHeader,
 )
+from src.api.render import canonical_score_to_musicxml
 from src.api.store import InMemoryScoreRepository
 
 
@@ -57,6 +59,42 @@ def _build_score() -> CanonicalScore:
         measures=measures,
         parts=[part],
     )
+
+
+def _pitch_summary(score_xml: str) -> list[tuple[str, str, str, str]]:
+    root = ET.fromstring(score_xml)
+    summary: list[tuple[str, str, str, str]] = []
+    for note_el in root.findall("./part/measure/note"):
+        pitch_el = note_el.find("./pitch")
+        if pitch_el is None:
+            continue
+        summary.append(
+            (
+                note_el.attrib.get("{http://www.w3.org/XML/1998/namespace}id", ""),
+                pitch_el.findtext("./step", ""),
+                pitch_el.findtext("./alter", ""),
+                pitch_el.findtext("./octave", ""),
+            )
+        )
+    return summary
+
+
+def _technical_summary(score_xml: str, *, event_id: str) -> list[tuple[str, str]]:
+    root = ET.fromstring(score_xml)
+    summary: list[tuple[str, str]] = []
+    for note_el in root.findall("./part/measure/note"):
+        if note_el.attrib.get("{http://www.w3.org/XML/1998/namespace}id") != event_id:
+            continue
+        summary_el = note_el.find("./notations/technical")
+        if summary_el is None:
+            continue
+        summary.append(
+            (
+                summary_el.findtext("./string", ""),
+                summary_el.findtext("./fret", ""),
+            )
+        )
+    return summary
 
 
 def test_alt_positions_resolves_hit_key_to_event_and_returns_compact_picker_options():
@@ -118,3 +156,67 @@ def test_alt_positions_returns_404_when_event_hit_key_is_missing():
 
     assert response.status_code == 404
     assert response.json() == {"detail": "unknown event hit key: 1|1|9|0"}
+
+
+def test_apply_fingering_updates_musicxml_technical_tags_without_changing_pitches():
+    repository = InMemoryScoreRepository[CanonicalScore]()
+    stored_score = repository.create_score(_build_score())
+    original_xml = canonical_score_to_musicxml(stored_score.score)
+
+    client = CompatTestClient(create_app(repository=repository))
+    try:
+        response = client.post(
+            "/apply_fingering",
+            json={
+                "scoreId": stored_score.score_id,
+                "revision": stored_score.revision,
+                "fingeringSelections": [
+                    {"eventId": "answer", "stringIndex": 1, "fret": 7},
+                    {"eventId": "next", "stringIndex": 0, "fret": 20},
+                ],
+            },
+        )
+    finally:
+        client.close()
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["revision"] == 2
+    assert _pitch_summary(payload["scoreXML"]) == _pitch_summary(original_xml)
+    assert _technical_summary(original_xml, event_id="answer") == []
+    assert _technical_summary(original_xml, event_id="next") == []
+    assert _technical_summary(payload["scoreXML"], event_id="answer") == [("5", "7")]
+    assert _technical_summary(payload["scoreXML"], event_id="next") == [("6", "20")]
+
+    committed = repository.get_score(stored_score.score_id)
+    assert committed.revision == 2
+    assert committed.score.parts[0].events[2].fingering == GuitarFingering(string_index=1, fret=7)
+    assert committed.score.parts[0].events[3].fingering == GuitarFingering(string_index=0, fret=20)
+
+
+def test_apply_fingering_returns_409_for_stale_revision():
+    repository = InMemoryScoreRepository[CanonicalScore]()
+    stored_score = repository.create_score(_build_score())
+    fresh_draft = repository.create_draft(
+        stored_score.score_id,
+        base_revision=stored_score.revision,
+    )
+    repository.commit_draft(fresh_draft.draft_id)
+
+    client = CompatTestClient(create_app(repository=repository))
+    try:
+        response = client.post(
+            "/apply_fingering",
+            json={
+                "scoreId": stored_score.score_id,
+                "revision": stored_score.revision,
+                "fingeringSelections": [
+                    {"eventId": "answer", "stringIndex": 1, "fret": 7},
+                ],
+            },
+        )
+    finally:
+        client.close()
+
+    assert response.status_code == 409
+    assert "is at revision 2, not 1" in response.text

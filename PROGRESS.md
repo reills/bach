@@ -1,3 +1,9 @@
+## 2026-03-12 - P24
+
+- Added `/apply_fingering` to `src/api/routes/scores.py`, validating the caller's `revision`, applying one or more fingering selections by `eventId` through the existing canonical fingering helper, and committing the updated score back through the repository so the response returns re-exported MusicXML plus the new revision.
+- Extended `tests/test_api_fingering.py` with an end-to-end apply-fingering case that proves the returned MusicXML updates only fingering-related technical tags while preserving rendered pitch content, plus a stale-revision conflict case that returns HTTP `409`.
+- Ran the exact task command `bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_api_fingering.py` and confirmed it passes with `4 passed in 1.20s`.
+
 ## 2026-03-12 - P14
 
 - Added a minimal NoteLM inference loader in `src/models/notelm/inference.py` that reads the saved checkpoint config and model weights, resolves and loads the vocab file, and returns an eval-mode model on CPU by default.
