@@ -21,6 +21,7 @@ export interface ScoreState {
   selectedMeasureId: string | null;
   selectedBarIndex: number | null;
   lockedEventIds: string[] | null;
+  changedMeasureIds: string[] | null;
   lastEventId: string | null;
   midi: string | null;
 }

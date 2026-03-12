@@ -173,6 +173,7 @@ const initialState: ScoreState = {
   selectedMeasureId: null,
   selectedBarIndex: null,
   lockedEventIds: null,
+  changedMeasureIds: null,
   lastEventId: null,
   midi: null,
 };
@@ -238,6 +239,7 @@ const App = () => {
         selectedMeasureId: null,
         selectedBarIndex: null,
         lockedEventIds: null,
+        changedMeasureIds: null,
         lastEventId: null,
       }));
       setStatus('success', 'Score loaded. Click a measure to inpaint.');
@@ -272,6 +274,7 @@ const App = () => {
         selectedMeasureId: null,
         selectedBarIndex: null,
         lockedEventIds: null,
+        changedMeasureIds: null,
         lastEventId: null,
       }));
 
@@ -310,6 +313,7 @@ const App = () => {
       selectedMeasureId: null,
       selectedBarIndex: null,
       lockedEventIds: null,
+      changedMeasureIds: null,
       lastEventId: null,
       midi: null,
     }));
@@ -414,6 +418,11 @@ const App = () => {
             result.measureId ?? prev.selectedMeasureId ?? null,
           measureMap: result.measureMap,
           lockedEventIds: null,
+          changedMeasureIds: result.measureId
+            ? [result.measureId]
+            : prev.selectedMeasureId
+            ? [prev.selectedMeasureId]
+            : null,
         }));
         setStatus('success', 'Local draft ready. Commit or discard.');
       } catch (error) {
@@ -454,6 +463,7 @@ const App = () => {
         measureMap: response.measureMap ?? prev.measureMap,
         eventHitMap: response.eventHitMap ?? prev.eventHitMap,
         lockedEventIds: response.lockedEventIds ?? null,
+        changedMeasureIds: response.changedMeasureIds ?? null,
       }));
       setStatus('success', 'Draft ready. Compare and commit or discard.');
     } catch (error) {
@@ -480,6 +490,7 @@ const App = () => {
         draftBaseRevision: null,
         highlightMeasureId: null,
         lockedEventIds: null,
+        changedMeasureIds: null,
       }));
       setStatus('success', 'Local draft committed.');
       return;
@@ -508,6 +519,7 @@ const App = () => {
         draftBaseRevision: null,
         highlightMeasureId: null,
         lockedEventIds: null,
+        changedMeasureIds: null,
       }));
       setStatus('success', 'Draft committed.');
     } catch (error) {
@@ -531,6 +543,7 @@ const App = () => {
         draftBaseRevision: null,
         highlightMeasureId: null,
         lockedEventIds: null,
+        changedMeasureIds: null,
       }));
       setStatus('success', 'Local draft discarded.');
       return;
@@ -555,6 +568,7 @@ const App = () => {
         draftBaseRevision: null,
         highlightMeasureId: null,
         lockedEventIds: null,
+        changedMeasureIds: null,
       }));
       setStatus('success', 'Draft discarded.');
     } catch (error) {
@@ -814,7 +828,21 @@ const App = () => {
               {state.draftId && (
                 <div className="draft-indicator">
                   <span className="draft-indicator__icon">📝</span>
-                  <span className="draft-indicator__text">Draft ready for review</span>
+                  <div className="draft-indicator__body">
+                    <span className="draft-indicator__text">Draft ready for review</span>
+                    {(state.changedMeasureIds || state.lockedEventIds) && (
+                      <span className="draft-indicator__meta">
+                        {[
+                          state.changedMeasureIds &&
+                            `${state.changedMeasureIds.length} measure${state.changedMeasureIds.length !== 1 ? 's' : ''} changed`,
+                          state.lockedEventIds &&
+                            `${state.lockedEventIds.length} event${state.lockedEventIds.length !== 1 ? 's' : ''} locked`,
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </span>
+                    )}
+                  </div>
                   <div className="draft-indicator__actions">
                     <button
                       className="btn btn--small btn--primary"

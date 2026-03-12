@@ -1,3 +1,11 @@
+## 2026-03-12 - P26
+
+- Added `changedMeasureIds: string[] | null` to `ScoreState` in `frontend/src/state/types.ts`.
+- Updated `frontend/src/App.tsx`: stored `response.changedMeasureIds` from the inpaint preview API response; local-mode draft now derives `changedMeasureIds` from the replaced measure ID; all state resets (compose, load local, load demo, commit draft, discard draft) clear `changedMeasureIds` to null.
+- Enhanced the draft indicator in `App.tsx` to show a sub-line with counts ("N measures changed · M events locked") when either value is non-null, by wrapping the text in a `draft-indicator__body` flex column.
+- Added `.draft-indicator__body` and `.draft-indicator__meta` CSS rules to `App.css`; moved `flex: 1` from `__text` to the new `__body` wrapper.
+- Added 3 new vitest tests in `frontend/src/state/types.test.ts` covering `changedMeasureIds` null default and array assignment; ran `npx vitest run` inside `frontend/` and confirmed 15 passed.
+
 ## 2026-03-12 - P25
 
 - Added `frontend/src/components/FingeringPicker.tsx`, a lightweight picker component that lists alternate string/fret positions, marks the currently-selected one, and delegates selection to a callback.

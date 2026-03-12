@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { toHitKey, getMeasureId, getEventId } from './types';
-import type { HitKey, MeasureMap, EventHitMap } from './types';
+import type { HitKey, MeasureMap, EventHitMap, ScoreState } from './types';
 
 describe('toHitKey', () => {
   it('produces a canonical pipe-delimited key with all fields', () => {
@@ -66,5 +66,40 @@ describe('getEventId', () => {
     const hitMap: EventHitMap = { '3|2|1|0': 'evt-99' };
     const hit: HitKey = { barIndex: 3, voiceIndex: 2, beatIndex: 1, noteIndex: 0 };
     expect(getEventId(hitMap, hit)).toBe('evt-99');
+  });
+});
+
+describe('ScoreState changedMeasureIds', () => {
+  const base: ScoreState = {
+    scoreId: null,
+    revision: null,
+    scoreXml: null,
+    measureMap: null,
+    eventHitMap: null,
+    draftId: null,
+    draftXml: null,
+    draftBaseRevision: null,
+    highlightMeasureId: null,
+    selectedMeasureId: null,
+    selectedBarIndex: null,
+    lockedEventIds: null,
+    changedMeasureIds: null,
+    lastEventId: null,
+    midi: null,
+  };
+
+  it('defaults to null', () => {
+    expect(base.changedMeasureIds).toBeNull();
+  });
+
+  it('accepts an array of measure id strings', () => {
+    const s: ScoreState = { ...base, changedMeasureIds: ['m1', 'm2'] };
+    expect(s.changedMeasureIds).toEqual(['m1', 'm2']);
+  });
+
+  it('accepts a single-element array', () => {
+    const s: ScoreState = { ...base, changedMeasureIds: ['measure-7'] };
+    expect(s.changedMeasureIds).toHaveLength(1);
+    expect(s.changedMeasureIds![0]).toBe('measure-7');
   });
 });
