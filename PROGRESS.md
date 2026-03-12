@@ -1,3 +1,12 @@
+## 2026-03-12 - P27
+
+- Added `frontend/src/App.test.ts` with 15 vitest integration tests covering the full compose/inpaint workflow: compose response loading, measure selection, inpaint preview, commit draft, and discard draft.
+- Tests mock the API layer via `vi.mock('./api/client')` — no live backend required.
+- Each test verifies state transitions by applying the same transformation logic as the App.tsx handlers, checking that `scoreId`, `revision`, `scoreXml`, `measureMap`, `draftId`, `draftXml`, `lockedEventIds`, and `changedMeasureIds` are set or cleared correctly.
+- Two end-to-end workflow tests confirm the full compose → select → preview → commit path and the compose → select → preview → discard path.
+- Three additional "status text precondition" tests verify the state conditions that trigger each visible status message in App.tsx.
+- Ran `npx vitest run` inside `frontend/`: 30 passed (15 new + 15 existing).
+
 ## 2026-03-12 - P26
 
 - Added `changedMeasureIds: string[] | null` to `ScoreState` in `frontend/src/state/types.ts`.

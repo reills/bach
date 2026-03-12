@@ -1,5 +1,5 @@
-# TODO — Active Task: P26
+# TODO — Active Task: P27
 
-## P26 — Frontend draft state polish
+## P27 — Frontend integration tests for compose/inpaint flow
 
-Improve the existing frontend draft workflow so it displays lockedEventIds, changedMeasureIds, and clearer preview state returned by the backend. Keep the styling minimal and fit it into the current UI rather than redesigning the app. Update frontend-readme.md only if the implemented UI behavior needs small clarification. Append a PROGRESS.md entry and run any relevant frontend tests if present.
+Add lightweight frontend tests for the main workflow: load a score response, select a measure, request an inpaint preview, and commit or discard the draft. Mock the API layer rather than requiring a live backend. Keep the test surface focused on state transitions and visible UI text. Update frontend/package.json only if an additional small test utility is required. Append a PROGRESS.md entry and run the frontend test command.

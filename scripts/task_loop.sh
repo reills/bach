@@ -13,10 +13,11 @@
 #   --help              Show this help and exit
 #
 # ENVIRONMENT VARIABLES:
+#   AGENT_MODEL     Default model for both agents: "claude" or "codex" (default: codex)
+#   IMPLEMENT_MODEL Override model for implement agent
+#   REVIEW_MODEL    Override model for review agent
 #   IMPLEMENT_CMD   Shell command for the implement agent
-#                   Default: 'claude --dangerously-skip-permissions'
-#                   The command receives the instruction prompt on stdin.
-#   REVIEW_CMD      Shell command for the review agent (default: same as IMPLEMENT_CMD)
+#   REVIEW_CMD      Shell command for the review agent
 #   MAX_RETRIES     Max FAIL retries before a task is marked blocked (default: 3)
 #   AUTO_COMMIT     Set to 1 to git-commit after each PASS (default: 0)
 #   STOP_ON_BLOCKED Set to 1 to exit when a task is blocked (default: 1)
@@ -72,25 +73,26 @@ set -euo pipefail
 # ─────────────────────────────────────────────────────────────────────────────
 # Defaults (override with environment variables)
 # ─────────────────────────────────────────────────────────────────────────────
-#   AGENT_MODEL: "claude" or "codex" (default: codex)
-#     claude → claude --dangerously-skip-permissions -p "<prompt>"
-#     codex  → codex exec --full-auto -C . - < prompt_file
+#   claude → claude --dangerously-skip-permissions -p "<prompt>"
+#   codex  → codex exec --full-auto -C . - < prompt_file
 AGENT_MODEL="${AGENT_MODEL:-codex}"
+IMPLEMENT_MODEL="${IMPLEMENT_MODEL:-$AGENT_MODEL}"
+REVIEW_MODEL="${REVIEW_MODEL:-$AGENT_MODEL}"
 
-case "$AGENT_MODEL" in
-  claude)
-    IMPLEMENT_CMD="${IMPLEMENT_CMD:-claude --dangerously-skip-permissions -p}"
-    REVIEW_CMD="${REVIEW_CMD:-claude --dangerously-skip-permissions -p}"
-    ;;
-  codex)
-    IMPLEMENT_CMD="${IMPLEMENT_CMD:-codex exec --full-auto -C . -}"
-    REVIEW_CMD="${REVIEW_CMD:-codex exec --full-auto -C . -}"
-    ;;
-  *)
-    echo "[ERROR] Unknown AGENT_MODEL: $AGENT_MODEL (expected 'claude' or 'codex')" >&2
-    exit 1
-    ;;
-esac
+default_cmd_for_model() {
+  local model="$1"
+  case "$model" in
+    claude) printf '%s\n' 'claude --dangerously-skip-permissions -p' ;;
+    codex) printf '%s\n' 'codex exec --full-auto -C . -' ;;
+    *)
+      echo "[ERROR] Unknown model: $model (expected 'claude' or 'codex')" >&2
+      exit 1
+      ;;
+  esac
+}
+
+IMPLEMENT_CMD="${IMPLEMENT_CMD:-$(default_cmd_for_model "$IMPLEMENT_MODEL")}"
+REVIEW_CMD="${REVIEW_CMD:-$(default_cmd_for_model "$REVIEW_MODEL")}"
 
 MAX_RETRIES="${MAX_RETRIES:-3}"
 AUTO_COMMIT="${AUTO_COMMIT:-1}"
@@ -360,11 +362,14 @@ run_agent() {
   local prompt="$2"
   local active_prompt_file="${RUNNER_DIR}/${mode}_active_prompt.txt"
   local cmd
+  local model
 
   if [[ "$mode" == "implement" ]]; then
     cmd="$IMPLEMENT_CMD"
+    model="$IMPLEMENT_MODEL"
   else
     cmd="$REVIEW_CMD"
+    model="$REVIEW_MODEL"
   fi
 
   printf '%s\n' "$prompt" > "$active_prompt_file"
@@ -376,8 +381,8 @@ run_agent() {
     return 0
   fi
 
-  info "Running $mode agent ($AGENT_MODEL)..."
-  if [[ "$AGENT_MODEL" == "codex" ]]; then
+  info "Running $mode agent ($model)..."
+  if [[ "$model" == "codex" ]]; then
     $cmd < "$active_prompt_file"
   else
     $cmd "$(cat "$active_prompt_file")"

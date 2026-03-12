@@ -12,7 +12,9 @@
 #   --help              Show this help and exit
 #
 # Environment variables:
-#   AGENT_MODEL      "claude" or "codex" (default: codex)
+#   AGENT_MODEL      Default model for both agents: "claude" or "codex" (default: codex)
+#   IMPLEMENT_MODEL  Override model for implement agent
+#   REVIEW_MODEL     Override model for review agent
 #   IMPLEMENT_CMD    Override implement command
 #   REVIEW_CMD       Override review command
 #   MAX_RETRIES      Max FAIL retries before a task is marked blocked (default: 3)
@@ -449,7 +451,8 @@ function Run-Agent(
   [string]$Prompt,
   [string]$RunnerDir,
   [bool]$DryRun,
-  [string]$AgentModel,
+  [string]$ImplementModel,
+  [string]$ReviewModel,
   [string]$ImplementCommand,
   [string]$ReviewCommand,
   [string]$WorkingDirectory
@@ -458,6 +461,7 @@ function Run-Agent(
   [System.IO.File]::WriteAllText($activePromptFile, $Prompt + "`n")
 
   $commandText = if ($Mode -eq "implement") { $ImplementCommand } else { $ReviewCommand }
+  $agentModel = if ($Mode -eq "implement") { $ImplementModel } else { $ReviewModel }
 
   if ($DryRun) {
     Write-Info ("[DRY-RUN] Would run: {0}" -f $commandText)
@@ -466,11 +470,11 @@ function Run-Agent(
     return $true
   }
 
-  Write-Info ("Running {0} agent ({1})..." -f $Mode, $AgentModel)
+  Write-Info ("Running {0} agent ({1})..." -f $Mode, $agentModel)
   $commandParts = Split-CommandLine $commandText
   $exitCode = 0
 
-  if ($AgentModel -eq "codex") {
+  if ($agentModel -eq "codex") {
     $stdinText = Get-Content -Path $activePromptFile -Raw
     $exitCode = Invoke-ExternalCommand -CommandParts $commandParts -WorkingDirectory $WorkingDirectory -StdinText $stdinText
   }
@@ -558,7 +562,7 @@ function Do-Commit(
   Invoke-Git -Args @("add", "-A") -WorkingDirectory $WorkingDirectory
 
   $message = @"
-$TaskId: $TaskTitle
+${TaskId}: $TaskTitle
 
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 "@
@@ -603,7 +607,8 @@ function Run-Task(
   [int]$MaxRetries,
   [int]$AutoCommit,
   [bool]$DryRun,
-  [string]$AgentModel,
+  [string]$ImplementModel,
+  [string]$ReviewModel,
   [string]$ImplementCommand,
   [string]$ReviewCommand,
   [string]$WorkingDirectory
@@ -670,7 +675,7 @@ function Run-Task(
 
   Write-Info "--- IMPLEMENT PASS ---"
   $implPrompt = Render-Template -TemplateFile (Join-Path $RunnerDir "implement_instructions.txt") -TaskId $TaskId -TaskTitle $taskTitle -Attempt $attempt
-  if (-not (Run-Agent -Mode "implement" -Prompt $implPrompt -RunnerDir $RunnerDir -DryRun $DryRun -AgentModel $AgentModel -ImplementCommand $ImplementCommand -ReviewCommand $ReviewCommand -WorkingDirectory $WorkingDirectory)) {
+  if (-not (Run-Agent -Mode "implement" -Prompt $implPrompt -RunnerDir $RunnerDir -DryRun $DryRun -ImplementModel $ImplementModel -ReviewModel $ReviewModel -ImplementCommand $ImplementCommand -ReviewCommand $ReviewCommand -WorkingDirectory $WorkingDirectory)) {
     Write-Err ("Implement agent exited non-zero for {0}" -f $TaskId)
     return 1
   }
@@ -687,7 +692,7 @@ function Run-Task(
 
   Write-Info "--- REVIEW PASS ---"
   $reviewPrompt = Render-Template -TemplateFile (Join-Path $RunnerDir "review_instructions.txt") -TaskId $TaskId -TaskTitle $taskTitle -Attempt $attempt
-  if (-not (Run-Agent -Mode "review" -Prompt $reviewPrompt -RunnerDir $RunnerDir -DryRun $DryRun -AgentModel $AgentModel -ImplementCommand $ImplementCommand -ReviewCommand $ReviewCommand -WorkingDirectory $WorkingDirectory)) {
+  if (-not (Run-Agent -Mode "review" -Prompt $reviewPrompt -RunnerDir $RunnerDir -DryRun $DryRun -ImplementModel $ImplementModel -ReviewModel $ReviewModel -ImplementCommand $ImplementCommand -ReviewCommand $ReviewCommand -WorkingDirectory $WorkingDirectory)) {
     Write-Err ("Review agent exited non-zero for {0}" -f $TaskId)
     return 1
   }
@@ -767,20 +772,19 @@ $promptFile = $parsedArgs.PromptFile
 $stateFile = $parsedArgs.StateFile
 $forceTask = $parsedArgs.ForceTask
 
-$agentModel = Get-EnvOrDefault -Name "AGENT_MODEL" -Default "codex"
-switch ($agentModel) {
-  "claude" {
-    $implementCommand = Get-EnvOrDefault -Name "IMPLEMENT_CMD" -Default "claude --dangerously-skip-permissions -p"
-    $reviewCommand = Get-EnvOrDefault -Name "REVIEW_CMD" -Default "claude --dangerously-skip-permissions -p"
-  }
-  "codex" {
-    $implementCommand = Get-EnvOrDefault -Name "IMPLEMENT_CMD" -Default "codex exec --full-auto -C . -"
-    $reviewCommand = Get-EnvOrDefault -Name "REVIEW_CMD" -Default "codex exec --full-auto -C . -"
-  }
-  default {
-    Die ("Unknown AGENT_MODEL: {0} (expected 'claude' or 'codex')" -f $agentModel)
+function Get-DefaultCommandForModel([string]$Model) {
+  switch ($Model) {
+    "claude" { return "claude --dangerously-skip-permissions -p" }
+    "codex" { return "codex exec --full-auto -C . -" }
+    default { Die ("Unknown model: {0} (expected 'claude' or 'codex')" -f $Model) }
   }
 }
+
+$agentModel = Get-EnvOrDefault -Name "AGENT_MODEL" -Default "codex"
+$implementModel = Get-EnvOrDefault -Name "IMPLEMENT_MODEL" -Default $agentModel
+$reviewModel = Get-EnvOrDefault -Name "REVIEW_MODEL" -Default $agentModel
+$implementCommand = Get-EnvOrDefault -Name "IMPLEMENT_CMD" -Default (Get-DefaultCommandForModel -Model $implementModel)
+$reviewCommand = Get-EnvOrDefault -Name "REVIEW_CMD" -Default (Get-DefaultCommandForModel -Model $reviewModel)
 
 $maxRetries = Get-IntEnvOrDefault -Name "MAX_RETRIES" -Default 3
 $autoCommit = Get-IntEnvOrDefault -Name "AUTO_COMMIT" -Default 1
@@ -871,7 +875,8 @@ while ($true) {
     -MaxRetries $maxRetries `
     -AutoCommit $autoCommit `
     -DryRun $dryRun `
-    -AgentModel $agentModel `
+    -ImplementModel $implementModel `
+    -ReviewModel $reviewModel `
     -ImplementCommand $implementCommand `
     -ReviewCommand $reviewCommand `
     -WorkingDirectory $workingDirectory
