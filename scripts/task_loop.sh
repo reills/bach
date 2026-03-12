@@ -96,6 +96,7 @@ MAX_RETRIES="${MAX_RETRIES:-3}"
 AUTO_COMMIT="${AUTO_COMMIT:-1}"
 STOP_ON_BLOCKED="${STOP_ON_BLOCKED:-1}"
 DRY_RUN="${DRY_RUN:-0}"
+LAST_TASK="${LAST_TASK:-}"          # stop after this task completes (e.g. LAST_TASK=P24)
 
 PROMPT_FILE="prompts.md"
 STATE_FILE=".task_runner_state.tsv"
@@ -657,6 +658,11 @@ main() {
     case "$exit_code" in
       0)
         info "Task $current_task PASSED."
+        if [[ -n "$LAST_TASK" && "$current_task" == "$LAST_TASK" ]]; then
+          info "Reached LAST_TASK=$LAST_TASK. Stopping."
+          print_state
+          exit 0
+        fi
         ;;
       2)
         info "Task $current_task will be retried on next iteration."

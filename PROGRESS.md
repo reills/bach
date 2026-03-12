@@ -182,3 +182,15 @@
 - Added `src/api/store.py` with a small replaceable repository surface plus an in-memory implementation that creates score and draft IDs, tracks integer revisions, commits or discards drafts, and raises `StaleRevisionError` on stale base revisions or stale draft commits.
 - Exported the store types from `src/api/__init__.py` and added focused coverage in `tests/test_store.py` for the full draft lifecycle and stale revision rejection.
 - Ran the exact task command `bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_store.py` and confirmed it passes with `2 passed in 1.17s`.
+
+## 2026-03-12 - P19
+
+- Added `src/api/services/inpaint.py`, a minimal window-mode inpaint preview service that creates a draft from the in-memory score repository, identifies carry-in events at the target measure boundary, preserves those carry-ins, replaces only events whose `start_tick` falls inside the selected measure, and returns draft metadata including `changed_measure_ids` and `locked_event_ids`.
+- Added `tests/test_inpaint_service.py` to cover carry-in preservation plus locked-event reporting, and one-measure replacement that leaves earlier and later measures untouched while exercising the replacement callback contract.
+- Ran the exact task command `bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_inpaint_service.py tests/test_canonical_ops.py` and confirmed it passes with `5 passed in 1.18s`.
+
+## 2026-03-12 - P19
+
+- Updated `src/api/services/inpaint.py` so `changed_measure_ids` is derived from the actual replacement-event spans instead of always reporting only the selected measure; cross-bar replacements now mark every downstream measure they overlap.
+- Extended `tests/test_inpaint_service.py` with a focused regression case for a replacement event that starts in the selected measure and sustains into the next measure, while keeping the existing carry-in preservation and single-measure replacement coverage intact.
+- Ran the exact task command `bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_inpaint_service.py tests/test_canonical_ops.py` and confirmed it passes with `6 passed in 1.17s`.
