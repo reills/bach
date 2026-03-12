@@ -1,3 +1,4 @@
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Callable, Sequence
@@ -8,6 +9,8 @@ from src.api.canonical import CanonicalScore, PartInfo, tokens_to_canonical_scor
 from src.api.render import canonical_score_to_midi, canonical_score_to_musicxml
 from src.inference.generate_v1 import GenerationConfig, GenerationResult, generate_v1
 from src.tabber import DEFAULT_MAX_FRET, tab_events
+
+XML_NS = "http://www.w3.org/XML/1998/namespace"
 
 
 @dataclass(frozen=True)
@@ -41,13 +44,14 @@ def compose_baseline(
     )
     score = tokens_to_canonical_score(generation.tokens, tpq=tpq, part_info=part_info)
     score = _tab_score(score, max_fret=max_fret)
+    score_xml = canonical_score_to_musicxml(score)
     return ComposeServiceResult(
         generation=generation,
         score=score,
-        score_xml=canonical_score_to_musicxml(score),
+        score_xml=score_xml,
         midi=canonical_score_to_midi(score),
-        measure_map=build_measure_map(score),
-        event_hit_map=build_event_hit_map(score),
+        measure_map=build_measure_map(score_xml),
+        event_hit_map=build_event_hit_map(score_xml),
     )
 
 
@@ -67,61 +71,71 @@ def _tab_score(score: CanonicalScore, *, max_fret: int) -> CanonicalScore:
     return replace(score, parts=[tabbed_part])
 
 
-def build_measure_map(score: CanonicalScore) -> dict[str, str]:
-    return {str(measure.index): measure.id for measure in score.measures}
+def build_measure_map(score: CanonicalScore | str) -> dict[str, str]:
+    root = _musicxml_root(score)
+    measure_map: dict[str, str] = {}
+
+    for bar_index, measure_el in enumerate(_measure_elements(root)):
+        measure_id = measure_el.attrib.get(f"{{{XML_NS}}}id")
+        if measure_id is None:
+            measure_id = f"measure-{bar_index + 1}"
+        measure_map[str(bar_index)] = measure_id
+
+    return measure_map
 
 
-@dataclass(frozen=True)
-class _EventSlice:
-    event_id: str
-    voice_id: int
-    start_tick: int
-    dur_tick: int
-    ordinal: int
+@dataclass
+class _VoiceBeatState:
+    beat_index: int = -1
+    note_index: int = 0
 
 
-def build_event_hit_map(score: CanonicalScore) -> dict[str, str]:
-    if len(score.parts) != 1:
-        raise ValueError("compose service supports exactly one part")
-
+def build_event_hit_map(score: CanonicalScore | str) -> dict[str, str]:
+    root = _musicxml_root(score)
     event_hit_map: dict[str, str] = {}
-    part = score.parts[0]
 
-    for measure in score.measures:
-        slices_by_voice: dict[int, list[_EventSlice]] = {}
-        for ordinal, event in enumerate(part.events):
-            if event.pitch_midi is None:
+    for bar_index, measure_el in enumerate(_measure_elements(root)):
+        states_by_voice: dict[int, _VoiceBeatState] = {}
+        for note_el in measure_el.findall("./note"):
+            voice_index = _voice_index_for_note(note_el)
+            state = states_by_voice.setdefault(voice_index, _VoiceBeatState())
+            if note_el.find("./chord") is None:
+                state.beat_index += 1
+                state.note_index = 0
+            else:
+                if state.beat_index < 0:
+                    state.beat_index = 0
+                    state.note_index = 0
+                else:
+                    state.note_index += 1
+
+            event_id = note_el.attrib.get(f"{{{XML_NS}}}id")
+            if event_id is None:
                 continue
-
-            start_tick = max(event.start_tick, measure.start_tick)
-            end_tick = min(event.end_tick, measure.end_tick)
-            if start_tick >= end_tick:
-                continue
-
-            slices_by_voice.setdefault(event.voice_id, []).append(
-                _EventSlice(
-                    event_id=event.id,
-                    voice_id=event.voice_id,
-                    start_tick=start_tick,
-                    dur_tick=end_tick - start_tick,
-                    ordinal=ordinal,
-                )
-            )
-
-        for voice_id, slices in slices_by_voice.items():
-            cursor = measure.start_tick
-            beat_index = 0
-
-            for slice_ in sorted(slices, key=lambda item: (item.start_tick, item.ordinal)):
-                if slice_.start_tick > cursor:
-                    beat_index += 1
-                    cursor = slice_.start_tick
-
-                event_hit_map[_to_hit_key(measure.index, voice_id, beat_index, 0)] = slice_.event_id
-                beat_index += 1
-                cursor = max(cursor, slice_.start_tick + slice_.dur_tick)
+            event_hit_map[_to_hit_key(bar_index, voice_index, state.beat_index, state.note_index)] = event_id
 
     return event_hit_map
+
+
+def _musicxml_root(score: CanonicalScore | str) -> ET.Element:
+    if isinstance(score, CanonicalScore):
+        if len(score.parts) != 1:
+            raise ValueError("compose service supports exactly one part")
+        score_xml = canonical_score_to_musicxml(score)
+    else:
+        score_xml = score
+    return ET.fromstring(score_xml)
+
+
+def _measure_elements(root: ET.Element) -> list[ET.Element]:
+    return root.findall("./part/measure")
+
+
+def _voice_index_for_note(note_el: ET.Element) -> int:
+    voice_text = note_el.findtext("./voice")
+    if voice_text is None:
+        return 0
+    return max(int(voice_text) - 1, 0)
 
 
 def _to_hit_key(bar_index: int, voice_index: int, beat_index: int, note_index: int) -> str:

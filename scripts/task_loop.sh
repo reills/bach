@@ -485,6 +485,20 @@ run_task() {
   } > "$TODO_FILE"
   info "Wrote $TODO_FILE"
 
+  # ── Pre-flight: if targeted tests already pass, skip the agent entirely ────
+  if [[ "$DRY_RUN" -eq 0 && -n "$task_tests" && "$attempt" -gt 1 ]]; then
+    info "Pre-flight: running targeted tests to check if work is already done..."
+    if bash docs/skills/python-test-env/scripts/run_tests.sh $task_tests >/dev/null 2>&1; then
+      info "Pre-flight PASS — tests already green. Marking $task_id completed."
+      set_task_status "$task_id" "completed"
+      do_commit "$task_id" "$task_title"
+      printf '' > "$TODO_FILE"
+      return 0
+    else
+      info "Pre-flight: tests not passing yet. Proceeding with agent."
+    fi
+  fi
+
   # ── Clean previous run artifacts ───────────────────────────────────────────
   rm -f "$FINISHED_FILE" "$REVIEW_FILE"
 
