@@ -10,6 +10,7 @@ Minimal schema (v0):
 
 - Backend object shape: `CanonicalScore { header, measures[], parts[] }`
 - Python backend types may use snake_case field names (`start_tick`, `dur_tick`, `voice_id`); the schema here names the same logical fields in frontend-style camelCase.
+- Python backend parts are stored as `Part { info: PartInfo, events[] }`; the shorthand below flattens the `PartInfo` fields to describe the same logical data.
 - Header: `tpq`, `keySigMap`, `timeSigMap`, `tempoMap`, optional `pickupTicks`
 - Parts: `{ id, instrument, tuning, capo, midiProgram, events[] }`
 - Measures: `measures[]` with `id` (UUID), `index` (0-based), `startTick`, `lengthTicks`

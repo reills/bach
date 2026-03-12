@@ -40,8 +40,21 @@
 - Kept cross-bar `dur_tick` support and optional guitar fingering metadata intact, while clarifying in `frontend-readme.md` that the Python backend model uses snake_case names for the same canonical fields.
 - Ran `bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_canonical_types.py` and confirmed the targeted canonical types tests pass with `6 passed in 0.29s`.
 
+## 2026-03-12 - P03
+
+- Re-read `TODO.md` and verified the current canonical score model under `src/api/canonical/types.py` already satisfies the task shape and invariants for headers, parts, measures, events, optional guitar fingering, cross-bar sustains, and per-part `voice_id` numbering.
+- Re-ran the exact targeted task command `bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_canonical_types.py`; it passed with `6 passed in 0.27s`.
+- Wrote the required task handoff files for this run without changing the canonical-score implementation further.
+
 ## 2026-03-12 - P02
 
 - Verified the existing FastAPI backend skeleton still matches `TODO.md`: `src/api/app.py` exposes `create_app()` and registers the `/healthz` router from `src/api/routes/health.py`.
 - Re-ran the exact targeted task command `bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_api_health.py`; it passed with `1 passed in 0.19s`.
 - Wrote the required task handoff files for this run without changing unrelated code.
+
+## 2026-03-12 - P03
+
+- Tightened `src/api/canonical/types.py` so `Part` and `CanonicalScore` reject non-canonical nested objects with explicit `ValueError`s instead of failing later through attribute access.
+- Added focused construction tests in `tests/test_canonical_types.py` for invalid nested `Part`, `ScoreHeader`, `Measure`, and `Part` container entries, keeping the existing timing, ID, and voice invariants intact.
+- Clarified `frontend-readme.md` so the documented canonical schema now notes that backend `Part` objects store `info: PartInfo` plus `events`, while describing the same logical fields for the frontend.
+- Ran `bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_canonical_types.py` and confirmed the targeted canonical types tests pass with `8 passed in 0.28s`.

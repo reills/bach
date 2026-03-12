@@ -9,12 +9,12 @@
 ## Rules
 - Do one task per run.
 - Prefer small diffs; don't refactor unrelated code.
-- Always run tests for touched areas (use `bash docs/skills/python-test-env/scripts/run_tests.sh`).
+- Always run the test command from the "Test Command" section of TODO.md (targeted tests only, not the full suite).
 - Don't weaken or remove tests to make them pass.
 - If you add a new feature without tests, add tests in the same run.
 - Do not hard-code tests; test real behavior.
 - If tests fail, find and fix the underlying code issue before proceeding.
-- Write summary of what changed to `\finished_prompt_summary\prompt#` when finished.
+- Write summary of what changed to `finished.md` when finished (the task runner archives it automatically).
 - Don't add heavy deps without asking.
 
 ## Current Baseline

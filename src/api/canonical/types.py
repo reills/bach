@@ -154,6 +154,13 @@ class Part:
     info: PartInfo
     events: list[Event] = field(default_factory=list)
 
+    def __post_init__(self) -> None:
+        if not isinstance(self.info, PartInfo):
+            raise ValueError("part info must be a PartInfo instance")
+        for event in self.events:
+            if not isinstance(event, Event):
+                raise ValueError("part events must be Event instances")
+
 
 @dataclass(frozen=True)
 class CanonicalScore:
@@ -162,6 +169,8 @@ class CanonicalScore:
     parts: list[Part]
 
     def __post_init__(self) -> None:
+        if not isinstance(self.header, ScoreHeader):
+            raise ValueError("header must be a ScoreHeader instance")
         if not self.measures:
             raise ValueError("canonical score requires at least one measure")
         if not self.parts:
@@ -170,6 +179,8 @@ class CanonicalScore:
         measure_ids: set[str] = set()
         expected_start_tick = 0
         for expected_index, measure in enumerate(self.measures):
+            if not isinstance(measure, Measure):
+                raise ValueError("measures must contain Measure instances")
             if measure.id in measure_ids:
                 raise ValueError(f"duplicate measure id: {measure.id}")
             if measure.index != expected_index:
@@ -184,6 +195,8 @@ class CanonicalScore:
         event_ids: set[str] = set()
 
         for part in self.parts:
+            if not isinstance(part, Part):
+                raise ValueError("parts must contain Part instances")
             part_id = part.info.id
             if part_id in part_ids:
                 raise ValueError(f"duplicate part id: {part_id}")

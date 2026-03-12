@@ -98,6 +98,17 @@ def test_canonical_score_rejects_duplicate_event_ids():
         )
 
 
+def test_part_rejects_non_canonical_nested_objects():
+    with pytest.raises(ValueError, match="part info must be a PartInfo instance"):
+        Part(info="guitar")  # type: ignore[arg-type]
+
+    with pytest.raises(ValueError, match="part events must be Event instances"):
+        Part(
+            info=PartInfo(id="guitar", instrument="classical_guitar"),
+            events=["ev-1"],  # type: ignore[list-item]
+        )
+
+
 def test_canonical_score_rejects_gapped_voice_ids_within_a_part():
     with pytest.raises(ValueError, match="part voice_ids must be contiguous per part starting at 0"):
         CanonicalScore(
@@ -112,6 +123,29 @@ def test_canonical_score_rejects_gapped_voice_ids_within_a_part():
                     ],
                 )
             ],
+        )
+
+
+def test_canonical_score_rejects_non_canonical_container_entries():
+    with pytest.raises(ValueError, match="header must be a ScoreHeader instance"):
+        CanonicalScore(
+            header="header",  # type: ignore[arg-type]
+            measures=make_measures(),
+            parts=[Part(info=PartInfo(id="guitar", instrument="classical_guitar"))],
+        )
+
+    with pytest.raises(ValueError, match="measures must contain Measure instances"):
+        CanonicalScore(
+            header=make_header(),
+            measures=["m1"],  # type: ignore[list-item]
+            parts=[Part(info=PartInfo(id="guitar", instrument="classical_guitar"))],
+        )
+
+    with pytest.raises(ValueError, match="parts must contain Part instances"):
+        CanonicalScore(
+            header=make_header(),
+            measures=make_measures(),
+            parts=["guitar"],  # type: ignore[list-item]
         )
 
 
