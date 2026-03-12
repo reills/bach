@@ -71,3 +71,9 @@
 - Exported the new helpers from `src/api/canonical/__init__.py` without changing the existing token-to-canonical conversion path.
 - Added focused coverage in `tests/test_canonical_ops.py` for measure/event lookup, carry-in detection versus in-measure starts, and one-measure event replacement that preserves carry-in and later-measure events.
 - Ran `bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_canonical_ops.py` and confirmed the targeted tests pass with `3 passed in 0.27s`.
+
+## 2026-03-12 - P06
+
+- Added a minimal canonical-score MusicXML exporter in `src/api/render/musicxml.py` for a single part, emitting measure and note `xml:id` values, `divisions` from `header.tpq`, and barline-aware note splitting with MusicXML tie start/stop markers.
+- Added focused coverage in `tests/test_musicxml_export.py` for exported `xml:id` values, `divisions`, and cross-bar note splitting that keeps the same logical canonical event ID on both tied note fragments.
+- Ran `bash docs/skills/python-test-env/scripts/run_tests.sh tests/test_musicxml_export.py` and confirmed the targeted tests pass with `2 passed in 0.27s`.
