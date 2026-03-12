@@ -5,21 +5,24 @@ ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$ROOT"
 
 pick_python() {
-  if CONDA_NO_PLUGINS=true conda run -n bach python -V >/dev/null 2>&1; then
-    echo "CONDA_NO_PLUGINS=true conda run -n bach python"
+  if CONDA_NO_PLUGINS=true conda run -n bach-gen python -V >/dev/null 2>&1; then
+    echo "CONDA_NO_PLUGINS=true conda run -n bach-gen python"
     return 0
   fi
 
-  if [[ -x ".venv/bin/python" ]]; then
-    echo ".venv/bin/python"
-    return 0
-  fi
+  # Fallback: venv with a real (non-broken) python binary
+  for candidate in ".venv/bin/python" ".venv/Scripts/python.exe"; do
+    if [[ -x "$candidate" ]] && "$candidate" -V >/dev/null 2>&1; then
+      echo "$candidate"
+      return 0
+    fi
+  done
 
   return 1
 }
 
 if ! PYTHON_CMD="$(pick_python)"; then
-  echo "No usable Python runtime found. Expected conda env 'bach' or executable .venv/bin/python." >&2
+  echo "No usable Python runtime found. Expected conda env 'bach-gen' or a working .venv." >&2
   exit 1
 fi
 

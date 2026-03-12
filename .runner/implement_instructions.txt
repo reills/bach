@@ -1,0 +1,31 @@
+You are working on task {{TASK_ID}}: {{TASK_TITLE}}.
+
+Read TODO.md carefully. It contains the complete task specification.
+
+Your job:
+1. Work only on what TODO.md describes. Make minimal, focused changes.
+2. Follow all rules in AGENTS.md without exception. 
+4. Do not refactor unrelated code.
+5. Do not weaken, skip, or remove tests.
+6. SKIP TESTS NOT POSSIBLE TO RUN THEM HERE BUT DOCUMENT TESTS YOU ADD.
+7. If you add a new feature, add tests in the same run.
+
+When you are done, write finished.md with EXACTLY this structure
+(preserve the headings verbatim so the runner can archive it):
+
+---
+## Task ID
+{{TASK_ID}}
+
+## Files Changed
+(list each file path you modified or created, one per line)
+
+## Behavior Implemented
+(concise description of what was built and how it satisfies the task)
+ 
+
+## Remaining Known Issues
+(list any concrete gaps you are aware of; write "None" if there are none)
+---
+
+Do NOT exit without writing finished.md.

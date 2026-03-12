@@ -1,7 +1,7 @@
 # AGENTS.md — bach-gen
 
 ## How to run
-- Preferred runtime: `conda run -n bach python`
+- Preferred runtime: `conda run -n bach-gen python`
 - Optional venv fallback: `python -m venv .venv && source .venv/bin/activate`
 - Environment/test helper: `bash docs/skills/python-test-env/scripts/run_tests.sh --check`
 - Tests: `bash docs/skills/python-test-env/scripts/run_tests.sh`
@@ -14,6 +14,18 @@
 - If you add a new feature without tests, add tests in the same run.
 - Do not hard-code tests; test real behavior.
 - If tests fail, find and fix the underlying code issue before proceeding.
-- Update `TODO.md` when items are completed.
-- Append a short entry to `PROGRESS.md` for each change set.
+- Write summary of what changed to `\finished_prompt_summary\prompt#` when finished.
 - Don't add heavy deps without asking.
+
+## Current Baseline
+These parts already exist and should usually be reused, not rewritten:
+- Token schema and tokenizer in `src/tokens/schema.py`, `src/tokens/tokenizer.py`
+- MusicXML eventization in `src/tokens/eventizer.py`
+- Round-trip helpers in `src/tokens/roundtrip.py`
+- Dataset builder and vocab builder in `scripts/make_dataset.py`, `scripts/build_vocab.py`
+- Bar descriptor logic in `src/dataio/descriptors.py`
+- Dataset loading and packing in `src/dataio/dataset.py`, `src/dataio/collate_miditok.py`
+- NoteLM model skeleton in `src/models/notelm/model.py`
+- Basic decoding helpers in `src/utils/decoding/sampler.py`, `src/utils/decoding/rules.py`, `src/utils/decoding/scg.py`
+- Frontend shell and AlphaTab viewer in `frontend/src/App.tsx`, `frontend/src/components/ScoreViewer.tsx`
+- Local frontend mock mode in `frontend/src/mock/localData.ts`

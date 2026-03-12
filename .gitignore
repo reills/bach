@@ -48,6 +48,13 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# task runner: temp and state files (state file is intentionally tracked if you want resume)
+.task_runner_state.tsv.bak.*
+.runner/implement_active_prompt.txt
+.runner/review_active_prompt.txt
+finished.md
+review.md
+
 # frontend build artifacts
 /frontend/node_modules/
 /frontend/dist/

@@ -1,0 +1,6 @@
+P02 summary:
+- Confirmed the existing FastAPI backend skeleton already satisfies the task requirements.
+- `src/api/app.py` exposes `create_app()` and registers the `/healthz` route.
+- `src/api/routes/health.py` returns `{"status": "ok"}` for `GET /healthz`.
+- `tests/test_api_health.py` already covers the health check with `TestClient`.
+- Added `PROGRESS.md` and documented that tests were intentionally not run in this environment.
