@@ -7,8 +7,7 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
 
 from src.api.canonical import CanonicalScore
-from src.api.compose_service import ComposeServiceResult, build_event_hit_map, build_measure_map
-from src.api.render import canonical_score_to_musicxml
+from src.api.compose_service import ComposeServiceResult, export_score
 from src.api.services import preview_window_inpaint
 from src.api.store import (
     DraftNotFoundError,
@@ -150,8 +149,8 @@ def create_router(
             scoreXML=result.score_xml,
             baseRevision=result.base_revision,
             highlightMeasureId=result.highlight_measure_id,
-            measureMap=build_measure_map(result.score),
-            eventHitMap=build_event_hit_map(result.score),
+            measureMap=result.measure_map,
+            eventHitMap=result.event_hit_map,
             lockedEventIds=result.locked_event_ids,
             changedMeasureIds=result.changed_measure_ids,
         )
@@ -165,11 +164,12 @@ def create_router(
         except StaleRevisionError as exc:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
+        exported = export_score(committed.score)
         return CommitDraftResponse(
-            scoreXML=canonical_score_to_musicxml(committed.score),
+            scoreXML=exported.score_xml,
             revision=committed.revision,
-            measureMap=build_measure_map(committed.score),
-            eventHitMap=build_event_hit_map(committed.score),
+            measureMap=exported.measure_map,
+            eventHitMap=exported.event_hit_map,
         )
 
     @router.post("/discard_draft", response_model=DiscardDraftResponse)

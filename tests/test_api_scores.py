@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 
 from src.api import create_app
 from src.api.canonical import CanonicalScore, Event, Measure, Part, PartInfo, ScoreHeader
-from src.api.compose_service import ComposeServiceResult, build_event_hit_map, build_measure_map
+from src.api.compose_service import ComposeServiceResult, build_event_hit_map, build_measure_map, export_score
 from src.api.render import canonical_score_to_midi, canonical_score_to_musicxml
 from src.api.services import preview_window_inpaint
 from src.api.store import InMemoryScoreRepository
@@ -51,20 +51,37 @@ def _build_score() -> CanonicalScore:
     )
 
 
+def _assert_measure_map(payload: dict, *, expected: dict[str, str]) -> None:
+    assert payload["measureMap"] == expected
+    assert list(payload["measureMap"].keys()) == ["0", "1", "2"]
+    assert all(isinstance(measure_id, str) and measure_id for measure_id in payload["measureMap"].values())
+
+
+def _assert_event_hit_map(payload: dict, *, expected: dict[str, str]) -> None:
+    assert payload["eventHitMap"] == expected
+    assert payload["eventHitMap"]
+    for hit_key, event_id in payload["eventHitMap"].items():
+        parts = hit_key.split("|")
+        assert len(parts) == 4
+        assert all(part.isdigit() for part in parts)
+        assert isinstance(event_id, str) and event_id
+
+
 def test_compose_route_stores_generated_score_and_returns_frontend_payload():
     repository = InMemoryScoreRepository[CanonicalScore]()
     score = _build_score()
     captured: dict[str, object] = {}
+    exported = export_score(score)
 
     def fake_compose_service(request) -> ComposeServiceResult:
         captured["request"] = request.model_dump()
         return ComposeServiceResult(
             generation=GenerationResult(ids=[1, 2], tokens=["BAR", "EOS"], stopped_on_eos=True),
             score=score,
-            score_xml=canonical_score_to_musicxml(score),
+            score_xml=exported.score_xml,
             midi=canonical_score_to_midi(score),
-            measure_map=build_measure_map(score),
-            event_hit_map=build_event_hit_map(score),
+            measure_map=exported.measure_map,
+            event_hit_map=exported.event_hit_map,
         )
 
     client = CompatTestClient(
@@ -96,8 +113,8 @@ def test_compose_route_stores_generated_score_and_returns_frontend_payload():
     assert payload["scoreId"] == "score-1"
     assert payload["revision"] == 1
     assert payload["scoreXML"] == canonical_score_to_musicxml(score)
-    assert payload["measureMap"] == build_measure_map(score)
-    assert payload["eventHitMap"] == build_event_hit_map(score)
+    _assert_measure_map(payload, expected=build_measure_map(score))
+    _assert_event_hit_map(payload, expected=build_event_hit_map(score))
     assert base64.b64decode(payload["midi"]) == canonical_score_to_midi(score)
 
     stored = repository.get_score(payload["scoreId"])
@@ -128,7 +145,14 @@ def test_preview_then_commit_routes_update_score_and_revision():
         assert preview_payload["highlightMeasureId"] == "m1"
         assert preview_payload["changedMeasureIds"] == ["m1"]
         assert preview_payload["lockedEventIds"] == ["carry"]
-        assert preview_payload["measureMap"] == {"0": "m0", "1": "m1", "2": "m2"}
+        _assert_measure_map(
+            preview_payload,
+            expected={"0": "m0", "1": "m1", "2": "m2"},
+        )
+        _assert_event_hit_map(
+            preview_payload,
+            expected=build_event_hit_map(preview_payload["scoreXML"]),
+        )
         assert "part-0-m1-regen-0" in preview_payload["scoreXML"]
 
         commit_response = client.post(
@@ -145,7 +169,14 @@ def test_preview_then_commit_routes_update_score_and_revision():
     commit_payload = commit_response.json()
     assert commit_payload["revision"] == 2
     assert "part-0-m1-regen-0" in commit_payload["scoreXML"]
-    assert commit_payload["measureMap"] == {"0": "m0", "1": "m1", "2": "m2"}
+    _assert_measure_map(
+        commit_payload,
+        expected={"0": "m0", "1": "m1", "2": "m2"},
+    )
+    _assert_event_hit_map(
+        commit_payload,
+        expected=build_event_hit_map(commit_payload["scoreXML"]),
+    )
     assert "part-0-m1-regen-0" in commit_payload["eventHitMap"].values()
 
     committed = repository.get_score(stored_score.score_id)

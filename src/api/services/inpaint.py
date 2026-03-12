@@ -13,7 +13,7 @@ from src.api.canonical import (
     measure_by_id,
     replace_events_in_measure,
 )
-from src.api.render import canonical_score_to_musicxml
+from src.api.compose_service import export_score
 from src.api.store import ScoreDraftRepository
 
 ReplacementPlanner = Callable[[Part, Measure, list[Event], list[Event]], list[Event]]
@@ -24,6 +24,8 @@ class InpaintWindowResult:
     draft_id: str
     score: CanonicalScore
     score_xml: str
+    measure_map: dict[str, str]
+    event_hit_map: dict[str, str]
     base_revision: int
     highlight_measure_id: str
     locked_event_ids: list[str]
@@ -47,10 +49,13 @@ def preview_window_inpaint(
         replacement_planner=replacement_planner,
     )
     saved_draft = repository.save_draft(draft.draft_id, updated_score)
+    exported = export_score(saved_draft.score)
     return InpaintWindowResult(
         draft_id=saved_draft.draft_id,
         score=saved_draft.score,
-        score_xml=canonical_score_to_musicxml(saved_draft.score),
+        score_xml=exported.score_xml,
+        measure_map=exported.measure_map,
+        event_hit_map=exported.event_hit_map,
         base_revision=saved_draft.base_revision,
         highlight_measure_id=measure_id,
         locked_event_ids=effective_locked_ids,

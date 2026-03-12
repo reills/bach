@@ -23,6 +23,13 @@ class ComposeServiceResult:
     event_hit_map: dict[str, str]
 
 
+@dataclass(frozen=True)
+class ScoreExport:
+    score_xml: str
+    measure_map: dict[str, str]
+    event_hit_map: dict[str, str]
+
+
 def compose_baseline(
     checkpoint_path: str | Path,
     *,
@@ -44,14 +51,14 @@ def compose_baseline(
     )
     score = tokens_to_canonical_score(generation.tokens, tpq=tpq, part_info=part_info)
     score = _tab_score(score, max_fret=max_fret)
-    score_xml = canonical_score_to_musicxml(score)
+    exported = export_score(score)
     return ComposeServiceResult(
         generation=generation,
         score=score,
-        score_xml=score_xml,
+        score_xml=exported.score_xml,
         midi=canonical_score_to_midi(score),
-        measure_map=build_measure_map(score_xml),
-        event_hit_map=build_event_hit_map(score_xml),
+        measure_map=exported.measure_map,
+        event_hit_map=exported.event_hit_map,
     )
 
 
@@ -71,10 +78,27 @@ def _tab_score(score: CanonicalScore, *, max_fret: int) -> CanonicalScore:
     return replace(score, parts=[tabbed_part])
 
 
-def build_measure_map(score: CanonicalScore | str) -> dict[str, str]:
-    root = _musicxml_root(score)
-    measure_map: dict[str, str] = {}
+def export_score(score: CanonicalScore | str) -> ScoreExport:
+    if isinstance(score, CanonicalScore):
+        if len(score.parts) != 1:
+            raise ValueError("compose service supports exactly one part")
+        score_xml = canonical_score_to_musicxml(score)
+    else:
+        score_xml = score
+    root = ET.fromstring(score_xml)
+    return ScoreExport(
+        score_xml=score_xml,
+        measure_map=_build_measure_map(root),
+        event_hit_map=_build_event_hit_map(root),
+    )
 
+
+def build_measure_map(score: CanonicalScore | str) -> dict[str, str]:
+    return _build_measure_map(_musicxml_root(score))
+
+
+def _build_measure_map(root: ET.Element) -> dict[str, str]:
+    measure_map: dict[str, str] = {}
     for bar_index, measure_el in enumerate(_measure_elements(root)):
         measure_id = measure_el.attrib.get(f"{{{XML_NS}}}id")
         if measure_id is None:
@@ -91,9 +115,11 @@ class _VoiceBeatState:
 
 
 def build_event_hit_map(score: CanonicalScore | str) -> dict[str, str]:
-    root = _musicxml_root(score)
-    event_hit_map: dict[str, str] = {}
+    return _build_event_hit_map(_musicxml_root(score))
 
+
+def _build_event_hit_map(root: ET.Element) -> dict[str, str]:
+    event_hit_map: dict[str, str] = {}
     for bar_index, measure_el in enumerate(_measure_elements(root)):
         states_by_voice: dict[int, _VoiceBeatState] = {}
         for note_el in measure_el.findall("./note"):

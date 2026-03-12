@@ -1,6 +1,5 @@
 from src.api.canonical import CanonicalScore, Event, Measure, Part, PartInfo, ScoreHeader
-from src.api.compose_service import build_event_hit_map, build_measure_map
-from src.api.render import canonical_score_to_musicxml
+from src.api.compose_service import build_event_hit_map, build_measure_map, export_score
 
 
 def _build_polyphonic_score() -> CanonicalScore:
@@ -32,7 +31,8 @@ def _build_polyphonic_score() -> CanonicalScore:
 
 def test_hit_maps_follow_exported_polyphonic_musicxml_structure():
     score = _build_polyphonic_score()
-    score_xml = canonical_score_to_musicxml(score)
+    exported = export_score(score)
+    score_xml = exported.score_xml
 
     expected_measure_map = {
         "0": "m0",
@@ -51,6 +51,8 @@ def test_hit_maps_follow_exported_polyphonic_musicxml_structure():
     assert build_measure_map(score_xml) == expected_measure_map
     assert build_event_hit_map(score) == expected_event_hit_map
     assert build_event_hit_map(score_xml) == expected_event_hit_map
+    assert exported.measure_map == expected_measure_map
+    assert exported.event_hit_map == expected_event_hit_map
 
 
 def test_event_hit_map_tracks_note_index_for_chord_notes_in_musicxml():
