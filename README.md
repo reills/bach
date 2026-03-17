@@ -199,6 +199,12 @@ Serve the default FastAPI app:
 CONDA_NO_PLUGINS=true conda run -n bach python -m uvicorn src.api.app:app --reload
 ```
 
+If port 8000 is already in use (e.g. another app), specify a different port:
+
+```bash
+CONDA_NO_PLUGINS=true conda run -n bach python -m uvicorn src.api.app:app --reload --port 8001
+```
+
 Health check:
 
 ```bash
