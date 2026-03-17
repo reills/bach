@@ -11,9 +11,41 @@ What is shipped in this repo today:
 - FastAPI score, draft, inpaint, and fingering route contract
 - React + Vite + AlphaTab frontend with API mode, local test-data mode, and demo mode
 
-[frontend-readme.md](/mnt/c/Users/Admin/dev/bach_gen/frontend-readme.md) is the frontend/backend architecture contract. The root README is the practical setup and usage guide.
+This README is now both the setup guide and the short-form design record for the project. The frontend contract and browser workflow live in [frontend/README.md](/mnt/c/Users/Admin/dev/bach_gen/frontend/README.md).
 
-## 1. Prerequisites
+## 1. Project Shape
+
+The original project plan had more long-range material than the repo needed day to day. The important parts worth preserving are:
+
+- `NoteLM` composes symbolic music only. In v1 it does not generate string/fret tokens.
+- The guitar `Tabber` runs after composition and assigns playable `(string, fret)` positions under guitar constraints.
+- MusicXML is a render/export format. The backend/frontend editing flow is built around a canonical score model, not MusicXML as the source of truth.
+- The generation loop is meant to be fast preview -> inspect -> inpaint/repair -> export, not one giant offline batch step.
+
+## 2. Core Representation Notes
+
+These are the main historical design decisions from the original planning docs that still matter when reading the code:
+
+- `VOICE_v` means an internal continuity track, not a score part or SATB label.
+- Absolute pitch is reconstructed from `ABS_VOICE_*` anchors plus `MEL_INT12` deltas.
+- `HARM_*` tokens are derived interval features, not the source of pitch truth.
+- Token timing uses `TPQ = 24` so binary and ternary subdivisions both quantize cleanly.
+- Generated output maps `VOICE_v` directly to canonical `voiceId = v` for the single guitar part.
+- Exact doublings may be collapsed during preprocessing, so round-trip reconstruction targets a collapsed symbolic score, not original orchestration detail.
+
+Practical v1 token bundle shape for a pitched onset:
+
+```text
+VOICE_v, DUR_{ticks}, MEL_INT12_{delta}, HARM_OCT_{o|NA}, HARM_CLASS_{c|NA}
+```
+
+Practical implications:
+
+- illegal generations are usually token-grammar or playability problems, not just "bad MusicXML"
+- `/compose` is symbolic generation followed by token parsing and tab assignment
+- if symbolic notes parse but cannot be fingered, failure happens in the tab stage, not the language model stage
+
+## 3. Prerequisites
 
 Preferred Python runtime:
 
@@ -42,7 +74,7 @@ Frontend runtime:
 - `npm install` in `frontend/` is the supported setup path
 - running `npm install` at the repo root fails by design because there is no root `package.json`
 
-## 2. Repository Map
+## 4. Repository Map
 
 - [scripts/make_dataset.py](/mnt/c/Users/Admin/dev/bach_gen/scripts/make_dataset.py): MusicXML to bar-level parquet dataset
 - [scripts/build_vocab.py](/mnt/c/Users/Admin/dev/bach_gen/scripts/build_vocab.py): token vocab builder
@@ -53,7 +85,7 @@ Frontend runtime:
 - [src/api/routes/scores.py](/mnt/c/Users/Admin/dev/bach_gen/src/api/routes/scores.py): compose, inpaint, draft, and fingering routes
 - [frontend/src/App.tsx](/mnt/c/Users/Admin/dev/bach_gen/frontend/src/App.tsx): browser workflow shell
 
-## 3. Build Data
+## 5. Build Data
 
 Convert MusicXML into the parquet dataset used by training:
 
@@ -84,7 +116,7 @@ Default outputs:
 - `data/processed/plans.parquet`
 - `data/processed/vocab.json`
 
-## 4. Train NoteLM v1
+## 6. Train NoteLM v1
 
 Minimal practical first run:
 
@@ -144,7 +176,7 @@ Checkpoint files land in `out/notelm_v1/notelm_step<N>.pt` and include:
 - UTC timestamp
 - original training args
 
-## 5. Compose and Evaluate
+## 7. Compose and Evaluate
 
 The concrete shipped compose path is [scripts/generate_example.py](/mnt/c/Users/Admin/dev/bach_gen/scripts/generate_example.py).
 
@@ -191,7 +223,7 @@ CONDA_NO_PLUGINS=true conda run -n bach python scripts/eval_basic.py \
   --vocab data/processed/vocab.json
 ```
 
-## 6. Run the Backend
+## 8. Run the Backend
 
 Serve the default FastAPI app:
 
@@ -199,7 +231,7 @@ Serve the default FastAPI app:
 CONDA_NO_PLUGINS=true conda run -n bach python -m uvicorn src.api.app:app --reload
 ```
 
-If port 8000 is already in use (e.g. another app), specify a different port:
+If port 8000 is already in use, specify a different port:
 
 ```bash
 CONDA_NO_PLUGINS=true conda run -n bach python -m uvicorn src.api.app:app --reload --port 8001
@@ -244,19 +276,6 @@ Optional launcher env vars:
 - `BACH_GEN_TEMPERATURE` defaults to `1.0`
 - `BACH_GEN_TOP_P` defaults to `0.9`
 
-Because of that, the practical ways to exercise the shipped backend today are:
-
-1. Use `scripts/generate_example.py` for compose pipeline output.
-2. Run the focused API tests for compose, inpaint, drafts, and fingering:
-
-```bash
-bash docs/skills/python-test-env/scripts/run_tests.sh \
-  tests/test_compose_service.py \
-  tests/test_api_scores.py \
-  tests/test_api_fingering.py \
-  tests/test_api_errors.py
-```
-
 Important routes and payload families:
 
 - `POST /compose`
@@ -266,9 +285,7 @@ Important routes and payload families:
 - `POST /alt_positions`
 - `POST /apply_fingering`
 
-The canonical frontend contract for those payloads lives in [frontend-readme.md](/mnt/c/Users/Admin/dev/bach_gen/frontend-readme.md).
-
-## 7. Run the Frontend
+## 9. Run the Frontend
 
 Install and start the Vite app:
 
@@ -292,9 +309,9 @@ cd frontend
 VITE_USE_LOCAL_DATA=true npm run dev
 ```
 
-See [frontend/README.md](/mnt/c/Users/Admin/dev/bach_gen/frontend/README.md) for the browser workflow in detail.
+See [frontend/README.md](/mnt/c/Users/Admin/dev/bach_gen/frontend/README.md) for the browser workflow and frontend/backend contract.
 
-## 8. Exercise the MVP
+## 10. Exercise the MVP
 
 ### A. Compose pipeline
 
@@ -333,19 +350,7 @@ That test covers:
 - applying one or more fingering selections
 - confirming MusicXML pitch content stays unchanged while technical tags update
 
-## 9. Frontend Architecture Contract
-
-[frontend-readme.md](/mnt/c/Users/Admin/dev/bach_gen/frontend-readme.md) is the contract for:
-
-- canonical score shape
-- MusicXML export expectations
-- measure and event identity
-- inpaint and fingering API semantics
-- AlphaTab rendering assumptions
-
-Use it when changing backend payloads or frontend state assumptions.
-
-## 10. Focused Test Commands
+## 11. Focused Test Commands
 
 Backend and training smoke coverage used most often:
 

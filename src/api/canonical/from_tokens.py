@@ -1,4 +1,4 @@
-from dataclasses import replace
+from dataclasses import dataclass, field, replace
 from uuid import NAMESPACE_URL, uuid5
 
 from src.api.canonical.types import (
@@ -21,12 +21,73 @@ from src.tokens.tokenizer import parse_voice_event
 DEFAULT_GUITAR_TUNING = [40, 45, 50, 55, 59, 64]
 
 
+@dataclass(frozen=True)
+class ParseIssue:
+    kind: str
+    bar_index: int
+    token_index: int
+    token: str
+    message: str
+
+
+@dataclass
+class ParseDiagnostics:
+    skipped_invalid_voice_events: int = 0
+    skipped_voice_before_pos: int = 0
+    skipped_missing_anchor: int = 0
+    parsed_pitched_events: int = 0
+    parsed_rest_events: int = 0
+    issues: list[ParseIssue] = field(default_factory=list)
+    max_issues: int = 8
+
+    def add_issue(
+        self,
+        *,
+        kind: str,
+        bar_index: int,
+        token_index: int,
+        token: str,
+        message: str,
+    ) -> None:
+        if len(self.issues) >= self.max_issues:
+            return
+        self.issues.append(
+            ParseIssue(
+                kind=kind,
+                bar_index=bar_index,
+                token_index=token_index,
+                token=token,
+                message=message,
+            )
+        )
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "skipped_invalid_voice_events": self.skipped_invalid_voice_events,
+            "skipped_voice_before_pos": self.skipped_voice_before_pos,
+            "skipped_missing_anchor": self.skipped_missing_anchor,
+            "parsed_pitched_events": self.parsed_pitched_events,
+            "parsed_rest_events": self.parsed_rest_events,
+            "issues": [
+                {
+                    "kind": issue.kind,
+                    "bar_index": issue.bar_index,
+                    "token_index": issue.token_index,
+                    "token": issue.token,
+                    "message": issue.message,
+                }
+                for issue in self.issues
+            ],
+        }
+
+
 def tokens_to_canonical_score(
     tokens: list[str],
     tpq: int = 24,
     part_info: PartInfo | None = None,
     *,
     ignore_invalid_events: bool = False,
+    diagnostics: ParseDiagnostics | None = None,
 ) -> CanonicalScore:
     bars = split_bars(tokens)
     if not bars:
@@ -72,11 +133,13 @@ def tokens_to_canonical_score(
         events.extend(
             _events_from_bar(
                 bar_tokens=bar_tokens,
+                bar_index=bar_index,
                 bar_start_tick=bar_start_tick,
                 part_info=part_info,
                 prev_pitch=prev_pitch,
                 voice_id_map=voice_id_map,
                 ignore_invalid_events=ignore_invalid_events,
+                diagnostics=diagnostics,
             )
         )
         bar_start_tick = measure.end_tick
@@ -131,12 +194,14 @@ def _bar_length_ticks(time_sig: str, tpq: int) -> int:
 
 def _events_from_bar(
     bar_tokens: list[str],
+    bar_index: int,
     bar_start_tick: int,
     part_info: PartInfo,
     prev_pitch: dict[int, int | None],
     voice_id_map: dict[int, int],
     *,
     ignore_invalid_events: bool,
+    diagnostics: ParseDiagnostics | None,
 ) -> list[Event]:
     events: list[Event] = []
     event_counts: dict[tuple[int, int], int] = {}
@@ -172,14 +237,32 @@ def _events_from_bar(
         if token.startswith("VOICE_"):
             try:
                 voice_event, next_idx = parse_voice_event(bar_tokens, idx)
-            except ValueError:
+            except ValueError as exc:
                 if ignore_invalid_events:
+                    if diagnostics is not None:
+                        diagnostics.skipped_invalid_voice_events += 1
+                        diagnostics.add_issue(
+                            kind="invalid_voice_event",
+                            bar_index=bar_index,
+                            token_index=idx,
+                            token=token,
+                            message=str(exc),
+                        )
                     idx = _skip_invalid_voice_event(bar_tokens, idx)
                     continue
                 raise
 
             if current_pos_tick is None:
                 if ignore_invalid_events:
+                    if diagnostics is not None:
+                        diagnostics.skipped_voice_before_pos += 1
+                        diagnostics.add_issue(
+                            kind="voice_before_pos",
+                            bar_index=bar_index,
+                            token_index=idx,
+                            token=token,
+                            message=f"VOICE token before POS in bar starting at tick {bar_start_tick}",
+                        )
                     idx = next_idx
                     continue
                 raise ValueError(f"VOICE token before POS in bar starting at tick {bar_start_tick}")
@@ -199,12 +282,23 @@ def _events_from_bar(
                         voice_id=canonical_voice_id,
                     )
                 )
+                if diagnostics is not None:
+                    diagnostics.parsed_rest_events += 1
                 idx = next_idx
                 continue
 
             previous_pitch = prev_pitch.get(voice_event.voice)
             if previous_pitch is None:
                 if ignore_invalid_events:
+                    if diagnostics is not None:
+                        diagnostics.skipped_missing_anchor += 1
+                        diagnostics.add_issue(
+                            kind="missing_anchor",
+                            bar_index=bar_index,
+                            token_index=idx,
+                            token=token,
+                            message=f"missing anchor before VOICE_{voice_event.voice} at tick {current_pos_tick}",
+                        )
                     idx = next_idx
                     continue
                 raise ValueError(f"missing anchor before VOICE_{voice_event.voice} at tick {current_pos_tick}")
@@ -221,6 +315,8 @@ def _events_from_bar(
                     fingering=_to_fingering(voice_event.string, voice_event.fret, len(part_info.tuning)),
                 )
             )
+            if diagnostics is not None:
+                diagnostics.parsed_pitched_events += 1
             idx = next_idx
             continue
 

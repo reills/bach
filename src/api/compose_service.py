@@ -1,16 +1,24 @@
+import json
+import os
 import xml.etree.ElementTree as ET
-from dataclasses import dataclass, replace
+from dataclasses import asdict, dataclass, replace
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Sequence
+from uuid import uuid4
 
 import torch
 
 from src.api.canonical import CanonicalScore, PartInfo, tokens_to_canonical_score
+from src.api.canonical.from_tokens import ParseDiagnostics
 from src.api.render import canonical_score_to_midi, canonical_score_to_musicxml
 from src.inference.generate_v1 import GenerationConfig, GenerationResult, generate_v1
 from src.tabber import DEFAULT_MAX_FRET, tab_events
+from src.tokens.validator import validate_harm_tokens
 
 XML_NS = "http://www.w3.org/XML/1998/namespace"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_FAILURE_DIR = REPO_ROOT / "out" / "compose_failures"
 
 
 @dataclass(frozen=True)
@@ -30,6 +38,23 @@ class ScoreExport:
     event_hit_map: dict[str, str]
 
 
+class ComposeDiagnosticsError(ValueError):
+    def __init__(
+        self,
+        *,
+        stage: str,
+        message: str,
+        report_path: Path | None = None,
+    ) -> None:
+        self.stage = stage
+        self.message = message
+        self.report_path = report_path
+        detail = f"compose failed during {stage}: {message}"
+        if report_path is not None:
+            detail += f" [report: {report_path}]"
+        super().__init__(detail)
+
+
 def compose_baseline(
     checkpoint_path: str | Path,
     *,
@@ -42,30 +67,284 @@ def compose_baseline(
     max_fret: int = DEFAULT_MAX_FRET,
     generator: Callable[..., GenerationResult] = generate_v1,
 ) -> ComposeServiceResult:
-    generation = generator(
-        checkpoint_path,
-        seed_tokens=seed_tokens,
-        generation_config=generation_config,
-        vocab_path=vocab_path,
-        device=device,
-    )
-    generation = _trim_incomplete_generation(generation)
-    score = tokens_to_canonical_score(
-        generation.tokens,
-        tpq=tpq,
-        part_info=part_info,
-        ignore_invalid_events=True,
-    )
-    score = _tab_score(score, max_fret=max_fret)
-    exported = export_score(score)
+    generation: GenerationResult | None = None
+    trimmed_generation: GenerationResult | None = None
+    parse_diagnostics = ParseDiagnostics()
+    score: CanonicalScore | None = None
+    exported: ScoreExport | None = None
+
+    try:
+        generation = generator(
+            checkpoint_path,
+            seed_tokens=seed_tokens,
+            generation_config=generation_config,
+            vocab_path=vocab_path,
+            device=device,
+        )
+    except Exception as exc:  # pragma: no cover - exercised via route path
+        raise _compose_failure(
+            stage="generation",
+            exc=exc,
+            checkpoint_path=checkpoint_path,
+            seed_tokens=seed_tokens,
+            generation_config=generation_config,
+        ) from exc
+
+    try:
+        trimmed_generation = _trim_incomplete_generation(generation)
+    except Exception as exc:
+        raise _compose_failure(
+            stage="trim",
+            exc=exc,
+            checkpoint_path=checkpoint_path,
+            seed_tokens=seed_tokens,
+            generation_config=generation_config,
+            generation=generation,
+        ) from exc
+
+    try:
+        score = tokens_to_canonical_score(
+            trimmed_generation.tokens,
+            tpq=tpq,
+            part_info=part_info,
+            ignore_invalid_events=True,
+            diagnostics=parse_diagnostics,
+        )
+    except Exception as exc:
+        raise _compose_failure(
+            stage="parse",
+            exc=exc,
+            checkpoint_path=checkpoint_path,
+            seed_tokens=seed_tokens,
+            generation_config=generation_config,
+            generation=generation,
+            effective_tokens=trimmed_generation.tokens,
+            parse_diagnostics=parse_diagnostics,
+        ) from exc
+
+    try:
+        score = _tab_score(score, max_fret=max_fret)
+    except Exception as exc:
+        raise _compose_failure(
+            stage="tab",
+            exc=exc,
+            checkpoint_path=checkpoint_path,
+            seed_tokens=seed_tokens,
+            generation_config=generation_config,
+            generation=generation,
+            effective_tokens=trimmed_generation.tokens,
+            parse_diagnostics=parse_diagnostics,
+            score=score,
+        ) from exc
+
+    try:
+        exported = export_score(score)
+        midi = canonical_score_to_midi(score)
+    except Exception as exc:
+        raise _compose_failure(
+            stage="export",
+            exc=exc,
+            checkpoint_path=checkpoint_path,
+            seed_tokens=seed_tokens,
+            generation_config=generation_config,
+            generation=generation,
+            effective_tokens=trimmed_generation.tokens,
+            parse_diagnostics=parse_diagnostics,
+            score=score,
+        ) from exc
+
     return ComposeServiceResult(
-        generation=generation,
+        generation=trimmed_generation,
         score=score,
         score_xml=exported.score_xml,
-        midi=canonical_score_to_midi(score),
+        midi=midi,
         measure_map=exported.measure_map,
         event_hit_map=exported.event_hit_map,
     )
+
+
+def _compose_failure(
+    *,
+    stage: str,
+    exc: Exception,
+    checkpoint_path: str | Path,
+    seed_tokens: Sequence[str | int],
+    generation_config: GenerationConfig,
+    generation: GenerationResult | None = None,
+    effective_tokens: Sequence[str] | None = None,
+    parse_diagnostics: ParseDiagnostics | None = None,
+    score: CanonicalScore | None = None,
+) -> ComposeDiagnosticsError:
+    if isinstance(exc, ComposeDiagnosticsError):
+        return exc
+
+    report_path = _safe_write_failure_report(
+        stage=stage,
+        message=str(exc),
+        checkpoint_path=checkpoint_path,
+        seed_tokens=seed_tokens,
+        generation_config=generation_config,
+        generation=generation,
+        effective_tokens=effective_tokens,
+        parse_diagnostics=parse_diagnostics,
+        score=score,
+        exception_type=type(exc).__name__,
+    )
+    return ComposeDiagnosticsError(
+        stage=stage,
+        message=str(exc),
+        report_path=report_path,
+    )
+
+
+def _safe_write_failure_report(
+    *,
+    stage: str,
+    message: str,
+    checkpoint_path: str | Path,
+    seed_tokens: Sequence[str | int],
+    generation_config: GenerationConfig,
+    generation: GenerationResult | None,
+    effective_tokens: Sequence[str] | None,
+    parse_diagnostics: ParseDiagnostics | None,
+    score: CanonicalScore | None,
+    exception_type: str,
+) -> Path | None:
+    try:
+        return _write_failure_report(
+            stage=stage,
+            message=message,
+            checkpoint_path=checkpoint_path,
+            seed_tokens=seed_tokens,
+            generation_config=generation_config,
+            generation=generation,
+            effective_tokens=effective_tokens,
+            parse_diagnostics=parse_diagnostics,
+            score=score,
+            exception_type=exception_type,
+        )
+    except Exception:
+        return None
+
+
+def _write_failure_report(
+    *,
+    stage: str,
+    message: str,
+    checkpoint_path: str | Path,
+    seed_tokens: Sequence[str | int],
+    generation_config: GenerationConfig,
+    generation: GenerationResult | None,
+    effective_tokens: Sequence[str] | None,
+    parse_diagnostics: ParseDiagnostics | None,
+    score: CanonicalScore | None,
+    exception_type: str,
+) -> Path:
+    failure_dir = _failure_dir()
+    failure_dir.mkdir(parents=True, exist_ok=True)
+
+    report_id = _new_report_id()
+    report_path = failure_dir / f"{report_id}_{stage}.json"
+
+    generated_tokens = list(generation.tokens) if generation is not None else None
+    current_tokens = list(effective_tokens) if effective_tokens is not None else generated_tokens
+    generated_tokens_path = _write_tokens_file(
+        failure_dir / f"{report_id}_{stage}.generated.tokens.txt",
+        generated_tokens,
+    )
+    effective_tokens_path = None
+    if current_tokens is not None and current_tokens != generated_tokens:
+        effective_tokens_path = _write_tokens_file(
+            failure_dir / f"{report_id}_{stage}.effective.tokens.txt",
+            current_tokens,
+        )
+
+    report = {
+        "report_id": report_id,
+        "stage": stage,
+        "message": message,
+        "exception_type": exception_type,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "checkpoint_path": str(Path(checkpoint_path)),
+        "seed_tokens": [str(token) for token in seed_tokens],
+        "generation_config": asdict(generation_config),
+        "generation": _generation_summary(generation, generated_tokens_path, effective_tokens_path, current_tokens),
+        "parse_diagnostics": (parse_diagnostics.to_dict() if parse_diagnostics is not None else None),
+        "score_summary": _score_summary(score),
+        "token_summary": _token_summary(current_tokens),
+    }
+    report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    return report_path
+
+
+def _generation_summary(
+    generation: GenerationResult | None,
+    generated_tokens_path: Path | None,
+    effective_tokens_path: Path | None,
+    current_tokens: Sequence[str] | None,
+) -> dict[str, object]:
+    return {
+        "available": generation is not None,
+        "stopped_on_eos": generation.stopped_on_eos if generation is not None else None,
+        "generated_token_count": (len(generation.tokens) if generation is not None else 0),
+        "effective_token_count": (len(current_tokens) if current_tokens is not None else 0),
+        "generated_tokens_path": (str(generated_tokens_path) if generated_tokens_path is not None else None),
+        "effective_tokens_path": (str(effective_tokens_path) if effective_tokens_path is not None else None),
+    }
+
+
+def _score_summary(score: CanonicalScore | None) -> dict[str, object] | None:
+    if score is None:
+        return None
+    event_count = sum(len(part.events) for part in score.parts)
+    return {
+        "measure_count": len(score.measures),
+        "part_count": len(score.parts),
+        "event_count": event_count,
+        "last_tick": score.total_ticks,
+    }
+
+
+def _token_summary(tokens: Sequence[str] | None) -> dict[str, object] | None:
+    if tokens is None:
+        return None
+    summary = {
+        "token_count": len(tokens),
+        "bar_count": sum(1 for token in tokens if token == "BAR"),
+        "pos_token_count": sum(1 for token in tokens if token.startswith("POS_")),
+        "voice_token_count": sum(1 for token in tokens if token.startswith("VOICE_")),
+        "string_token_count": sum(1 for token in tokens if token.startswith("STR_")),
+        "fret_token_count": sum(1 for token in tokens if token.startswith("FRET_")),
+        "preview_head": list(tokens[:32]),
+        "preview_tail": list(tokens[-32:]) if len(tokens) > 32 else list(tokens),
+    }
+    try:
+        harm_errors = validate_harm_tokens(list(tokens))
+    except Exception as exc:  # pragma: no cover - best-effort diagnostics
+        summary["harmonic_validation_error"] = str(exc)
+    else:
+        summary["harmonic_validation_error_count"] = len(harm_errors)
+        summary["harmonic_validation_errors_preview"] = harm_errors[:8]
+    return summary
+
+
+def _failure_dir() -> Path:
+    configured = os.environ.get("BACH_GEN_COMPOSE_FAILURE_DIR")
+    if configured:
+        return Path(configured).expanduser()
+    return DEFAULT_FAILURE_DIR
+
+
+def _new_report_id() -> str:
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    return f"{timestamp}_{uuid4().hex[:8]}"
+
+
+def _write_tokens_file(path: Path, tokens: Sequence[str] | None) -> Path | None:
+    if tokens is None:
+        return None
+    path.write_text(" ".join(tokens), encoding="utf-8")
+    return path
 
 
 def _trim_incomplete_generation(generation: GenerationResult) -> GenerationResult:

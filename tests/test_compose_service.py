@@ -1,11 +1,13 @@
+import json
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+import pytest
 from music21.midi import MidiFile
 
 from src.api.canonical import Event
 from src.api.canonical.from_tokens import _ensure_unique_event_ids
-from src.api.compose_service import compose_baseline
+from src.api.compose_service import ComposeDiagnosticsError, compose_baseline
 from src.inference.generate_v1 import GenerationConfig, GenerationResult
 
 XML_NS = "http://www.w3.org/XML/1998/namespace"
@@ -213,6 +215,71 @@ def test_compose_baseline_skips_generated_events_without_pos_or_anchor():
     assert [measure.index for measure in result.score.measures] == [0]
     assert len(result.score.parts[0].events) == 1
     assert result.score.parts[0].events[0].start_tick == 24
+
+
+def test_compose_baseline_persists_failure_report_with_stage_and_parse_diagnostics(
+    monkeypatch,
+    tmp_path,
+):
+    generated_tokens = [
+        "BAR",
+        "TIME_SIG_4_4",
+        "KEY_C",
+        "VOICE_0",
+        "DUR_24",
+        "MEL_INT12_0",
+        "HARM_OCT_0",
+        "HARM_CLASS_0",
+        "ABS_VOICE_0_90",
+        "POS_0",
+        "VOICE_0",
+        "DUR_24",
+        "MEL_INT12_0",
+        "HARM_OCT_0",
+        "HARM_CLASS_0",
+    ]
+
+    def fake_generator(
+        checkpoint_path,
+        *,
+        seed_tokens,
+        generation_config,
+        vocab_path=None,
+        device="cpu",
+    ):
+        return GenerationResult(
+            ids=list(range(len(generated_tokens))),
+            tokens=generated_tokens,
+            stopped_on_eos=False,
+        )
+
+    monkeypatch.setenv("BACH_GEN_COMPOSE_FAILURE_DIR", str(tmp_path))
+
+    with pytest.raises(ComposeDiagnosticsError) as excinfo:
+        compose_baseline(
+            Path("/tmp/fake-checkpoint.pt"),
+            seed_tokens=["KEY_C", "MEAS_4"],
+            generation_config=GenerationConfig(max_length=32),
+            generator=fake_generator,
+        )
+
+    error = excinfo.value
+    assert error.stage == "tab"
+    assert error.report_path is not None
+    assert error.report_path.exists()
+    assert "compose failed during tab" in str(error)
+    assert "report:" in str(error)
+
+    report = json.loads(error.report_path.read_text(encoding="utf-8"))
+    assert report["stage"] == "tab"
+    assert report["message"] == "no playable guitar voicing at onset 0: note is outside the fret range"
+    assert report["generation"]["generated_token_count"] == len(generated_tokens)
+    assert Path(report["generation"]["generated_tokens_path"]).exists()
+    assert report["parse_diagnostics"]["skipped_voice_before_pos"] == 1
+    assert report["parse_diagnostics"]["parsed_pitched_events"] == 1
+    assert report["score_summary"]["measure_count"] == 1
+    assert report["token_summary"]["bar_count"] == 1
+    assert "harmonic_validation_error_count" in report["token_summary"]
 
 
 def test_ensure_unique_event_ids_rewrites_duplicates():

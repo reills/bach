@@ -8,7 +8,13 @@ from fastapi.testclient import TestClient
 
 from src.api import create_app
 from src.api.canonical import CanonicalScore, Event, Measure, Part, PartInfo, ScoreHeader
-from src.api.compose_service import ComposeServiceResult, build_event_hit_map, build_measure_map, export_score
+from src.api.compose_service import (
+    ComposeDiagnosticsError,
+    ComposeServiceResult,
+    build_event_hit_map,
+    build_measure_map,
+    export_score,
+)
 from src.api.render import canonical_score_to_midi, canonical_score_to_musicxml
 from src.api.services import preview_window_inpaint
 from src.api.store import InMemoryScoreRepository
@@ -176,6 +182,36 @@ def test_compose_route_returns_json_error_for_invalid_generation_with_cors_heade
     assert response.status_code == 400
     assert response.json() == {
         "detail": "generated token stream does not contain a complete event prefix"
+    }
+    assert response.headers["access-control-allow-origin"] == "http://localhost:5173"
+
+
+def test_compose_route_returns_stage_and_report_path_for_diagnostic_failures():
+    report_path = Path("/tmp/compose_failure_report.json")
+
+    def fake_compose_service(request) -> ComposeServiceResult:
+        raise ComposeDiagnosticsError(
+            stage="tab",
+            message="no playable guitar voicing at onset 0: note is outside the fret range",
+            report_path=report_path,
+        )
+
+    client = CompatTestClient(create_app(compose_service=fake_compose_service))
+    try:
+        response = client.post(
+            "/compose",
+            headers={"Origin": "http://localhost:5173"},
+            json={},
+        )
+    finally:
+        client.close()
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "detail": (
+            "compose failed during tab: no playable guitar voicing at onset 0: "
+            "note is outside the fret range [report: /tmp/compose_failure_report.json]"
+        )
     }
     assert response.headers["access-control-allow-origin"] == "http://localhost:5173"
 
