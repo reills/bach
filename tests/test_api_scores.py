@@ -125,6 +125,61 @@ def test_compose_route_stores_generated_score_and_returns_frontend_payload():
     assert stored.score == score
 
 
+def test_compose_route_allows_localhost_dev_origins_on_nondefault_ports():
+    repository = InMemoryScoreRepository[CanonicalScore]()
+    score = _build_score()
+    exported = export_score(score)
+
+    def fake_compose_service(request) -> ComposeServiceResult:
+        return ComposeServiceResult(
+            generation=GenerationResult(ids=[1, 2], tokens=["BAR", "EOS"], stopped_on_eos=True),
+            score=score,
+            score_xml=exported.score_xml,
+            midi=canonical_score_to_midi(score),
+            measure_map=exported.measure_map,
+            event_hit_map=exported.event_hit_map,
+        )
+
+    client = CompatTestClient(
+        create_app(
+            compose_service=fake_compose_service,
+            repository=repository,
+        )
+    )
+    try:
+        response = client.post(
+            "/compose",
+            headers={"Origin": "http://localhost:5174"},
+            json={},
+        )
+    finally:
+        client.close()
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://localhost:5174"
+
+
+def test_compose_route_returns_json_error_for_invalid_generation_with_cors_header():
+    def fake_compose_service(request) -> ComposeServiceResult:
+        raise ValueError("generated token stream does not contain a complete event prefix")
+
+    client = CompatTestClient(create_app(compose_service=fake_compose_service))
+    try:
+        response = client.post(
+            "/compose",
+            headers={"Origin": "http://localhost:5173"},
+            json={},
+        )
+    finally:
+        client.close()
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "detail": "generated token stream does not contain a complete event prefix"
+    }
+    assert response.headers["access-control-allow-origin"] == "http://localhost:5173"
+
+
 def test_compose_launcher_binds_real_compose_service(monkeypatch):
     from src.api.compose_launcher import ComposeRuntimeConfig, create_configured_app
 
@@ -237,6 +292,57 @@ def test_compose_launcher_uses_local_defaults_when_env_is_unset(monkeypatch):
 
     assert config.checkpoint_path == DEFAULT_CHECKPOINT_PATH
     assert config.vocab_path == DEFAULT_VOCAB_PATH
+
+
+def test_compose_launcher_defaults_seed_controls_when_request_has_no_constraints(monkeypatch):
+    from src.api.compose_launcher import ComposeRuntimeConfig, create_configured_app
+
+    score = _build_score()
+    exported = export_score(score)
+    captured: dict[str, object] = {}
+
+    def fake_load_notelm_checkpoint(checkpoint_path, *, vocab_path=None, device="cpu"):
+        return SimpleNamespace(vocab_path=Path("/tmp/runtime-vocab.json"))
+
+    def fake_compose_baseline(
+        checkpoint_path,
+        *,
+        seed_tokens,
+        generation_config,
+        vocab_path=None,
+        device="cpu",
+        generator=None,
+    ) -> ComposeServiceResult:
+        captured["seed_tokens"] = list(seed_tokens)
+        captured["generation_config"] = generation_config
+        return ComposeServiceResult(
+            generation=GenerationResult(ids=[1, 2], tokens=["BAR", "EOS"], stopped_on_eos=True),
+            score=score,
+            score_xml=exported.score_xml,
+            midi=canonical_score_to_midi(score),
+            measure_map=exported.measure_map,
+            event_hit_map=exported.event_hit_map,
+        )
+
+    monkeypatch.setattr("src.api.compose_launcher.load_notelm_checkpoint", fake_load_notelm_checkpoint)
+    monkeypatch.setattr("src.api.compose_launcher.compose_baseline", fake_compose_baseline)
+
+    app = create_configured_app(
+        ComposeRuntimeConfig(
+            checkpoint_path=Path("/tmp/notelm.pt"),
+            vocab_path=Path("/tmp/vocab.json"),
+            device="cpu",
+        )
+    )
+    client = CompatTestClient(app)
+    try:
+        response = client.post("/compose", json={})
+    finally:
+        client.close()
+
+    assert response.status_code == 200
+    assert captured["seed_tokens"] == ["KEY_C", "MEAS_4"]
+    assert captured["generation_config"].max_length == 512
 
 
 def test_preview_then_commit_routes_update_score_and_revision():

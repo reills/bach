@@ -49,7 +49,13 @@ def compose_baseline(
         vocab_path=vocab_path,
         device=device,
     )
-    score = tokens_to_canonical_score(generation.tokens, tpq=tpq, part_info=part_info)
+    generation = _trim_incomplete_generation(generation)
+    score = tokens_to_canonical_score(
+        generation.tokens,
+        tpq=tpq,
+        part_info=part_info,
+        ignore_invalid_events=True,
+    )
     score = _tab_score(score, max_fret=max_fret)
     exported = export_score(score)
     return ComposeServiceResult(
@@ -60,6 +66,76 @@ def compose_baseline(
         measure_map=exported.measure_map,
         event_hit_map=exported.event_hit_map,
     )
+
+
+def _trim_incomplete_generation(generation: GenerationResult) -> GenerationResult:
+    complete_tokens = _trim_incomplete_suffix(generation.tokens)
+    if len(complete_tokens) == len(generation.tokens):
+        return generation
+    if not complete_tokens:
+        raise ValueError("generated token stream does not contain a complete event prefix")
+    return replace(
+        generation,
+        ids=generation.ids[: len(complete_tokens)],
+        tokens=complete_tokens,
+    )
+
+
+def _trim_incomplete_suffix(tokens: Sequence[str]) -> list[str]:
+    safe_end = 0
+    idx = 0
+    while idx < len(tokens):
+        next_idx = _next_complete_token_index(tokens, idx)
+        if next_idx is None:
+            break
+        safe_end = next_idx
+        idx = next_idx
+    return list(tokens[:safe_end])
+
+
+def _next_complete_token_index(tokens: Sequence[str], idx: int) -> int | None:
+    token = tokens[idx]
+    if token.startswith("VOICE_"):
+        return _next_complete_voice_event_index(tokens, idx)
+    if token.startswith("STR_") or token.startswith("FRET_"):
+        return None
+    return idx + 1
+
+
+def _next_complete_voice_event_index(tokens: Sequence[str], idx: int) -> int | None:
+    next_idx = idx + 1
+    if next_idx >= len(tokens):
+        return None
+
+    first_token = tokens[next_idx]
+    if first_token.startswith("REST_"):
+        return next_idx + 1
+    if not first_token.startswith("DUR_"):
+        return idx + 1
+
+    next_idx += 1
+    if next_idx < len(tokens) and tokens[next_idx].startswith("DUP_"):
+        next_idx += 1
+
+    required_prefixes = ("MEL_INT12_", "HARM_OCT_", "HARM_CLASS_")
+    for prefix in required_prefixes:
+        if next_idx >= len(tokens):
+            return None
+        if not tokens[next_idx].startswith(prefix):
+            return idx + 1
+        next_idx += 1
+
+    if next_idx < len(tokens) and tokens[next_idx].startswith("STR_"):
+        next_idx += 1
+        if next_idx >= len(tokens):
+            return None
+        if not tokens[next_idx].startswith("FRET_"):
+            return idx + 1
+        next_idx += 1
+    elif next_idx < len(tokens) and tokens[next_idx].startswith("FRET_"):
+        return idx + 1
+
+    return next_idx
 
 
 def _tab_score(score: CanonicalScore, *, max_fret: int) -> CanonicalScore:

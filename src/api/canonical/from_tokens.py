@@ -1,3 +1,4 @@
+from dataclasses import replace
 from uuid import NAMESPACE_URL, uuid5
 
 from src.api.canonical.types import (
@@ -24,6 +25,8 @@ def tokens_to_canonical_score(
     tokens: list[str],
     tpq: int = 24,
     part_info: PartInfo | None = None,
+    *,
+    ignore_invalid_events: bool = False,
 ) -> CanonicalScore:
     bars = split_bars(tokens)
     if not bars:
@@ -73,6 +76,7 @@ def tokens_to_canonical_score(
                 part_info=part_info,
                 prev_pitch=prev_pitch,
                 voice_id_map=voice_id_map,
+                ignore_invalid_events=ignore_invalid_events,
             )
         )
         bar_start_tick = measure.end_tick
@@ -82,6 +86,9 @@ def tokens_to_canonical_score(
         key_sig_map=key_sig_map,
         time_sig_map=time_sig_map,
     )
+    if ignore_invalid_events:
+        events = _ensure_unique_event_ids(events, part_info.id)
+
     part = Part(info=part_info, events=events)
     return CanonicalScore(header=header, measures=measures, parts=[part])
 
@@ -128,6 +135,8 @@ def _events_from_bar(
     part_info: PartInfo,
     prev_pitch: dict[int, int | None],
     voice_id_map: dict[int, int],
+    *,
+    ignore_invalid_events: bool,
 ) -> list[Event]:
     events: list[Event] = []
     event_counts: dict[tuple[int, int], int] = {}
@@ -161,10 +170,20 @@ def _events_from_bar(
             idx += 1
             continue
         if token.startswith("VOICE_"):
+            try:
+                voice_event, next_idx = parse_voice_event(bar_tokens, idx)
+            except ValueError:
+                if ignore_invalid_events:
+                    idx = _skip_invalid_voice_event(bar_tokens, idx)
+                    continue
+                raise
+
             if current_pos_tick is None:
+                if ignore_invalid_events:
+                    idx = next_idx
+                    continue
                 raise ValueError(f"VOICE token before POS in bar starting at tick {bar_start_tick}")
 
-            voice_event, next_idx = parse_voice_event(bar_tokens, idx)
             canonical_voice_id = voice_id_map[voice_event.voice]
             event_ordinal_key = (canonical_voice_id, current_pos_tick)
             ordinal = event_counts.get(event_ordinal_key, 0)
@@ -185,6 +204,9 @@ def _events_from_bar(
 
             previous_pitch = prev_pitch.get(voice_event.voice)
             if previous_pitch is None:
+                if ignore_invalid_events:
+                    idx = next_idx
+                    continue
                 raise ValueError(f"missing anchor before VOICE_{voice_event.voice} at tick {current_pos_tick}")
 
             pitch_midi = previous_pitch + voice_event.mel_int
@@ -205,6 +227,34 @@ def _events_from_bar(
         idx += 1
 
     return events
+
+
+def _skip_invalid_voice_event(bar_tokens: list[str], idx: int) -> int:
+    next_idx = idx + 1
+    while next_idx < len(bar_tokens):
+        token = bar_tokens[next_idx]
+        if token == "BAR" or token.startswith("POS_") or token.startswith("VOICE_"):
+            break
+        next_idx += 1
+    return next_idx
+
+
+def _ensure_unique_event_ids(events: list[Event], part_id: str) -> list[Event]:
+    seen_ids: set[str] = set()
+    deduped: list[Event] = []
+    for idx, event in enumerate(events):
+        event_id = event.id
+        if event_id in seen_ids:
+            event_id = str(
+                uuid5(
+                    NAMESPACE_URL,
+                    f"bach-gen:event-dedupe:{part_id}:{idx}:{event.voice_id}:{event.start_tick}",
+                )
+            )
+            event = replace(event, id=event_id)
+        seen_ids.add(event_id)
+        deduped.append(event)
+    return deduped
 
 
 def _to_fingering(string_number: int | None, fret: int | None, string_count: int) -> GuitarFingering | None:

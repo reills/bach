@@ -167,7 +167,13 @@ def create_router(
                 detail="compose service is not configured",
             )
 
-        result = compose_service(request)
+        try:
+            result = compose_service(request)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(exc),
+            ) from exc
         stored_score = score_repository.create_score(result.score, name=request.name or "Untitled")
         return ComposeResponse(
             scoreId=stored_score.score_id,

@@ -59,14 +59,12 @@ def build_compose_service(config: ComposeRuntimeConfig) -> ComposeHandler:
     def compose_service(request: ComposeRequest) -> ComposeServiceResult:
         constraints = _constraints_dict(request.constraints)
         controls = ComposeControls(
-            key=_constraint_text(constraints, "key"),
+            key=_constraint_text(constraints, "key", default="C"),
             style=_constraint_text(constraints, "style"),
             difficulty=_constraint_text(constraints, "difficulty"),
-            measures=_constraint_int(constraints, "measures"),
+            measures=_constraint_int(constraints, "measures", default=4),
         )
         seed_tokens = build_control_prefix_tokens(controls)
-        if not seed_tokens:
-            seed_tokens = ["KEY_C"]
 
         generation_config = GenerationConfig(
             max_length=_constraint_int(constraints, "max_length", "maxLength", default=config.max_length),
