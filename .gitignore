@@ -55,6 +55,9 @@ lerna-debug.log*
 finished.md
 review.md
 
+# model checkpoints and training outputs
+/out/
+
 # frontend build artifacts
 /frontend/node_modules/
 /frontend/dist/

@@ -218,6 +218,32 @@ Current backend reality:
 - the default app uses an in-memory repository
 - `/compose` exists in the contract, but `src.api.app:app` does not bind a default `compose_service`, so the default app returns `503 compose service is not configured` on `/compose`
 
+To run `/compose` locally against a trained checkpoint, use the supported compose launcher instead:
+
+```bash
+CONDA_NO_PLUGINS=true conda run -n bach python -m uvicorn src.api.compose_app:app --reload
+```
+
+By default, the launcher uses:
+
+- `out/notelm_v1/notelm_step5000.pt`
+- `out/notelm_v1/vocab.json`
+
+You only need env vars if you want to override those defaults:
+
+```bash
+BACH_GEN_CHECKPOINT=out/notelm_v1/notelm_step5000.pt \
+BACH_GEN_VOCAB=out/notelm_v1/vocab.json \
+CONDA_NO_PLUGINS=true conda run -n bach python -m uvicorn src.api.compose_app:app --reload
+```
+
+Optional launcher env vars:
+
+- `BACH_GEN_DEVICE` defaults to `cuda` when available, else `cpu`
+- `BACH_GEN_MAX_LENGTH` defaults to `512`
+- `BACH_GEN_TEMPERATURE` defaults to `1.0`
+- `BACH_GEN_TOP_P` defaults to `0.9`
+
 Because of that, the practical ways to exercise the shipped backend today are:
 
 1. Use `scripts/generate_example.py` for compose pipeline output.

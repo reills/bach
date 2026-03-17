@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from itertools import count
 from typing import Generic, Protocol, TypeVar
 
@@ -13,6 +14,9 @@ class StoredScore(Generic[ScoreT]):
     score_id: str
     revision: int
     score: ScoreT
+    name: str = "Untitled"
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 @dataclass(frozen=True)
@@ -21,6 +25,7 @@ class StoredDraft(Generic[ScoreT]):
     score_id: str
     base_revision: int
     score: ScoreT
+    created_at: datetime | None = None
 
 
 class ScoreNotFoundError(KeyError):
@@ -36,7 +41,7 @@ class StaleRevisionError(RuntimeError):
 
 
 class ScoreDraftRepository(Protocol[ScoreT]):
-    def create_score(self, score: ScoreT) -> StoredScore[ScoreT]:
+    def create_score(self, score: ScoreT, *, name: str = "Untitled") -> StoredScore[ScoreT]:
         ...
 
     def get_score(self, score_id: str) -> StoredScore[ScoreT]:
@@ -67,6 +72,9 @@ class ScoreDraftRepository(Protocol[ScoreT]):
 class _ScoreState(Generic[ScoreT]):
     revision: int
     score: ScoreT
+    name: str
+    created_at: datetime
+    updated_at: datetime
 
 
 @dataclass
@@ -74,6 +82,7 @@ class _DraftState(Generic[ScoreT]):
     score_id: str
     base_revision: int
     score: ScoreT
+    created_at: datetime
 
 
 class InMemoryScoreRepository(Generic[ScoreT]):
@@ -83,11 +92,15 @@ class InMemoryScoreRepository(Generic[ScoreT]):
         self._score_ids = count(1)
         self._draft_ids = count(1)
 
-    def create_score(self, score: ScoreT) -> StoredScore[ScoreT]:
+    def create_score(self, score: ScoreT, *, name: str = "Untitled") -> StoredScore[ScoreT]:
         score_id = self._next_id("score", self._score_ids)
+        now = datetime.now(timezone.utc)
         self._scores[score_id] = _ScoreState(
             revision=1,
             score=deepcopy(score),
+            name=name,
+            created_at=now,
+            updated_at=now,
         )
         return self.get_score(score_id)
 
@@ -97,6 +110,9 @@ class InMemoryScoreRepository(Generic[ScoreT]):
             score_id=score_id,
             revision=state.revision,
             score=deepcopy(state.score),
+            name=state.name,
+            created_at=state.created_at,
+            updated_at=state.updated_at,
         )
 
     def create_draft(
@@ -114,10 +130,12 @@ class InMemoryScoreRepository(Generic[ScoreT]):
             )
 
         draft_id = self._next_id("draft", self._draft_ids)
+        now = datetime.now(timezone.utc)
         self._drafts[draft_id] = _DraftState(
             score_id=score_id,
             base_revision=score_state.revision,
             score=deepcopy(score_state.score),
+            created_at=now,
         )
         return self.get_draft(draft_id)
 
@@ -128,6 +146,7 @@ class InMemoryScoreRepository(Generic[ScoreT]):
             score_id=state.score_id,
             base_revision=state.base_revision,
             score=deepcopy(state.score),
+            created_at=state.created_at,
         )
 
     def save_draft(self, draft_id: str, score: ScoreT) -> StoredDraft[ScoreT]:
@@ -146,6 +165,7 @@ class InMemoryScoreRepository(Generic[ScoreT]):
 
         score_state.revision += 1
         score_state.score = deepcopy(draft_state.score)
+        score_state.updated_at = datetime.now(timezone.utc)
         del self._drafts[draft_id]
         return self.get_score(draft_state.score_id)
 

@@ -35,12 +35,16 @@ ComposeHandler = Callable[[BaseModel], ComposeServiceResult]
 class ComposeRequest(BaseModel):
     prompt: str | None = None
     constraints: dict[str, Any] | None = None
+    name: str | None = None
 
 
 class ComposeResponse(BaseModel):
     scoreId: str
     revision: int
     scoreXML: str
+    name: str
+    createdAt: str
+    updatedAt: str
     measureMap: dict[str, str] | None = None
     eventHitMap: dict[str, str] | None = None
     midi: str | None = None
@@ -164,11 +168,14 @@ def create_router(
             )
 
         result = compose_service(request)
-        stored_score = score_repository.create_score(result.score)
+        stored_score = score_repository.create_score(result.score, name=request.name or "Untitled")
         return ComposeResponse(
             scoreId=stored_score.score_id,
             revision=stored_score.revision,
             scoreXML=result.score_xml,
+            name=stored_score.name,
+            createdAt=(stored_score.created_at.isoformat() if stored_score.created_at else ""),
+            updatedAt=(stored_score.updated_at.isoformat() if stored_score.updated_at else ""),
             measureMap=result.measure_map,
             eventHitMap=result.event_hit_map,
             midi=base64.b64encode(result.midi).decode("ascii"),

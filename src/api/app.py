@@ -1,4 +1,7 @@
+import os
+
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from src.api.canonical import CanonicalScore
 from src.api.routes.health import router as health_router
@@ -12,6 +15,12 @@ def create_app(
     repository: ScoreDraftRepository[CanonicalScore] | None = None,
 ) -> FastAPI:
     app = FastAPI(title="bach-gen API")
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
     app.include_router(health_router)
     app.include_router(
         create_scores_router(
@@ -22,4 +31,13 @@ def create_app(
     return app
 
 
-app = create_app()
+def _default_repository() -> ScoreDraftRepository[CanonicalScore]:
+    database_url = os.environ.get("DATABASE_URL")
+    if database_url:
+        from src.api.store_postgres import PostgresScoreRepository
+        return PostgresScoreRepository(database_url)
+    from src.api.store import InMemoryScoreRepository
+    return InMemoryScoreRepository[CanonicalScore]()
+
+
+app = create_app(repository=_default_repository())

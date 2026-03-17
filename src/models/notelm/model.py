@@ -103,7 +103,10 @@ class MultiHeadSelfAttention(nn.Module):
 
         attn_scores = torch.matmul(q, k.transpose(-2, -1)) / math.sqrt(self.head_dim)
 
-        causal = self.causal_mask[:seq_len, :seq_len]
+        if seq_len <= self.causal_mask.size(0):
+            causal = self.causal_mask[:seq_len, :seq_len]
+        else:
+            causal = torch.tril(torch.ones(seq_len, seq_len, dtype=torch.bool, device=x.device))
         attn_scores = attn_scores.masked_fill(~causal, torch.finfo(attn_scores.dtype).min)
 
         if attn_mask is not None:

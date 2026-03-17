@@ -1,5 +1,7 @@
 import asyncio
 import base64
+from pathlib import Path
+from types import SimpleNamespace
 
 import httpx
 from fastapi.testclient import TestClient
@@ -106,6 +108,7 @@ def test_compose_route_stores_generated_score_and_returns_frontend_payload():
         "request": {
             "prompt": "Prelude",
             "constraints": {"temperature": 0.5},
+            "name": None,
         }
     }
 
@@ -120,6 +123,120 @@ def test_compose_route_stores_generated_score_and_returns_frontend_payload():
     stored = repository.get_score(payload["scoreId"])
     assert stored.revision == 1
     assert stored.score == score
+
+
+def test_compose_launcher_binds_real_compose_service(monkeypatch):
+    from src.api.compose_launcher import ComposeRuntimeConfig, create_configured_app
+
+    score = _build_score()
+    exported = export_score(score)
+    load_calls: list[dict[str, object]] = []
+    captured: dict[str, object] = {}
+
+    def fake_load_notelm_checkpoint(checkpoint_path, *, vocab_path=None, device="cpu"):
+        load_calls.append(
+            {
+                "checkpoint_path": Path(checkpoint_path),
+                "vocab_path": None if vocab_path is None else Path(vocab_path),
+                "device": device,
+            }
+        )
+        return SimpleNamespace(vocab_path=Path("/tmp/runtime-vocab.json"))
+
+    def fake_compose_baseline(
+        checkpoint_path,
+        *,
+        seed_tokens,
+        generation_config,
+        vocab_path=None,
+        device="cpu",
+        generator=None,
+    ) -> ComposeServiceResult:
+        captured["checkpoint_path"] = Path(checkpoint_path)
+        captured["seed_tokens"] = list(seed_tokens)
+        captured["generation_config"] = generation_config
+        captured["vocab_path"] = None if vocab_path is None else Path(vocab_path)
+        captured["device"] = device
+        captured["generator"] = generator
+        return ComposeServiceResult(
+            generation=GenerationResult(ids=[1, 2], tokens=["BAR", "EOS"], stopped_on_eos=True),
+            score=score,
+            score_xml=exported.score_xml,
+            midi=canonical_score_to_midi(score),
+            measure_map=exported.measure_map,
+            event_hit_map=exported.event_hit_map,
+        )
+
+    monkeypatch.setattr("src.api.compose_launcher.load_notelm_checkpoint", fake_load_notelm_checkpoint)
+    monkeypatch.setattr("src.api.compose_launcher.compose_baseline", fake_compose_baseline)
+
+    app = create_configured_app(
+        ComposeRuntimeConfig(
+            checkpoint_path=Path("/tmp/notelm.pt"),
+            vocab_path=Path("/tmp/vocab.json"),
+            device="cpu",
+            max_length=96,
+            top_p=0.95,
+        )
+    )
+    client = CompatTestClient(app)
+    try:
+        response = client.post(
+            "/compose",
+            json={
+                "name": "Launcher test",
+                "constraints": {
+                    "key": "g minor",
+                    "style": "chorale",
+                    "difficulty": "easy",
+                    "measures": 8,
+                    "temperature": 0.5,
+                    "topP": 0.8,
+                    "maxLength": 64,
+                },
+            },
+        )
+    finally:
+        client.close()
+
+    assert response.status_code == 200
+    assert load_calls == [
+        {
+            "checkpoint_path": Path("/tmp/notelm.pt"),
+            "vocab_path": Path("/tmp/vocab.json"),
+            "device": "cpu",
+        }
+    ]
+    assert captured["checkpoint_path"] == Path("/tmp/notelm.pt")
+    assert captured["seed_tokens"] == [
+        "KEY_Gm",
+        "STYLE_CHORALE",
+        "DIFFICULTY_EASY",
+        "MEAS_8",
+    ]
+    assert captured["generation_config"].max_length == 64
+    assert captured["generation_config"].temperature == 0.5
+    assert captured["generation_config"].top_p == 0.8
+    assert captured["vocab_path"] == Path("/tmp/runtime-vocab.json")
+    assert captured["device"] == "cpu"
+    assert callable(captured["generator"])
+
+
+def test_compose_launcher_uses_local_defaults_when_env_is_unset(monkeypatch):
+    from src.api.compose_launcher import (
+        DEFAULT_CHECKPOINT_PATH,
+        DEFAULT_VOCAB_PATH,
+        _runtime_config_from_env,
+    )
+
+    monkeypatch.delenv("BACH_GEN_CHECKPOINT", raising=False)
+    monkeypatch.delenv("BACH_GEN_VOCAB", raising=False)
+    monkeypatch.delenv("BACH_GEN_DEVICE", raising=False)
+
+    config = _runtime_config_from_env()
+
+    assert config.checkpoint_path == DEFAULT_CHECKPOINT_PATH
+    assert config.vocab_path == DEFAULT_VOCAB_PATH
 
 
 def test_preview_then_commit_routes_update_score_and_revision():

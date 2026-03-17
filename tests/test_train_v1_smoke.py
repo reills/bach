@@ -11,19 +11,24 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def _make_events(tmp_path: Path, n_bars: int = 6) -> tuple[Path, Path]:
+def _make_events(
+    tmp_path: Path,
+    n_bars: int = 6,
+    bars_per_piece: int = 3,
+) -> tuple[Path, Path]:
     """Create minimal vocab.json and events.parquet for smoke testing."""
     vocab = {
         "<pad>": 0,
         "<unk>": 1,
         "BAR": 2,
         "MEAS_1": 3,
-        "POS_0": 4,
-        "VOICE_0": 5,
-        "DUR_24": 6,
-        "MEL_INT12_0": 7,
-        "HARM_OCT_0": 8,
-        "HARM_CLASS_0": 9,
+        "KEY_C": 4,
+        "POS_0": 5,
+        "VOICE_0": 6,
+        "DUR_24": 7,
+        "MEL_INT12_0": 8,
+        "HARM_OCT_0": 9,
+        "HARM_CLASS_0": 10,
     }
     vocab_path = tmp_path / "vocab.json"
     vocab_path.write_text(json.dumps(vocab), encoding="utf-8")
@@ -31,12 +36,12 @@ def _make_events(tmp_path: Path, n_bars: int = 6) -> tuple[Path, Path]:
     bar_tokens = "BAR POS_0 VOICE_0 DUR_24 MEL_INT12_0 HARM_OCT_0 HARM_CLASS_0"
     rows = [
         {
-            "piece_id": f"piece_{i // 3}",
-            "bar_index": i % 3,
+            "piece_id": f"piece_{i // bars_per_piece}",
+            "bar_index": i % bars_per_piece,
             "tokens": bar_tokens,
             "plan_json": json.dumps(
                 {
-                    "bar_index": i % 3,
+                    "bar_index": i % bars_per_piece,
                     "time_sig": "4/4",
                     "key": "C",
                     "density_bucket": "LOW",
@@ -184,6 +189,11 @@ def test_resume_continues_from_step(synthetic_data, tmp_path):
     steps = [int(p.stem.replace("notelm_step", "")) for p in checkpoints]
     final_step = max(s for s in steps if s != 10)
     assert final_step > 10, f"Expected step > 10, got {final_step}"
+    final_ckpt = torch.load(out_dir / f"notelm_step{final_step}.pt", map_location="cpu")
+    assert not torch.equal(
+        final_ckpt["model_state"]["token_embedding.weight"],
+        model.state_dict()["token_embedding.weight"],
+    ), "Expected resumed training to update model weights"
 
 
 def test_val_split_runs(synthetic_data, tmp_path):
@@ -217,3 +227,57 @@ def test_checkpoint_metadata_fields(synthetic_data, tmp_path):
     # timestamp should be a valid ISO string
     from datetime import datetime
     datetime.fromisoformat(ckpt["timestamp"])
+
+
+def test_default_multibar_path_runs_with_prefix_headroom(tmp_path):
+    """Default multi-bar packing plus plan-key prefixes should complete."""
+    vocab_path, events_path = _make_events(tmp_path, n_bars=8, bars_per_piece=4)
+    out_dir = tmp_path / "out"
+    result = _run_trainer(
+        [
+            "--events", str(events_path),
+            "--vocab", str(vocab_path),
+            "--output-dir", str(out_dir),
+            "--d-model", "32",
+            "--n-heads", "2",
+            "--n-layers", "1",
+            "--batch-size", "2",
+            "--max-seq-len", "29",
+            "--allow-truncate",
+            "--dry-run-batches", "1",
+            "--log-every", "1",
+            "--seed", "42",
+            "--device", "cpu",
+        ]
+    )
+    assert result.returncode == 0, result.stderr
+    combined = result.stderr + result.stdout
+    assert "Dry-run complete" in combined
+
+
+def test_piece_level_val_split_keeps_pieces_disjoint():
+    """Validation splitting should hold out whole pieces, not mixed sequences."""
+    from scripts.train_v1 import _split_indices_by_piece_id
+
+    piece_ids = [
+        "piece_a",
+        "piece_a",
+        "piece_b",
+        "piece_b",
+        "piece_c",
+        "piece_c",
+        "piece_d",
+        "piece_d",
+    ]
+    train_indices, val_indices, n_val_pieces = _split_indices_by_piece_id(
+        piece_ids,
+        0.25,
+        42,
+    )
+    train_pieces = {piece_ids[i] for i in train_indices}
+    val_pieces = {piece_ids[i] for i in val_indices}
+
+    assert n_val_pieces == 1
+    assert train_indices
+    assert val_indices
+    assert train_pieces.isdisjoint(val_pieces)
