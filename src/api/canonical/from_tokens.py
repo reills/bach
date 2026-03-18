@@ -149,6 +149,7 @@ def tokens_to_canonical_score(
         key_sig_map=key_sig_map,
         time_sig_map=time_sig_map,
     )
+    events.sort(key=lambda e: e.start_tick)
     if ignore_invalid_events:
         events = _ensure_unique_event_ids(events, part_info.id)
 
