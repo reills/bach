@@ -13,7 +13,8 @@
     "@coderline/alphatab": "^1.8.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^6.30.3"
+    "react-router-dom": "^6.30.3",
+    "verovio": "^6.1.0"
   },
   "devDependencies": {
     "@coderline/alphatab-vite": "^1.8.0",

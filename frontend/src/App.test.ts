@@ -15,7 +15,12 @@ import {
   commitDraft,
   discardDraft,
 } from './api/client';
-import { getMeasureId, getEventId } from './state/types';
+import {
+  canUseGuitarNoteActions,
+  getEventId,
+  getMeasureId,
+  inferInstrumentMode,
+} from './state/types';
 import type { ScoreState, MeasureMap, EventHitMap } from './state/types';
 
 vi.mock('./api/client');
@@ -38,13 +43,6 @@ const initialState: ScoreState = {
   midi: null,
   instrumentMode: null,
 };
-
-// Mirror the inferInstrumentMode logic from App.tsx
-function inferInstrumentMode(xml: string): 'guitar' | 'piano' {
-  if (xml.includes('<staves>2</staves>')) return 'piano';
-  if (xml.includes('<staff-tuning') || xml.includes('<staff-details')) return 'guitar';
-  return 'guitar';
-}
 
 // Minimal helpers that mirror the App.tsx handler state transforms.
 function applyComposeResponse(
@@ -605,7 +603,8 @@ describe('compose/inpaint workflow — state transitions', () => {
   });
 
   it('inferInstrumentMode: detects guitar from <staff-details', () => {
-    const xml = '<score-partwise><staff-details><staff-lines>6</staff-lines></staff-details></score-partwise>';
+    const xml =
+      '<score-partwise><measure><staff-details><staff-lines>6</staff-lines></staff-details></measure></score-partwise>';
     expect(inferInstrumentMode(xml)).toBe('guitar');
   });
 
@@ -625,8 +624,7 @@ describe('compose/inpaint workflow — state transitions', () => {
     };
 
     // The guard condition: piano skips guitar-only fingering
-    const shouldCallFingering = pianoState.instrumentMode !== 'piano';
-    expect(shouldCallFingering).toBe(false);
+    expect(canUseGuitarNoteActions(pianoState.instrumentMode)).toBe(false);
   });
 
   it('guitar note click: instrumentMode guitar proceeds to fingering API', () => {
@@ -639,8 +637,7 @@ describe('compose/inpaint workflow — state transitions', () => {
       eventHitMap: { '0|-1|-1|-1': 'evt-1' },
     };
 
-    const shouldCallFingering = guitarState.instrumentMode !== 'piano';
-    expect(shouldCallFingering).toBe(true);
+    expect(canUseGuitarNoteActions(guitarState.instrumentMode)).toBe(true);
   });
 
   it('eventHitMap: getEventId resolves eventId from a hit key after compose', async () => {

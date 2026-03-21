@@ -1,11 +1,19 @@
 import { useEffect, useRef } from 'react';
 import * as alphaTab from '@coderline/alphatab';
-import type { HitKey } from '../state/types';
+import type { HitKey, InstrumentMode, ScoreViewTab } from '../state/types';
+import {
+  getScoreViewerLabel,
+  getStaffVisibility,
+  resolveStaveProfile,
+  shouldShowTabSwitcher,
+} from './scoreViewerStaves';
 
 interface ScoreViewerProps {
   scoreXml: string | null;
   highlightMeasureId: string | null;
-  instrumentMode: 'guitar' | 'piano' | null;
+  instrumentMode: InstrumentMode | null;
+  viewTab: ScoreViewTab;
+  onViewTabChange?: (viewTab: ScoreViewTab) => void;
   onMeasureClick?: (barIndex: number) => void;
   onNoteClick?: (hit: HitKey) => void;
   onApiReady?: (api: unknown) => void;
@@ -52,19 +60,40 @@ const resolveHitKey = (args: any): HitKey | null => {
   };
 };
 
-// Guitar mode: ScoreTab (standard notation + tab staves together)
-// Piano/null: Score (standard notation only)
-const resolveStaveProfile = (instrumentMode: 'guitar' | 'piano' | null): number => {
-  if (instrumentMode === 'guitar') {
-    return (alphaTab as any).StaveProfile?.ScoreTab ?? 1;
+const applyStaffVisibility = (
+  api: any,
+  instrumentMode: InstrumentMode | null,
+  viewTab: ScoreViewTab,
+) => {
+  const tracks =
+    (Array.isArray(api?.tracks) && api.tracks.length > 0 ? api.tracks : null) ??
+    (Array.isArray(api?.score?.tracks) ? api.score.tracks : null) ??
+    [];
+
+  if (!tracks.length) return;
+
+  const visibility = getStaffVisibility(instrumentMode, viewTab);
+  for (const track of tracks) {
+    for (const staff of track?.staves ?? []) {
+      staff.showStandardNotation = visibility.showStandardNotation;
+      staff.showTablature = visibility.showTablature;
+    }
   }
-  return (alphaTab as any).StaveProfile?.Score ?? 2;
+
+  if (api?.settings?.display != null) {
+    api.settings.display.staveProfile = resolveStaveProfile(alphaTab, instrumentMode, viewTab);
+    api.updateSettings?.();
+  }
+
+  api.renderTracks?.(tracks);
 };
 
 const ScoreViewer = ({
   scoreXml,
   highlightMeasureId,
   instrumentMode,
+  viewTab,
+  onViewTabChange,
   onMeasureClick,
   onNoteClick,
   onApiReady,
@@ -73,8 +102,6 @@ const ScoreViewer = ({
 }: ScoreViewerProps) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const apiRef = useRef<any>(null);
-  const scoreLoadedRef = useRef(false);
-  const scoreXmlRef = useRef<string | null>(null);
   const onMeasureClickRef = useRef<ScoreViewerProps['onMeasureClick']>();
   const onNoteClickRef = useRef<ScoreViewerProps['onNoteClick']>();
   const onApiReadyRef = useRef<ScoreViewerProps['onApiReady']>();
@@ -107,7 +134,7 @@ const ScoreViewer = ({
         stretchForce: 0.6,
         justifyLastSystem: false,
         padding: [36, 8, 64, 24],
-        staveProfile: resolveStaveProfile(null),
+        staveProfile: resolveStaveProfile(alphaTab, instrumentMode, viewTab),
         resources: {
           copyrightFont: '11px Arial',
         },
@@ -130,6 +157,12 @@ const ScoreViewer = ({
     if (api?.playerPositionChanged?.on) {
       api.playerPositionChanged.on((args: any) => {
         onPositionChangedRef.current?.(args?.currentTime ?? 0, args?.endTime ?? 0);
+      });
+    }
+
+    if (api?.scoreLoaded?.on) {
+      api.scoreLoaded.on(() => {
+        applyStaffVisibility(api, instrumentMode, viewTab);
       });
     }
 
@@ -159,41 +192,54 @@ const ScoreViewer = ({
     };
   }, []);
 
-  // Load score and set profile when scoreXml changes
   useEffect(() => {
-    if (!scoreXml) {
-      scoreLoadedRef.current = false;
-      scoreXmlRef.current = null;
-      return;
-    }
-    if (!apiRef.current) {
-      return;
-    }
-    scoreLoadedRef.current = true;
-    scoreXmlRef.current = scoreXml;
-    if (apiRef.current.settings?.display != null) {
-      apiRef.current.settings.display.staveProfile = resolveStaveProfile(instrumentMode);
-    }
+    if (!scoreXml || !apiRef.current) return;
     loadScoreXml(apiRef.current, scoreXml);
   }, [scoreXml]);
 
-  // Reload with updated stave profile when instrumentMode changes
   useEffect(() => {
-    const api = apiRef.current;
-    if (!api || !scoreLoadedRef.current || !scoreXmlRef.current) return;
-    if (api.settings?.display != null) {
-      api.settings.display.staveProfile = resolveStaveProfile(instrumentMode);
-      loadScoreXml(api, scoreXmlRef.current);
+    if (!apiRef.current) {
+      return;
     }
-  }, [instrumentMode]);
+    applyStaffVisibility(apiRef.current, instrumentMode, viewTab);
+  }, [instrumentMode, viewTab]);
+
+  const label = getScoreViewerLabel(instrumentMode, viewTab);
+  const showSwitcher = shouldShowTabSwitcher(instrumentMode);
 
   return (
     <div className="score-viewer">
       <div className="score-viewer__header">
         <span className="score-viewer__label">
           <span className="score-viewer__label-icon">🎼</span>
-          Sheet Music
+          {label}
         </span>
+          {showSwitcher ? (
+            <div
+              className="score-viewer__switcher"
+              role="tablist"
+              aria-label="Score view"
+            >
+              <button
+                type="button"
+                role="tab"
+                aria-selected={viewTab === 'score'}
+                className={`score-viewer__switch ${viewTab === 'score' ? 'score-viewer__switch--active' : ''}`}
+                onClick={() => onViewTabChange?.('score')}
+              >
+                Sheet Music
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={viewTab === 'tab'}
+                className={`score-viewer__switch ${viewTab === 'tab' ? 'score-viewer__switch--active' : ''}`}
+                onClick={() => onViewTabChange?.('tab')}
+              >
+                Guitar Tab
+              </button>
+            </div>
+          ) : null}
         {highlightMeasureId ? (
           <span className="score-viewer__badge">
             <span>✏️</span>

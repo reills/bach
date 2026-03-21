@@ -1,12 +1,17 @@
 import { useMemo, useState } from 'react';
 import './App.css';
 import ScoreViewer from './components/ScoreViewer';
+import SheetMusicViewer from './components/SheetMusicViewer';
 import FingeringPicker from './components/FingeringPicker';
 import { compose, inpaintPreview, commitDraft, discardDraft, altPositions, applyFingering } from './api/client';
 import {
+  canUseGuitarNoteActions,
   getEventId,
   getMeasureId,
+  inferInstrumentMode,
   type HitKey,
+  type InstrumentMode,
+  type ScoreViewTab,
   type ScoreState,
 } from './state/types';
 import {
@@ -166,12 +171,6 @@ const initialState: ScoreState = {
   instrumentMode: null,
 };
 
-const inferInstrumentMode = (xml: string): 'guitar' | 'piano' => {
-  if (xml.includes('<staves>2</staves>')) return 'piano';
-  if (xml.includes('<staff-tuning') || xml.includes('<staff-details')) return 'guitar';
-  return 'guitar';
-};
-
 type StatusTone = 'idle' | 'busy' | 'success' | 'error';
 type DataSource = 'api' | 'local';
 
@@ -189,7 +188,8 @@ const App = () => {
   const [localManifest, setLocalManifest] = useState<LocalManifest | null>(
     null,
   );
-  const [selectedInstrument, setSelectedInstrument] = useState<'guitar' | 'piano'>('guitar');
+  const [instrumentMode, setInstrumentMode] = useState<InstrumentMode>('guitar');
+  const [viewTab, setViewTab] = useState<ScoreViewTab>('score');
   const [mode, setMode] = useState<'window' | 'repair'>('window');
   const [constraints, setConstraints] = useState({
     keepHarmony: false,
@@ -206,6 +206,7 @@ const App = () => {
   const [fingeringBusy, setFingeringBusy] = useState(false);
 
   const renderXml = state.draftXml ?? state.scoreXml;
+  const showSheetMusic = state.instrumentMode === 'piano';
   const measureCount = state.measureMap ? Object.keys(state.measureMap).length : 0;
   const eventMapCount = state.eventHitMap
     ? Object.keys(state.eventHitMap).length
@@ -216,11 +217,19 @@ const App = () => {
     setStatusMessage(message);
   };
 
+  const resetLoadedScoreUi = () => {
+    setViewTab('score');
+    setFingeringPicker(null);
+    setFingeringBusy(false);
+    setPlaybackPos(null);
+  };
+
   const handleCompose = async () => {
     setBusy(true);
     setStatus('busy', 'Composing a new score...');
     try {
-      const response = await compose({ prompt, render_mode: selectedInstrument });
+      const response = await compose({ prompt, render_mode: instrumentMode });
+      resetLoadedScoreUi();
       setState((prev) => ({
         ...prev,
         scoreId: response.scoreId,
@@ -256,7 +265,9 @@ const App = () => {
       const bundle = await loadLocalData();
       const baseDoc = parseScoreXml(bundle.baseXml);
       const measureMap = buildMeasureMap(baseDoc);
+      const loadedInstrumentMode = inferInstrumentMode(bundle.baseXml);
 
+      resetLoadedScoreUi();
       setState((prev) => ({
         ...prev,
         scoreId: `local:${bundle.manifest.baseScore}`,
@@ -265,7 +276,7 @@ const App = () => {
         measureMap,
         eventHitMap: null,
         midi: null,
-        instrumentMode: inferInstrumentMode(bundle.baseXml),
+        instrumentMode: loadedInstrumentMode,
         draftId: null,
         draftXml: null,
         draftBaseRevision: null,
@@ -295,6 +306,7 @@ const App = () => {
   };
 
   const handleLoadDemo = () => {
+    resetLoadedScoreUi();
     setState((prev) => ({
       ...prev,
       scoreId: 'demo',
@@ -342,8 +354,10 @@ const App = () => {
       lastEventId: eventId,
     }));
 
-    // Guitar-only: fingering/alt-positions not applicable for piano
-    if (state.instrumentMode === 'piano') return;
+    if (!canUseGuitarNoteActions(state.instrumentMode)) {
+      setFingeringPicker(null);
+      return;
+    }
 
     if (!eventId || !state.scoreId) return;
     const measureId = getMeasureId(state.measureMap, hit.barIndex);
@@ -688,9 +702,9 @@ const App = () => {
                   <label className="field">
                     <span>Instrument</span>
                     <select
-                      value={selectedInstrument}
+                      value={instrumentMode}
                       onChange={(event) =>
-                        setSelectedInstrument(event.target.value as 'guitar' | 'piano')
+                        setInstrumentMode(event.target.value as InstrumentMode)
                       }
                     >
                       <option value="guitar">Guitar</option>
@@ -869,7 +883,7 @@ const App = () => {
           </div>
 
           {/* Fingering Picker */}
-          {fingeringPicker && (
+          {fingeringPicker && canUseGuitarNoteActions(state.instrumentMode) && (
             <div className="panel__section">
               <div className="panel__title">
                 <span className="panel__title-icon">🎸</span>
@@ -948,16 +962,28 @@ const App = () => {
         </section>
 
         <section className="panel panel--viewer">
-          <ScoreViewer
-            scoreXml={renderXml}
-            highlightMeasureId={state.highlightMeasureId}
-            instrumentMode={state.instrumentMode}
-            onMeasureClick={handleMeasureClick}
-            onNoteClick={handleNoteClick}
-            onApiReady={setAlphaTabApi}
-            onPlayerReady={() => setPlayerReady(true)}
-            onPositionChanged={(current, total) => setPlaybackPos({ current, total })}
-          />
+          {showSheetMusic ? (
+            <SheetMusicViewer
+              scoreXml={renderXml}
+              highlightMeasureId={state.highlightMeasureId}
+              instrumentMode={state.instrumentMode}
+              viewTab={viewTab}
+              onViewTabChange={setViewTab}
+            />
+          ) : (
+            <ScoreViewer
+              scoreXml={renderXml}
+              highlightMeasureId={state.highlightMeasureId}
+              instrumentMode={state.instrumentMode}
+              viewTab={viewTab}
+              onViewTabChange={setViewTab}
+              onMeasureClick={handleMeasureClick}
+              onNoteClick={handleNoteClick}
+              onApiReady={setAlphaTabApi}
+              onPlayerReady={() => setPlayerReady(true)}
+              onPositionChanged={(current, total) => setPlaybackPos({ current, total })}
+            />
+          )}
         </section>
 
         <aside className="panel panel--meta">

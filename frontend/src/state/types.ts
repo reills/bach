@@ -1,5 +1,7 @@
 export type MeasureMap = Record<string, string>;
 export type EventHitMap = Record<string, string>;
+export type InstrumentMode = 'guitar' | 'piano';
+export type ScoreViewTab = 'score' | 'tab';
 
 export interface HitKey {
   barIndex: number;
@@ -24,8 +26,28 @@ export interface ScoreState {
   changedMeasureIds: string[] | null;
   lastEventId: string | null;
   midi: string | null;
-  instrumentMode: 'guitar' | 'piano' | null;
+  instrumentMode: InstrumentMode | null;
 }
+
+export const inferInstrumentMode = (xml: string): InstrumentMode => {
+  if (xml.includes('<staves>2</staves>')) {
+    return 'piano';
+  }
+
+  const firstMeasure = xml.match(/<measure\b[\s\S]*?<\/measure>/i)?.[0] ?? xml;
+  if (
+    firstMeasure.includes('<staff-details') ||
+    firstMeasure.includes('<staff-tuning')
+  ) {
+    return 'guitar';
+  }
+
+  return 'guitar';
+};
+
+export const canUseGuitarNoteActions = (
+  instrumentMode: InstrumentMode | null,
+): instrumentMode is 'guitar' => instrumentMode === 'guitar';
 
 export const toHitKey = (hit: HitKey): string => {
   const voice = hit.voiceIndex ?? -1;
