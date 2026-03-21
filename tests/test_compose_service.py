@@ -1,6 +1,6 @@
 import json
 import xml.etree.ElementTree as ET
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 import pytest
 from music21.midi import MidiFile
@@ -11,6 +11,19 @@ from src.api.compose_service import ComposeDiagnosticsError, compose_baseline
 from src.inference.generate_v1 import GenerationConfig, GenerationResult
 
 XML_NS = "http://www.w3.org/XML/1998/namespace"
+
+
+def test_compose_diagnostics_error_formats_report_paths_with_forward_slashes():
+    error = ComposeDiagnosticsError(
+        stage="tab",
+        message="no playable guitar voicing",
+        report_path=PureWindowsPath("/tmp/compose_failure_report.json"),
+    )
+
+    assert str(error) == (
+        "compose failed during tab: no playable guitar voicing "
+        "[report: /tmp/compose_failure_report.json]"
+    )
 
 
 def test_compose_baseline_runs_transformation_pipeline_with_stubbed_generation():
@@ -280,6 +293,60 @@ def test_compose_baseline_persists_failure_report_with_stage_and_parse_diagnosti
     assert report["score_summary"]["measure_count"] == 1
     assert report["token_summary"]["bar_count"] == 1
     assert "harmonic_validation_error_count" in report["token_summary"]
+
+
+def _make_fake_generator(tokens: list[str]):
+    def fake_generator(checkpoint_path, *, seed_tokens, generation_config, vocab_path=None, device="cpu"):
+        return GenerationResult(
+            ids=list(range(len(tokens))),
+            tokens=tokens,
+            stopped_on_eos=False,
+        )
+    return fake_generator
+
+
+_MINIMAL_TOKENS = [
+    "BAR",
+    "TIME_SIG_4_4",
+    "KEY_C",
+    "ABS_VOICE_3_60",
+    "POS_0",
+    "VOICE_3",
+    "DUR_24",
+    "MEL_INT12_0",
+    "HARM_OCT_0",
+    "HARM_CLASS_0",
+]
+
+
+def test_compose_baseline_guitar_mode_default_returns_guitar_render_mode():
+    result = compose_baseline(
+        Path("/tmp/fake.pt"),
+        seed_tokens=["KEY_C"],
+        generation_config=GenerationConfig(max_length=32),
+        generator=_make_fake_generator(_MINIMAL_TOKENS),
+    )
+    assert result.render_mode == "guitar"
+    # Guitar mode: fingering assigned
+    assert result.score.parts[0].events[0].fingering is not None
+    # Part still has tuning (guitar string info)
+    assert result.score.parts[0].info.tuning != []
+
+
+def test_compose_baseline_piano_mode_skips_tabbing_and_overrides_part_info():
+    result = compose_baseline(
+        Path("/tmp/fake.pt"),
+        seed_tokens=["KEY_C"],
+        generation_config=GenerationConfig(max_length=32),
+        render_mode="piano",
+        generator=_make_fake_generator(_MINIMAL_TOKENS),
+    )
+    assert result.render_mode == "piano"
+    # Piano mode: no fingering
+    assert result.score.parts[0].events[0].fingering is None
+    # Part overridden to piano with empty tuning
+    assert result.score.parts[0].info.instrument == "piano"
+    assert result.score.parts[0].info.tuning == []
 
 
 def test_ensure_unique_event_ids_rewrites_duplicates():

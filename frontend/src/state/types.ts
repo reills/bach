@@ -24,6 +24,7 @@ export interface ScoreState {
   changedMeasureIds: string[] | null;
   lastEventId: string | null;
   midi: string | null;
+  instrumentMode: 'guitar' | 'piano' | null;
 }
 
 export const toHitKey = (hit: HitKey): string => {

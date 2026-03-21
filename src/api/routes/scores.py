@@ -36,6 +36,7 @@ class ComposeRequest(BaseModel):
     prompt: str | None = None
     constraints: dict[str, Any] | None = None
     name: str | None = None
+    render_mode: Literal["guitar", "piano"] = "guitar"
 
 
 class ComposeResponse(BaseModel):
@@ -45,6 +46,7 @@ class ComposeResponse(BaseModel):
     name: str
     createdAt: str
     updatedAt: str
+    instrumentMode: Literal["guitar", "piano"]
     measureMap: dict[str, str] | None = None
     eventHitMap: dict[str, str] | None = None
     midi: str | None = None
@@ -182,6 +184,7 @@ def create_router(
             name=stored_score.name,
             createdAt=(stored_score.created_at.isoformat() if stored_score.created_at else ""),
             updatedAt=(stored_score.updated_at.isoformat() if stored_score.updated_at else ""),
+            instrumentMode=result.render_mode,
             measureMap=result.measure_map,
             eventHitMap=result.event_hit_map,
             midi=base64.b64encode(result.midi).decode("ascii"),

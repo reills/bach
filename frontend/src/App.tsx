@@ -22,138 +22,125 @@ const DEMO_XML = `<?xml version="1.0" encoding="UTF-8"?>
 <score-partwise version="3.1">
   <part-list>
     <score-part id="P1">
-      <part-name>Guitar</part-name>
+      <part-name>Classical Guitar</part-name>
     </score-part>
   </part-list>
   <part id="P1">
     <measure number="1" xml:id="measure-1">
       <attributes>
-        <divisions>24</divisions>
+        <divisions>4</divisions>
         <key>
           <fifths>0</fifths>
+          <mode>minor</mode>
         </key>
         <time>
           <beats>4</beats>
           <beat-type>4</beat-type>
         </time>
         <clef>
-          <sign>TAB</sign>
-          <line>5</line>
+          <sign>G</sign>
+          <line>2</line>
+          <clef-octave-change>-1</clef-octave-change>
         </clef>
+        <staff-details>
+          <staff-lines>6</staff-lines>
+          <staff-tuning line="1">
+            <tuning-step>E</tuning-step>
+            <tuning-octave>4</tuning-octave>
+          </staff-tuning>
+          <staff-tuning line="2">
+            <tuning-step>B</tuning-step>
+            <tuning-octave>3</tuning-octave>
+          </staff-tuning>
+          <staff-tuning line="3">
+            <tuning-step>G</tuning-step>
+            <tuning-octave>3</tuning-octave>
+          </staff-tuning>
+          <staff-tuning line="4">
+            <tuning-step>D</tuning-step>
+            <tuning-octave>3</tuning-octave>
+          </staff-tuning>
+          <staff-tuning line="5">
+            <tuning-step>A</tuning-step>
+            <tuning-octave>2</tuning-octave>
+          </staff-tuning>
+          <staff-tuning line="6">
+            <tuning-step>E</tuning-step>
+            <tuning-octave>2</tuning-octave>
+          </staff-tuning>
+        </staff-details>
       </attributes>
       <note>
-        <pitch>
-          <step>E</step>
-          <octave>4</octave>
-        </pitch>
-        <duration>24</duration>
+        <pitch><step>E</step><octave>4</octave></pitch>
+        <duration>4</duration>
         <type>quarter</type>
-        <notations>
-          <technical>
-            <string>1</string>
-            <fret>0</fret>
-          </technical>
-        </notations>
+        <notations><technical><string>1</string><fret>0</fret></technical></notations>
       </note>
       <note>
-        <pitch>
-          <step>G</step>
-          <octave>4</octave>
-        </pitch>
-        <duration>24</duration>
+        <pitch><step>D</step><octave>4</octave></pitch>
+        <duration>4</duration>
         <type>quarter</type>
-        <notations>
-          <technical>
-            <string>1</string>
-            <fret>3</fret>
-          </technical>
-        </notations>
+        <notations><technical><string>2</string><fret>3</fret></technical></notations>
       </note>
       <note>
-        <pitch>
-          <step>A</step>
-          <octave>4</octave>
-        </pitch>
-        <duration>24</duration>
+        <pitch><step>C</step><octave>4</octave></pitch>
+        <duration>4</duration>
         <type>quarter</type>
-        <notations>
-          <technical>
-            <string>1</string>
-            <fret>5</fret>
-          </technical>
-        </notations>
+        <notations><technical><string>2</string><fret>1</fret></technical></notations>
       </note>
       <note>
-        <pitch>
-          <step>G</step>
-          <octave>4</octave>
-        </pitch>
-        <duration>24</duration>
+        <pitch><step>B</step><octave>3</octave></pitch>
+        <duration>4</duration>
         <type>quarter</type>
-        <notations>
-          <technical>
-            <string>1</string>
-            <fret>3</fret>
-          </technical>
-        </notations>
+        <notations><technical><string>2</string><fret>0</fret></technical></notations>
       </note>
     </measure>
     <measure number="2" xml:id="measure-2">
       <note>
-        <pitch>
-          <step>F</step>
-          <octave>4</octave>
-        </pitch>
-        <duration>24</duration>
+        <pitch><step>A</step><octave>3</octave></pitch>
+        <duration>4</duration>
         <type>quarter</type>
-        <notations>
-          <technical>
-            <string>1</string>
-            <fret>1</fret>
-          </technical>
-        </notations>
+        <notations><technical><string>3</string><fret>2</fret></technical></notations>
       </note>
       <note>
-        <pitch>
-          <step>E</step>
-          <octave>4</octave>
-        </pitch>
-        <duration>24</duration>
+        <pitch><step>G</step><octave>3</octave></pitch>
+        <duration>4</duration>
         <type>quarter</type>
-        <notations>
-          <technical>
-            <string>1</string>
-            <fret>0</fret>
-          </technical>
-        </notations>
+        <notations><technical><string>3</string><fret>0</fret></technical></notations>
       </note>
       <note>
-        <pitch>
-          <step>D</step>
-          <octave>4</octave>
-        </pitch>
-        <duration>24</duration>
+        <pitch><step>A</step><octave>3</octave></pitch>
+        <duration>4</duration>
         <type>quarter</type>
-        <notations>
-          <technical>
-            <string>2</string>
-            <fret>3</fret>
-          </technical>
-        </notations>
+        <notations><technical><string>3</string><fret>2</fret></technical></notations>
       </note>
       <note>
-        <pitch>
-          <step>E</step>
-          <octave>4</octave>
-        </pitch>
-        <duration>24</duration>
+        <pitch><step>B</step><octave>3</octave></pitch>
+        <duration>4</duration>
         <type>quarter</type>
-        <notations>
-          <technical>
-            <string>1</string>
-            <fret>0</fret>
-          </technical>
-        </notations>
+        <notations><technical><string>2</string><fret>0</fret></technical></notations>
+      </note>
+    </measure>
+    <measure number="3" xml:id="measure-3">
+      <note>
+        <pitch><step>C</step><octave>4</octave></pitch>
+        <duration>8</duration>
+        <type>half</type>
+        <notations><technical><string>2</string><fret>1</fret></technical></notations>
+      </note>
+      <note>
+        <pitch><step>B</step><octave>3</octave></pitch>
+        <duration>8</duration>
+        <type>half</type>
+        <notations><technical><string>2</string><fret>0</fret></technical></notations>
+      </note>
+    </measure>
+    <measure number="4" xml:id="measure-4">
+      <note>
+        <pitch><step>E</step><octave>3</octave></pitch>
+        <duration>16</duration>
+        <type>whole</type>
+        <notations><technical><string>4</string><fret>2</fret></technical></notations>
       </note>
     </measure>
   </part>
@@ -176,6 +163,13 @@ const initialState: ScoreState = {
   changedMeasureIds: null,
   lastEventId: null,
   midi: null,
+  instrumentMode: null,
+};
+
+const inferInstrumentMode = (xml: string): 'guitar' | 'piano' => {
+  if (xml.includes('<staves>2</staves>')) return 'piano';
+  if (xml.includes('<staff-tuning') || xml.includes('<staff-details')) return 'guitar';
+  return 'guitar';
 };
 
 type StatusTone = 'idle' | 'busy' | 'success' | 'error';
@@ -187,12 +181,15 @@ const defaultSource: DataSource =
 const App = () => {
   const [state, setState] = useState<ScoreState>(initialState);
   const [alphaTabApi, setAlphaTabApi] = useState<any>(null);
+  const [playerReady, setPlayerReady] = useState(false);
+  const [playbackPos, setPlaybackPos] = useState<{ current: number; total: number } | null>(null);
   const [prompt, setPrompt] = useState('');
   const [dataSource, setDataSource] = useState<DataSource>(defaultSource);
   const [localSnippets, setLocalSnippets] = useState<string[]>([]);
   const [localManifest, setLocalManifest] = useState<LocalManifest | null>(
     null,
   );
+  const [selectedInstrument, setSelectedInstrument] = useState<'guitar' | 'piano'>('guitar');
   const [mode, setMode] = useState<'window' | 'repair'>('window');
   const [constraints, setConstraints] = useState({
     keepHarmony: false,
@@ -223,7 +220,7 @@ const App = () => {
     setBusy(true);
     setStatus('busy', 'Composing a new score...');
     try {
-      const response = await compose({ prompt });
+      const response = await compose({ prompt, render_mode: selectedInstrument });
       setState((prev) => ({
         ...prev,
         scoreId: response.scoreId,
@@ -232,6 +229,7 @@ const App = () => {
         measureMap: response.measureMap ?? null,
         eventHitMap: response.eventHitMap ?? null,
         midi: response.midi ?? null,
+        instrumentMode: response.instrumentMode,
         draftId: null,
         draftXml: null,
         draftBaseRevision: null,
@@ -267,6 +265,7 @@ const App = () => {
         measureMap,
         eventHitMap: null,
         midi: null,
+        instrumentMode: inferInstrumentMode(bundle.baseXml),
         draftId: null,
         draftXml: null,
         draftBaseRevision: null,
@@ -306,6 +305,7 @@ const App = () => {
         '1': 'demo-measure-2',
       },
       eventHitMap: null,
+      instrumentMode: inferInstrumentMode(DEMO_XML),
       draftId: null,
       draftXml: null,
       draftBaseRevision: null,
@@ -341,6 +341,9 @@ const App = () => {
       ...prev,
       lastEventId: eventId,
     }));
+
+    // Guitar-only: fingering/alt-positions not applicable for piano
+    if (state.instrumentMode === 'piano') return;
 
     if (!eventId || !state.scoreId) return;
     const measureId = getMeasureId(state.measureMap, hit.barIndex);
@@ -609,34 +612,21 @@ const App = () => {
   };
 
   const handlePlay = () => {
-    if (!alphaTabApi) {
-      setStatus('error', 'AlphaTab not ready yet.');
-      return;
-    }
-    const player = alphaTabApi.player ?? alphaTabApi.Player;
-    if (player?.play) {
-      player.play();
-    } else if (alphaTabApi.play) {
-      alphaTabApi.play();
-    }
+    alphaTabApi?.playPause();
   };
 
   const handlePause = () => {
-    const player = alphaTabApi?.player ?? alphaTabApi?.Player;
-    if (player?.pause) {
-      player.pause();
-    } else if (alphaTabApi?.pause) {
-      alphaTabApi.pause();
-    }
+    alphaTabApi?.playPause();
   };
 
   const handleStop = () => {
-    const player = alphaTabApi?.player ?? alphaTabApi?.Player;
-    if (player?.stop) {
-      player.stop();
-    } else if (alphaTabApi?.stop) {
-      alphaTabApi.stop();
-    }
+    alphaTabApi?.stop();
+    setPlaybackPos(null);
+  };
+
+  const formatTime = (ms: number) => {
+    const s = Math.floor(ms / 1000);
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
   };
 
   const statusClass = useMemo(
@@ -694,15 +684,29 @@ const App = () => {
                 </select>
               </label>
               {dataSource === 'api' ? (
-                <label className="field">
-                  <span>Prompt (optional)</span>
-                  <textarea
-                    value={prompt}
-                    onChange={(event) => setPrompt(event.target.value)}
-                    placeholder="e.g., Baroque style, minor key, moderate tempo..."
-                    rows={2}
-                  />
-                </label>
+                <>
+                  <label className="field">
+                    <span>Instrument</span>
+                    <select
+                      value={selectedInstrument}
+                      onChange={(event) =>
+                        setSelectedInstrument(event.target.value as 'guitar' | 'piano')
+                      }
+                    >
+                      <option value="guitar">Guitar</option>
+                      <option value="piano">Piano</option>
+                    </select>
+                  </label>
+                  <label className="field">
+                    <span>Prompt (optional)</span>
+                    <textarea
+                      value={prompt}
+                      onChange={(event) => setPrompt(event.target.value)}
+                      placeholder="e.g., Baroque style, minor key, moderate tempo..."
+                      rows={2}
+                    />
+                  </label>
+                </>
               ) : (
                 <div className="helper-text">
                   Uses local MusicXML files for testing without a backend.
@@ -894,15 +898,15 @@ const App = () => {
                   <button
                     className="btn btn--icon-only"
                     onClick={handlePlay}
-                    disabled={!renderXml}
-                    title="Play"
+                    disabled={!renderXml || !playerReady}
+                    title={playerReady ? 'Play' : 'Loading soundfont…'}
                   >
                     ▶
                   </button>
                   <button
                     className="btn btn--icon-only"
                     onClick={handlePause}
-                    disabled={!renderXml}
+                    disabled={!renderXml || !playerReady}
                     title="Pause"
                   >
                     ⏸
@@ -910,12 +914,17 @@ const App = () => {
                   <button
                     className="btn btn--icon-only"
                     onClick={handleStop}
-                    disabled={!renderXml}
+                    disabled={!renderXml || !playerReady}
                     title="Stop"
                   >
                     ⏹
                   </button>
                 </div>
+                {playbackPos && (
+                  <span className="playback-bar__time">
+                    {formatTime(playbackPos.current)} / {formatTime(playbackPos.total)}
+                  </span>
+                )}
                 <div className="playback-bar__divider" />
                 <div className="playback-bar__exports">
                   <button
@@ -942,9 +951,12 @@ const App = () => {
           <ScoreViewer
             scoreXml={renderXml}
             highlightMeasureId={state.highlightMeasureId}
+            instrumentMode={state.instrumentMode}
             onMeasureClick={handleMeasureClick}
             onNoteClick={handleNoteClick}
             onApiReady={setAlphaTabApi}
+            onPlayerReady={() => setPlayerReady(true)}
+            onPositionChanged={(current, total) => setPlaybackPos({ current, total })}
           />
         </section>
 

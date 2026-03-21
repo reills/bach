@@ -13,8 +13,9 @@ from src.api.canonical import (
     measure_by_id,
     replace_events_in_measure,
 )
-from src.api.compose_service import export_score
+from src.api.compose_service import _normalize_to_guitar_range, export_score
 from src.api.store import ScoreDraftRepository
+from src.tabber import DEFAULT_MAX_FRET, tab_events
 
 ReplacementPlanner = Callable[[Part, Measure, list[Event], list[Event]], list[Event]]
 
@@ -48,6 +49,7 @@ def preview_window_inpaint(
         locked_event_ids=locked_event_ids,
         replacement_planner=replacement_planner,
     )
+    updated_score = _retab_if_guitar(draft.score, updated_score)
     saved_draft = repository.save_draft(draft.draft_id, updated_score)
     exported = export_score(saved_draft.score)
     return InpaintWindowResult(
@@ -61,6 +63,57 @@ def preview_window_inpaint(
         locked_event_ids=effective_locked_ids,
         changed_measure_ids=changed_measure_ids,
     )
+
+
+def _retab_if_guitar(original_score: CanonicalScore, updated_score: CanonicalScore) -> CanonicalScore:
+    """Re-tab guitar scores while preserving unchanged user-selected fingerings."""
+    if len(updated_score.parts) != 1:
+        return updated_score
+    part = updated_score.parts[0]
+    if not part.info.tuning:
+        return updated_score
+
+    normalized_score = _normalize_to_guitar_range(updated_score)
+    normalized_part = normalized_score.parts[0]
+    try:
+        tabbed_events = tab_events(
+            normalized_part.events,
+            tuning=normalized_part.info.tuning,
+            max_fret=DEFAULT_MAX_FRET,
+        )
+    except Exception as exc:
+        raise ValueError(f"guitar inpaint retab failed: {exc}") from exc
+
+    preserved_events = _preserve_unchanged_fingerings(
+        original_score.parts[0].events,
+        tabbed_events,
+    )
+    return replace(
+        normalized_score,
+        parts=[replace(normalized_part, events=preserved_events)],
+    )
+
+
+def _preserve_unchanged_fingerings(
+    original_events: Sequence[Event],
+    retabbed_events: Sequence[Event],
+) -> list[Event]:
+    original_by_id = {event.id: event for event in original_events}
+    preserved: list[Event] = []
+    for event in retabbed_events:
+        original = original_by_id.get(event.id)
+        if (
+            original is not None
+            and original.fingering is not None
+            and original.start_tick == event.start_tick
+            and original.dur_tick == event.dur_tick
+            and original.voice_id == event.voice_id
+            and original.pitch_midi == event.pitch_midi
+        ):
+            preserved.append(replace(event, fingering=original.fingering))
+            continue
+        preserved.append(event)
+    return preserved
 
 
 def _inpaint_score(

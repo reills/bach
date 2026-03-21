@@ -36,7 +36,15 @@ const initialState: ScoreState = {
   changedMeasureIds: null,
   lastEventId: null,
   midi: null,
+  instrumentMode: null,
 };
+
+// Mirror the inferInstrumentMode logic from App.tsx
+function inferInstrumentMode(xml: string): 'guitar' | 'piano' {
+  if (xml.includes('<staves>2</staves>')) return 'piano';
+  if (xml.includes('<staff-tuning') || xml.includes('<staff-details')) return 'guitar';
+  return 'guitar';
+}
 
 // Minimal helpers that mirror the App.tsx handler state transforms.
 function applyComposeResponse(
@@ -48,6 +56,7 @@ function applyComposeResponse(
     measureMap?: MeasureMap;
     eventHitMap?: EventHitMap;
     midi?: string;
+    instrumentMode: 'guitar' | 'piano';
   },
 ): ScoreState {
   return {
@@ -58,6 +67,7 @@ function applyComposeResponse(
     measureMap: response.measureMap ?? null,
     eventHitMap: response.eventHitMap ?? null,
     midi: response.midi ?? null,
+    instrumentMode: response.instrumentMode,
     draftId: null,
     draftXml: null,
     draftBaseRevision: null,
@@ -156,6 +166,7 @@ describe('compose/inpaint workflow — state transitions', () => {
       revision: 0,
       scoreXML: MINIMAL_XML,
       measureMap: { '0': 'measure-1', '1': 'measure-2' } as MeasureMap,
+      instrumentMode: 'guitar' as const,
     };
     vi.mocked(compose).mockResolvedValue(composeResponse);
 
@@ -191,6 +202,7 @@ describe('compose/inpaint workflow — state transitions', () => {
       revision: 0,
       scoreXML: MINIMAL_XML,
       measureMap: { '0': 'measure-A' } as MeasureMap,
+      instrumentMode: 'guitar' as const,
     };
     vi.mocked(compose).mockResolvedValue(composeResponse);
 
@@ -374,6 +386,7 @@ describe('compose/inpaint workflow — state transitions', () => {
       revision: 0,
       scoreXML: MINIMAL_XML,
       measureMap,
+      instrumentMode: 'guitar',
     });
     vi.mocked(inpaintPreview).mockResolvedValue({
       draftId: 'draft-1',
@@ -426,6 +439,7 @@ describe('compose/inpaint workflow — state transitions', () => {
       revision: 0,
       scoreXML: MINIMAL_XML,
       measureMap,
+      instrumentMode: 'guitar',
     });
     vi.mocked(inpaintPreview).mockResolvedValue({
       draftId: 'draft-2',
@@ -469,6 +483,7 @@ describe('compose/inpaint workflow — state transitions', () => {
       revision: 0,
       scoreXML: MINIMAL_XML,
       measureMap: { '0': 'measure-1' },
+      instrumentMode: 'guitar',
     });
 
     const response = await compose({});
@@ -545,6 +560,89 @@ describe('compose/inpaint workflow — state transitions', () => {
     expect(state.scoreXml).toBe(MINIMAL_XML);
   });
 
+  it('compose: stores instrumentMode from the API response', async () => {
+    vi.mocked(compose).mockResolvedValue({
+      scoreId: 'score-guitar',
+      revision: 0,
+      scoreXML: MINIMAL_XML,
+      measureMap: { '0': 'measure-1' },
+      instrumentMode: 'guitar',
+    });
+
+    const response = await compose({ render_mode: 'guitar' });
+    const state = applyComposeResponse(initialState, response);
+
+    expect(state.instrumentMode).toBe('guitar');
+  });
+
+  it('compose: stores piano instrumentMode when render_mode is piano', async () => {
+    vi.mocked(compose).mockResolvedValue({
+      scoreId: 'score-piano',
+      revision: 0,
+      scoreXML: MINIMAL_XML,
+      measureMap: { '0': 'measure-1' },
+      instrumentMode: 'piano',
+    });
+
+    const response = await compose({ render_mode: 'piano' });
+    const state = applyComposeResponse(initialState, response);
+
+    expect(state.instrumentMode).toBe('piano');
+  });
+
+  it('compose: instrumentMode starts null before any score is loaded', () => {
+    expect(initialState.instrumentMode).toBeNull();
+  });
+
+  it('inferInstrumentMode: detects piano from <staves>2</staves>', () => {
+    const xml = '<score-partwise><attributes><staves>2</staves></attributes></score-partwise>';
+    expect(inferInstrumentMode(xml)).toBe('piano');
+  });
+
+  it('inferInstrumentMode: detects guitar from <staff-tuning', () => {
+    const xml = '<score-partwise><staff-details><staff-tuning line="1"/></staff-details></score-partwise>';
+    expect(inferInstrumentMode(xml)).toBe('guitar');
+  });
+
+  it('inferInstrumentMode: detects guitar from <staff-details', () => {
+    const xml = '<score-partwise><staff-details><staff-lines>6</staff-lines></staff-details></score-partwise>';
+    expect(inferInstrumentMode(xml)).toBe('guitar');
+  });
+
+  it('inferInstrumentMode: defaults to guitar for plain XML', () => {
+    expect(inferInstrumentMode(MINIMAL_XML)).toBe('guitar');
+  });
+
+  it('piano note click: instrumentMode piano should prevent guitar-only API call', () => {
+    // Simulate the guard in handleNoteClick: if instrumentMode is piano, return early
+    const pianoState: ScoreState = {
+      ...initialState,
+      scoreId: 'score-piano',
+      revision: 0,
+      scoreXml: MINIMAL_XML,
+      instrumentMode: 'piano',
+      eventHitMap: { '0|-1|-1|-1': 'evt-1' },
+    };
+
+    // The guard condition: piano skips guitar-only fingering
+    const shouldCallFingering = pianoState.instrumentMode !== 'piano';
+    expect(shouldCallFingering).toBe(false);
+  });
+
+  it('guitar note click: instrumentMode guitar proceeds to fingering API', () => {
+    const guitarState: ScoreState = {
+      ...initialState,
+      scoreId: 'score-guitar',
+      revision: 0,
+      scoreXml: MINIMAL_XML,
+      instrumentMode: 'guitar',
+      eventHitMap: { '0|-1|-1|-1': 'evt-1' },
+    };
+
+    const shouldCallFingering = guitarState.instrumentMode !== 'piano';
+    expect(shouldCallFingering).toBe(true);
+  });
+
   it('eventHitMap: getEventId resolves eventId from a hit key after compose', async () => {
     const hitMap: EventHitMap = { '0|0|-1|-1': 'evt-bar0-voice0' };
     vi.mocked(compose).mockResolvedValue({
@@ -553,6 +651,7 @@ describe('compose/inpaint workflow — state transitions', () => {
       scoreXML: MINIMAL_XML,
       measureMap: { '0': 'measure-1' },
       eventHitMap: hitMap,
+      instrumentMode: 'guitar',
     });
 
     const response = await compose({});

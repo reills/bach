@@ -38,3 +38,22 @@ def test_tab_events_rejects_same_onset_voicing_that_needs_one_string_twice():
 
     with pytest.raises(ValueError, match="onset 0"):
         tab_events(events)
+
+
+def test_tab_events_preserves_existing_explicit_fingering():
+    events = [
+        Event(
+            id="user-choice",
+            start_tick=0,
+            dur_tick=24,
+            voice_id=0,
+            pitch_midi=64,
+            fingering=GuitarFingering(string_index=4, fret=5),
+        ),
+        Event(id="next-note", start_tick=24, dur_tick=24, voice_id=0, pitch_midi=62),
+    ]
+
+    tabbed = tab_events(events)
+
+    assert tabbed[0].fingering == GuitarFingering(string_index=4, fret=5)
+    assert tabbed[1].fingering is not None

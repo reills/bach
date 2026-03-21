@@ -4,7 +4,7 @@ import xml.etree.ElementTree as ET
 from dataclasses import asdict, dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Callable, Sequence
+from typing import Callable, Literal, Sequence
 from uuid import uuid4
 
 import torch
@@ -15,6 +15,9 @@ from src.api.render import canonical_score_to_midi, canonical_score_to_musicxml
 from src.inference.generate_v1 import GenerationConfig, GenerationResult, generate_v1
 from src.tabber import DEFAULT_MAX_FRET, tab_events
 from src.tokens.validator import validate_harm_tokens
+
+# Lowest open string on a standard-tuned guitar (low E2)
+_GUITAR_LOWEST_MIDI = 40
 
 XML_NS = "http://www.w3.org/XML/1998/namespace"
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -29,6 +32,7 @@ class ComposeServiceResult:
     midi: bytes
     measure_map: dict[str, str]
     event_hit_map: dict[str, str]
+    render_mode: Literal["guitar", "piano"] = "guitar"
 
 
 @dataclass(frozen=True)
@@ -51,7 +55,7 @@ class ComposeDiagnosticsError(ValueError):
         self.report_path = report_path
         detail = f"compose failed during {stage}: {message}"
         if report_path is not None:
-            detail += f" [report: {report_path}]"
+            detail += f" [report: {_display_path(report_path)}]"
         super().__init__(detail)
 
 
@@ -65,6 +69,7 @@ def compose_baseline(
     tpq: int = 24,
     part_info: PartInfo | None = None,
     max_fret: int = DEFAULT_MAX_FRET,
+    render_mode: Literal["guitar", "piano"] = "guitar",
     generator: Callable[..., GenerationResult] = generate_v1,
 ) -> ComposeServiceResult:
     generation: GenerationResult | None = None
@@ -122,20 +127,40 @@ def compose_baseline(
             parse_diagnostics=parse_diagnostics,
         ) from exc
 
-    try:
-        score = _tab_score(score, max_fret=max_fret)
-    except Exception as exc:
-        raise _compose_failure(
-            stage="tab",
-            exc=exc,
-            checkpoint_path=checkpoint_path,
-            seed_tokens=seed_tokens,
-            generation_config=generation_config,
-            generation=generation,
-            effective_tokens=trimmed_generation.tokens,
-            parse_diagnostics=parse_diagnostics,
-            score=score,
-        ) from exc
+    if render_mode == "guitar":
+        try:
+            score = _normalize_to_guitar_range(score)
+            score = _tab_score(score, max_fret=max_fret)
+        except Exception as exc:
+            raise _compose_failure(
+                stage="tab",
+                exc=exc,
+                checkpoint_path=checkpoint_path,
+                seed_tokens=seed_tokens,
+                generation_config=generation_config,
+                generation=generation,
+                effective_tokens=trimmed_generation.tokens,
+                parse_diagnostics=parse_diagnostics,
+                score=score,
+            ) from exc
+    else:
+        # Piano path: override PartInfo to remove string-instrument semantics
+        try:
+            part = score.parts[0]
+            piano_info = replace(part.info, instrument="piano", tuning=[], capo=0)
+            score = replace(score, parts=[replace(part, info=piano_info)])
+        except Exception as exc:
+            raise _compose_failure(
+                stage="tab",
+                exc=exc,
+                checkpoint_path=checkpoint_path,
+                seed_tokens=seed_tokens,
+                generation_config=generation_config,
+                generation=generation,
+                effective_tokens=trimmed_generation.tokens,
+                parse_diagnostics=parse_diagnostics,
+                score=score,
+            ) from exc
 
     try:
         exported = export_score(score)
@@ -160,6 +185,7 @@ def compose_baseline(
         midi=midi,
         measure_map=exported.measure_map,
         event_hit_map=exported.event_hit_map,
+        render_mode=render_mode,
     )
 
 
@@ -225,6 +251,10 @@ def _safe_write_failure_report(
         )
     except Exception:
         return None
+
+
+def _display_path(path: Path) -> str:
+    return path.as_posix()
 
 
 def _write_failure_report(
@@ -415,6 +445,22 @@ def _next_complete_voice_event_index(tokens: Sequence[str], idx: int) -> int | N
         return idx + 1
 
     return next_idx
+
+
+def _normalize_to_guitar_range(score: CanonicalScore) -> CanonicalScore:
+    """Shift pitches below the lowest guitar string up by whole octaves."""
+    if len(score.parts) != 1:
+        raise ValueError("compose service supports exactly one part")
+    part = score.parts[0]
+    normalized: list = []
+    for event in part.events:
+        if event.pitch_midi is not None and event.pitch_midi < _GUITAR_LOWEST_MIDI:
+            new_pitch = event.pitch_midi
+            while new_pitch < _GUITAR_LOWEST_MIDI:
+                new_pitch += 12
+            event = replace(event, pitch_midi=new_pitch)
+        normalized.append(event)
+    return replace(score, parts=[replace(part, events=normalized)])
 
 
 def _tab_score(score: CanonicalScore, *, max_fret: int) -> CanonicalScore:

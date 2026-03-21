@@ -3,6 +3,7 @@ import type { EventHitMap, MeasureMap } from '../state/types';
 export interface ComposeRequest {
   prompt?: string;
   constraints?: Record<string, unknown>;
+  render_mode?: 'guitar' | 'piano';
 }
 
 export interface ComposeResponse {
@@ -12,6 +13,7 @@ export interface ComposeResponse {
   measureMap?: MeasureMap;
   eventHitMap?: EventHitMap;
   midi?: string;
+  instrumentMode: 'guitar' | 'piano';
 }
 
 export interface InpaintPreviewRequest {

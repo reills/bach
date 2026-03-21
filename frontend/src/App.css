@@ -464,6 +464,7 @@
 }
 
 .score-viewer__canvas {
+  position: relative;
   width: 100%;
   min-height: 500px;
   border-radius: 16px;
@@ -472,6 +473,32 @@
   overflow: auto;
   padding: 0.75rem 1rem 1rem;
   box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.02);
+}
+
+.score-viewer__tab-section--hidden {
+  display: none;
+}
+
+.score-viewer__tab-header {
+  margin-top: 0.5rem;
+}
+
+/* AlphaTab playback cursor — these elements exist but are transparent by default */
+.at-cursor-bar {
+  background: rgba(255, 220, 0, 0.2);
+}
+
+.at-cursor-beat {
+  background: rgba(13, 110, 253, 0.8);
+}
+
+.at-selection div {
+  background: rgba(13, 110, 253, 0.1);
+}
+
+.at-highlight * {
+  fill: #0d6efd;
+  stroke: #0d6efd;
 }
 
 .score-viewer__empty {
@@ -636,6 +663,14 @@
   gap: 0.25rem;
 }
 
+.playback-bar__time {
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  white-space: nowrap;
+  align-self: center;
+}
+
 .playback-bar__divider {
   width: 1px;
   height: 24px;
@@ -718,6 +753,36 @@
 .draft-indicator__actions {
   display: flex;
   gap: 0.35rem;
+}
+
+/* View tab switcher (guitar score/tab toggle) */
+.view-tab-switcher {
+  display: flex;
+  gap: 0.25rem;
+  margin-left: auto;
+}
+
+.view-tab-btn {
+  padding: 0.25rem 0.7rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.view-tab-btn:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text);
+}
+
+.view-tab-btn--active {
+  background: rgba(43, 122, 120, 0.18);
+  border-color: rgba(43, 122, 120, 0.45);
+  color: var(--accent);
 }
 
 /* Selection highlight */

@@ -115,6 +115,7 @@ def test_compose_route_stores_generated_score_and_returns_frontend_payload():
             "prompt": "Prelude",
             "constraints": {"temperature": 0.5},
             "name": None,
+            "render_mode": "guitar",
         }
     }
 
@@ -122,6 +123,7 @@ def test_compose_route_stores_generated_score_and_returns_frontend_payload():
     assert payload["scoreId"] == "score-1"
     assert payload["revision"] == 1
     assert payload["scoreXML"] == canonical_score_to_musicxml(score)
+    assert payload["instrumentMode"] == "guitar"
     _assert_measure_map(payload, expected=build_measure_map(score))
     _assert_event_hit_map(payload, expected=build_event_hit_map(score))
     assert base64.b64decode(payload["midi"]) == canonical_score_to_midi(score)
@@ -241,6 +243,7 @@ def test_compose_launcher_binds_real_compose_service(monkeypatch):
         generation_config,
         vocab_path=None,
         device="cpu",
+        render_mode="guitar",
         generator=None,
     ) -> ComposeServiceResult:
         captured["checkpoint_path"] = Path(checkpoint_path)
@@ -347,6 +350,7 @@ def test_compose_launcher_defaults_seed_controls_when_request_has_no_constraints
         generation_config,
         vocab_path=None,
         device="cpu",
+        render_mode="guitar",
         generator=None,
     ) -> ComposeServiceResult:
         captured["seed_tokens"] = list(seed_tokens)
@@ -441,6 +445,45 @@ def test_preview_then_commit_routes_update_score_and_revision():
     committed = repository.get_score(stored_score.score_id)
     assert committed.revision == 2
     assert committed.score.parts[0].events[2].id == "part-0-m1-regen-0"
+
+
+def test_compose_route_render_mode_guitar_default_and_piano_explicit():
+    """Compose request accepts render_mode; response always includes instrumentMode."""
+    repository = InMemoryScoreRepository[CanonicalScore]()
+    score = _build_score()
+    exported = export_score(score)
+    captured_modes: list[str] = []
+
+    def fake_compose_service(request) -> ComposeServiceResult:
+        captured_modes.append(request.render_mode)
+        mode = request.render_mode
+        return ComposeServiceResult(
+            generation=GenerationResult(ids=[1], tokens=["BAR"], stopped_on_eos=True),
+            score=score,
+            score_xml=exported.score_xml,
+            midi=canonical_score_to_midi(score),
+            measure_map=exported.measure_map,
+            event_hit_map=exported.event_hit_map,
+            render_mode=mode,
+        )
+
+    client = CompatTestClient(
+        create_app(compose_service=fake_compose_service, repository=repository)
+    )
+    try:
+        # Default: guitar
+        r1 = client.post("/compose", json={})
+        assert r1.status_code == 200
+        assert r1.json()["instrumentMode"] == "guitar"
+
+        # Explicit: piano
+        r2 = client.post("/compose", json={"render_mode": "piano"})
+        assert r2.status_code == 200
+        assert r2.json()["instrumentMode"] == "piano"
+    finally:
+        client.close()
+
+    assert captured_modes == ["guitar", "piano"]
 
 
 def test_commit_draft_returns_409_for_stale_revision_conflicts():

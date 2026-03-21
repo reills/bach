@@ -63,23 +63,33 @@ def tab_events(
     _validate_max_fret(max_fret)
 
     indexed_notes: list[_IndexedNote] = []
+    fixed_fingerings: dict[_IndexedNote, GuitarFingering] = {}
     tabbed_events: list[Event | None] = [None] * len(events)
     for index, event in enumerate(events):
         if event.pitch_midi is None:
             tabbed_events[index] = event
             continue
-        indexed_notes.append(
-            _IndexedNote(
-                index=index,
-                pitch_midi=event.pitch_midi,
-                onset_tick=event.start_tick,
-                dur_tick=event.dur_tick,
-                voice_id=event.voice_id,
-            )
+        indexed_note = _IndexedNote(
+            index=index,
+            pitch_midi=event.pitch_midi,
+            onset_tick=event.start_tick,
+            dur_tick=event.dur_tick,
+            voice_id=event.voice_id,
         )
+        indexed_notes.append(indexed_note)
+        if event.fingering is not None:
+            fixed_fingerings[indexed_note] = event.fingering
+            tabbed_events[index] = event
 
-    assignments = _assign_fingerings(indexed_notes, normalized_tuning, max_fret)
+    assignments = _assign_fingerings(
+        indexed_notes,
+        normalized_tuning,
+        max_fret,
+        fixed_fingerings=fixed_fingerings,
+    )
     for indexed_note, fingering in assignments.items():
+        if indexed_note in fixed_fingerings:
+            continue
         tabbed_events[indexed_note.index] = replace(events[indexed_note.index], fingering=fingering)
 
     return [event for event in tabbed_events if event is not None]
@@ -135,8 +145,11 @@ def _assign_fingerings(
     notes: Sequence[_IndexedNote],
     tuning: tuple[int, ...],
     max_fret: int,
+    *,
+    fixed_fingerings: dict[_IndexedNote, GuitarFingering] | None = None,
 ) -> dict[_IndexedNote, GuitarFingering]:
     assignments: dict[_IndexedNote, GuitarFingering] = {}
+    fixed_fingerings = fixed_fingerings or {}
     previous_by_voice: dict[int, GuitarFingering] = {}
     notes_by_onset: dict[int, list[_IndexedNote]] = {}
 
@@ -148,7 +161,29 @@ def _assign_fingerings(
         if len(onset_notes) > len(tuning):
             raise ValueError(f"no playable guitar voicing at onset {onset_tick}: more notes than strings")
 
-        candidate_lists = [_candidate_fingerings(note.pitch_midi, tuning, max_fret) for note in onset_notes]
+        fixed_notes: list[tuple[_IndexedNote, GuitarFingering]] = []
+        open_notes: list[_IndexedNote] = []
+        used_strings: set[int] = set()
+        for note in onset_notes:
+            fingering = fixed_fingerings.get(note)
+            if fingering is None:
+                open_notes.append(note)
+                continue
+            if fingering.string_index in used_strings:
+                raise ValueError(f"no playable guitar voicing at onset {onset_tick}: duplicate string use required")
+            if fingering not in _candidate_fingerings(note.pitch_midi, tuning, max_fret):
+                raise ValueError(f"existing fingering is not playable at onset {onset_tick}")
+            used_strings.add(fingering.string_index)
+            fixed_notes.append((note, fingering))
+
+        candidate_lists = [
+            [
+                fingering
+                for fingering in _candidate_fingerings(note.pitch_midi, tuning, max_fret)
+                if fingering.string_index not in used_strings
+            ]
+            for note in open_notes
+        ]
         if any(not candidates for candidates in candidate_lists):
             raise ValueError(f"no playable guitar voicing at onset {onset_tick}: note is outside the fret range")
 
@@ -156,11 +191,12 @@ def _assign_fingerings(
         best_cost: tuple[int, int, int, int, tuple[int, ...]] | None = None
 
         # On each onset, brute-force the small candidate grid and keep only unique-string voicings.
-        for combo in product(*candidate_lists):
+        combo_iter = product(*candidate_lists) if candidate_lists else [()]
+        for combo in combo_iter:
             strings = {fingering.string_index for fingering in combo}
             if len(strings) != len(combo):
                 continue
-            cost = _combo_cost(onset_notes, combo, previous_by_voice)
+            cost = _combo_cost(open_notes, combo, previous_by_voice)
             if best_cost is None or cost < best_cost:
                 best_cost = cost
                 best_combo = combo
@@ -168,9 +204,22 @@ def _assign_fingerings(
         if best_combo is None:
             raise ValueError(f"no playable guitar voicing at onset {onset_tick}: duplicate string use required")
 
-        for note, fingering in zip(onset_notes, best_combo):
+        chosen_by_note = {
+            note: fingering
+            for note, fingering in fixed_notes
+        }
+        chosen_by_note.update(
+            {
+                note: fingering
+                for note, fingering in zip(open_notes, best_combo)
+            }
+        )
+
+        for note in onset_notes:
+            fingering = chosen_by_note[note]
             assignments[note] = fingering
-            previous_by_voice[note.voice_id] = fingering
+        for note in onset_notes:
+            previous_by_voice[note.voice_id] = chosen_by_note[note]
 
     return assignments
 

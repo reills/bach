@@ -93,6 +93,7 @@ def build_compose_service(config: ComposeRuntimeConfig) -> ComposeHandler:
             generation_config=generation_config,
             vocab_path=loaded.vocab_path,
             device=config.device,
+            render_mode=request.render_mode,
             generator=generator,
         )
 
