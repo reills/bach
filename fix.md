@@ -1,145 +1,47 @@
-The current setup is wrong at the data-model level.
-                                                                                
-  You have one scoreXml trying to serve as:                                     
-                                                                                
-  - the canonical musical truth                                                 
-  - the standard-notation document
-  - the tablature document                                                      
-  - the interaction map source for two different renderers                      
-                                                                                
-  That is why it keeps drifting and confusing agents.                           
-                                                                                
-  What’s Broken
-  The current frontend splits responsibility across:                            
-                                                                                
-  - frontend/src/App.tsx                                                        
-  - frontend/src/components/ScoreViewer.tsx                                     
-  - frontend/src/components/SheetMusicViewer.tsx                                
-                                                                                
-  And the API only gives one document shape in:
+• What’s Wrong
 
-  - frontend/src/api/types.ts                                                   
-  - frontend/src/state/types.ts                                                 
-                                                                                
-  That means:                                                                   
-                                                                                
-  - Verovio and AlphaTab are interpreting the same guitar XML differently.      
-  - The app is switching renderers, not switching views of one explicit render  
-    bundle.                                                                     
-  - A single eventHitMap is being treated like it applies equally to both views.  - Guitar tab semantics like <staff-details>, <staff-tuning>, and              
-    <technical><string/><fret/></technical> leak into the score view.           
-                                                                                
-  Correct Architecture                                                          
-  Use one truth, but not one XML.                                               
-                                                                                
-  The one truth should be the backend canonical score model. From that one      
-  truth, generate two explicit render artifacts for guitar:                     
-                                                                                
-  - scoreView: standard notation only                                           
-  - tabView: tablature only                                                     
-                                                                                
-  For piano:                                                                    
+  - The model looks undertrained for the amount of data you have. out/notelm_v1/train_args.json:19 shows
+    max_steps=5000, batch_size=4, bars_per_seq=4, while data/processed/stats.json says the dataset has 247,834
+    bars across 3,154 pieces. Roughly, you only exposed it to about a third of one full pass at best.
+  - Conditioning is weak. The collator only prepends a tiny prefix like KEY_* and MEAS_* for the whole packed
+    sequence in src/dataio/collate_miditok.py:145 and src/dataio/collate_miditok.py:215. The model supports
+    descriptor embeddings in src/models/notelm/model.py:178, but training never passes desc_embed in scripts/
+    train_v1.py:518.
+  - You’re making the LM predict derived harmonic tokens as if they were creative choices. HARM_* is generated
+    token-by-token, but one failure report already shows 49 harmonic mismatches in out/
+    compose_failures/20260323T070106Z_5814c16a_tab.json. That wastes capacity and adds noise.
+  - Decoding is very loose. Defaults are temperature=1.0, top_p=0.9, no EOS, no real no-repeat logic in src/
+    inference/generate_v1.py:17 and src/utils/decoding/sampler.py:32. The optional SCG rules are too weak and
+    not key-aware in src/utils/decoding/rules.py:16 and src/utils/decoding/scg.py:19.
+  - Your eval is mostly syntax-level. scripts/eval_basic.py:94 doesn’t measure key fit, cadence quality,
+    harmonic consistency, or repetition. So you can get “valid” output that still sounds bad.
 
-  - scoreView only                                                              
-                                                                                
-  So the API shape should become something like:                                
-                                                                                
-  type RenderView = {                                                           
-    xml: string;                                                                
-    measureMap?: Record<string, string>;                                        
-    eventHitMap?: Record<string, string>;                                       
-  };                                                                            
-                                                                                
-  type ScoreDocumentBundle = {                                                  
-    instrumentMode: 'guitar' | 'piano';                                         
-    views: {                                                                    
-      score: RenderView;                                                        
-      tab?: RenderView;                                                         
-    };                                                                          
-  };                                                                            
-                                                                                
-  Then frontend state becomes:                                                  
-                                                                                
-  type LoadedScoreState = {                                                     
-    scoreId: string | null;                                                     
-    revision: number | null;                                                    
-    document: ScoreDocumentBundle | null;                                       
-    draftDocument: ScoreDocumentBundle | null;                                  
-  };
-                                                                                
-  Not:                                                                          
-                                                                                
-  - scoreXml                                                                    
-  - draftXml                                                                    
-  - one shared map for everything                                               
-                                                                                
-  Backend Rules                                                                 
-  In src/api/render/musicxml.py, split export into two guitar exporters:        
-                                                                                
-  - canonical_score_to_standard_musicxml(score)                                 
-  - canonical_score_to_tab_musicxml(score)                                      
-                                                                                
-  For guitar score export:                                                      
+  One live KEY_C sample from the current checkpoint had 39 note onsets over 5 bars, and about 51% of them were
+  outside the C-major pitch-class set. That matches your complaint pretty directly.
 
-  - emit normal notation staff                                                  
-  - do not emit tab staff metadata                                              
-  - do not emit <staff-details>, <staff-lines>6, <staff-tuning>, <capo>         
-  - likely do not emit <technical><string/><fret/></technical> in the score view
-    if you want clean sheet music                                               
+  What I’d Do First
 
-  For guitar tab export:                                                        
-                                                                                
-  - emit the current tab-capable metadata                                       
-  - keep <staff-details>                                                        
-  - keep tuning/capo                                                            
-  - keep string/fret technical data                                             
-                                                                                
-  Both must be derived from the same CanonicalScore, same pitches, same         
-  durations, same event IDs.                                                    
-                                                                                
-  That is the key point: one musical source, two render documents.              
-                                                                                
-  Frontend Rules                                                                
-  Do not make one component try to be both renderers.                           
-                                                                                
-  Use:                                                                          
-                                                                                
-  - StandardScoreViewer for views.score.xml                                     
-  - TabViewer for views.tab.xml                                                 
-                                                                                
-  And in frontend/src/App.tsx, choose only by explicit document:                
-                                                                                
-  - guitar + viewTab === 'score' -> document.views.score                        
-  - guitar + viewTab === 'tab' -> document.views.tab                            
-  - piano -> document.views.score                                               
-                                                                                
-  No renderer should contain hidden mode-translation logic.                     
-                                                                                
-  Why Notes Drift Today                                                         
-  The likely causes are:                                                        
-                                                                                
-  - same guitar XML is being parsed differently by Verovio vs AlphaTab          
-  - score-view and tab-view hit maps are being treated as identical             
-  - tablature-specific MusicXML is being used as if it were clean score notation                                                                                
-  If the tab view and score view must stay aligned, each view needs its own     
-  eventHitMap. Do not assume renderer ordering is identical.                    
-                                                                                
-  Implementation Order                                                          
-                                                                                
-  1. Change API responses to return views.score and views.tab.                  
-  2. Change frontend state to store a render bundle, not raw scoreXml.          
-  3. Split backend guitar export into separate score/tab exporters.             
-  4. Route SheetMusicViewer only to views.score.xml.                            
-  5. Route ScoreViewer/AlphaTab only to views.tab.xml.                          
-  6. Keep separate per-view maps.                                               
-  7. Remove all frontend logic that toggles standard/tab visibility inside one  
-     imported document.                                                         
-                                                                                
-  That is the clean fix. Not another patch.                                     
-                                                                                
-  If you want, I can do the actual re-architecture next in this order:          
-                                                                                
-  1. API/state types                                                            
-  2. backend dual-view export                                                   
-  3. app wiring                                                                 
-  4. renderer cleanup
+  1. Train longer before changing architecture. I’d push this checkpoint toward at least 20k-50k steps and
+     watch validation loss plus sample quality every few thousand steps.
+  2. Tighten inference immediately: try temperature 0.7-0.85 and top_p 0.8-0.9. Right now sampling is too
+     permissive for a still-weak model.
+  3. Normalize the corpus more aggressively. If the goal is “sounds in-key and Bach-ish,” transpose training
+     pieces to a small canonical set first, ideally C major / A minor, instead of asking a lightly conditioned
+     model to learn all keys equally well.
+  4. Stop predicting HARM_OCT and HARM_CLASS directly. Derive them from the pitches during training/inference,
+     or at minimum remove their loss weight. They should be consistency features, not freeform sampled content.
+  5. Add real musical eval: off-key rate by declared key, harmonic-token mismatch count, cadence-ending
+     quality, repeated-pattern rate, and tab/playability failure rate.
+  6. If guitar output matters, add guitar awareness before tabbing. Right now the LM generates symbolic notes
+     and the tabber often fails afterward, which is a separate problem from tonality.
+
+  Best Next Patch
+  If you want me to implement changes, I’d do them in this order:
+
+  1. Add better eval metrics and a generation-audit script.
+  2. Make HARM_* deterministic instead of sampled.
+  3. Wire real bar descriptors into training, or at least strengthen conditioning.
+  4. Add constrained decoding for key consistency and token grammar.
+
+  If you want, I can take the first pass and patch eval_basic.py plus generation so you can measure exactly why
+  samples are sounding bad.

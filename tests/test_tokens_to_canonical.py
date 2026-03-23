@@ -1,5 +1,5 @@
 from src.api.canonical import PartInfo
-from src.api.canonical.from_tokens import tokens_to_canonical_score
+from src.api.canonical.from_tokens import ParseDiagnostics, tokens_to_canonical_score
 
 
 def test_tokens_to_canonical_score_reconstructs_simple_monophonic_bar():
@@ -75,3 +75,40 @@ def test_tokens_to_canonical_score_preserves_cross_bar_sustain():
     assert event.end_tick == 48
     assert event.pitch_midi == 60
     assert score.measure_for_tick(24).id == score.measures[1].id
+
+
+def test_tokens_to_canonical_score_compacts_surviving_voice_ids_after_skipping_missing_anchors():
+    diagnostics = ParseDiagnostics()
+    tokens = [
+        "BAR",
+        "TIME_SIG_4_4",
+        "KEY_C",
+        "ABS_VOICE_1_60",
+        "ABS_VOICE_4_67",
+        "POS_0",
+        "VOICE_1",
+        "DUR_24",
+        "MEL_INT12_0",
+        "HARM_OCT_0",
+        "HARM_CLASS_0",
+        "VOICE_3",
+        "DUR_24",
+        "MEL_INT12_0",
+        "HARM_OCT_0",
+        "HARM_CLASS_0",
+        "VOICE_4",
+        "DUR_24",
+        "MEL_INT12_0",
+        "HARM_OCT_0",
+        "HARM_CLASS_7",
+    ]
+
+    score = tokens_to_canonical_score(
+        tokens,
+        ignore_invalid_events=True,
+        diagnostics=diagnostics,
+    )
+
+    assert diagnostics.skipped_missing_anchor == 1
+    assert [event.pitch_midi for event in score.parts[0].events] == [60, 67]
+    assert [event.voice_id for event in score.parts[0].events] == [0, 1]
