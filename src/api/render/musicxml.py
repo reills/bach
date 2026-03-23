@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 import xml.etree.ElementTree as ET
+from typing import Literal
 
 from src.api.canonical.types import CanonicalScore, Event, Measure, Part
 
@@ -37,6 +38,15 @@ class _RenderedSlice:
 def canonical_score_to_musicxml(score: CanonicalScore) -> str:
     if len(score.parts) != 1:
         raise ValueError("musicxml exporter supports exactly one part")
+    part = score.parts[0]
+    if _is_piano(part):
+        return canonical_score_to_standard_musicxml(score)
+    return canonical_score_to_tab_musicxml(score)
+
+
+def canonical_score_to_standard_musicxml(score: CanonicalScore) -> str:
+    if len(score.parts) != 1:
+        raise ValueError("musicxml exporter supports exactly one part")
 
     part = score.parts[0]
     root = ET.Element("score-partwise", version="4.0")
@@ -49,8 +59,33 @@ def canonical_score_to_musicxml(score: CanonicalScore) -> str:
     for measure in score.measures:
         measure_el = ET.SubElement(part_el, "measure", number=str(measure.index + 1))
         measure_el.set(f"{{{XML_NS}}}id", measure.id)
-        _append_measure_attributes(measure_el, score, measure)
-        _append_measure_content(measure_el, score, measure)
+        _append_measure_attributes(measure_el, score, measure, guitar_view="score")
+        _append_measure_content(measure_el, score, measure, guitar_view="score")
+
+    ET.indent(root)
+    return ET.tostring(root, encoding="unicode")
+
+
+def canonical_score_to_tab_musicxml(score: CanonicalScore) -> str:
+    if len(score.parts) != 1:
+        raise ValueError("musicxml exporter supports exactly one part")
+
+    part = score.parts[0]
+    if _is_piano(part):
+        raise ValueError("tab musicxml exporter does not support piano scores")
+
+    root = ET.Element("score-partwise", version="4.0")
+
+    part_list_el = ET.SubElement(root, "part-list")
+    score_part_el = ET.SubElement(part_list_el, "score-part", id=part.info.id)
+    ET.SubElement(score_part_el, "part-name").text = part.info.instrument
+
+    part_el = ET.SubElement(root, "part", id=part.info.id)
+    for measure in score.measures:
+        measure_el = ET.SubElement(part_el, "measure", number=str(measure.index + 1))
+        measure_el.set(f"{{{XML_NS}}}id", measure.id)
+        _append_measure_attributes(measure_el, score, measure, guitar_view="tab")
+        _append_measure_content(measure_el, score, measure, guitar_view="tab")
 
     ET.indent(root)
     return ET.tostring(root, encoding="unicode")
@@ -64,9 +99,26 @@ def _is_piano(part: Part) -> bool:
     return part.info.instrument == "piano"
 
 
-def _append_measure_attributes(measure_el: ET.Element, score: CanonicalScore, measure: Measure) -> None:
-    has_time_sig = measure.start_tick in score.header.time_sig_map
+def _append_measure_attributes(
+    measure_el: ET.Element,
+    score: CanonicalScore,
+    measure: Measure,
+    *,
+    guitar_view: Literal["score", "tab"],
+) -> None:
     has_first_measure = measure.index == 0
+
+    # Only emit a time sig when it actually changes from the previous measure.
+    # The token parser stores the current time sig for *every* bar in time_sig_map,
+    # so we must suppress repeats to avoid a time signature appearing before every measure.
+    current_sig = score.header.time_sig_map.get(measure.start_tick)
+    if has_first_measure:
+        has_time_sig = current_sig is not None
+    else:
+        prev_start = score.measures[measure.index - 1].start_tick
+        prev_sig = score.header.time_sig_map.get(prev_start)
+        has_time_sig = current_sig is not None and current_sig != prev_sig
+
     if not has_first_measure and not has_time_sig:
         return
 
@@ -74,8 +126,8 @@ def _append_measure_attributes(measure_el: ET.Element, score: CanonicalScore, me
     attributes_el = ET.SubElement(measure_el, "attributes")
     ET.SubElement(attributes_el, "divisions").text = str(score.header.tpq)
 
-    if has_time_sig:
-        beats, beat_type = score.header.time_sig_map[measure.start_tick].split("/", 1)
+    if has_time_sig and current_sig is not None:
+        beats, beat_type = current_sig.split("/", 1)
         time_el = ET.SubElement(attributes_el, "time")
         ET.SubElement(time_el, "beats").text = beats
         ET.SubElement(time_el, "beat-type").text = beat_type
@@ -84,15 +136,23 @@ def _append_measure_attributes(measure_el: ET.Element, score: CanonicalScore, me
         if _is_piano(part):
             _append_piano_attributes(attributes_el)
         else:
-            _append_guitar_attributes(attributes_el, part)
+            _append_guitar_attributes(attributes_el, part, view=guitar_view)
 
 
-def _append_guitar_attributes(attributes_el: ET.Element, part: "Part") -> None:
-    """Emit guitar treble-clef (8vb) and staff-details with tuning."""
+def _append_guitar_attributes(
+    attributes_el: ET.Element,
+    part: "Part",
+    *,
+    view: Literal["score", "tab"],
+) -> None:
+    """Emit clean standard notation or tab-capable guitar metadata."""
     clef_el = ET.SubElement(attributes_el, "clef")
     ET.SubElement(clef_el, "sign").text = "G"
     ET.SubElement(clef_el, "line").text = "2"
     ET.SubElement(clef_el, "clef-octave-change").text = "-1"
+
+    if view == "score":
+        return
 
     tuning = part.info.tuning
     if not tuning:
@@ -129,15 +189,35 @@ def _append_piano_attributes(attributes_el: ET.Element) -> None:
     ET.SubElement(clef2_el, "line").text = "4"
 
 
-def _append_measure_content(measure_el: ET.Element, score: CanonicalScore, measure: Measure) -> None:
+def _append_measure_content(
+    measure_el: ET.Element,
+    score: CanonicalScore,
+    measure: Measure,
+    *,
+    guitar_view: Literal["score", "tab"],
+) -> None:
     part = score.parts[0]
+    tpq = score.header.tpq
     if _is_piano(part):
-        _append_measure_content_piano(measure_el, part, measure)
+        _append_measure_content_piano(measure_el, part, measure, tpq)
     else:
-        _append_measure_content_guitar(measure_el, part, measure)
+        _append_measure_content_guitar(
+            measure_el,
+            part,
+            measure,
+            tpq,
+            include_fingering=guitar_view == "tab",
+        )
 
 
-def _append_measure_content_guitar(measure_el: ET.Element, part: "Part", measure: Measure) -> None:
+def _append_measure_content_guitar(
+    measure_el: ET.Element,
+    part: "Part",
+    measure: Measure,
+    tpq: int,
+    *,
+    include_fingering: bool,
+) -> None:
     slices_by_voice: dict[int, list[_RenderedSlice]] = {}
 
     for event in part.events:
@@ -165,13 +245,22 @@ def _append_measure_content_guitar(measure_el: ET.Element, part: "Part", measure
                         dur_tick=slice_.start_tick - cursor,
                     ),
                     string_count=string_count,
+                    include_fingering=include_fingering,
+                    tpq=tpq,
                 )
             is_chord = (
                 slice_.event is not None
                 and slice_.event.pitch_midi is not None
                 and last_pitched_onset == slice_.start_tick
             )
-            _append_note(measure_el, slice_, string_count=string_count, is_chord=is_chord)
+            _append_note(
+                measure_el,
+                slice_,
+                string_count=string_count,
+                include_fingering=include_fingering,
+                is_chord=is_chord,
+                tpq=tpq,
+            )
             if slice_.event is not None and slice_.event.pitch_midi is not None:
                 last_pitched_onset = slice_.start_tick
             cursor = max(cursor, slice_.start_tick + slice_.dur_tick)
@@ -186,10 +275,12 @@ def _append_measure_content_guitar(measure_el: ET.Element, part: "Part", measure
                     dur_tick=measure.end_tick - cursor,
                 ),
                 string_count=string_count,
+                include_fingering=include_fingering,
+                tpq=tpq,
             )
 
 
-def _append_measure_content_piano(measure_el: ET.Element, part: "Part", measure: Measure) -> None:
+def _append_measure_content_piano(measure_el: ET.Element, part: "Part", measure: Measure, tpq: int) -> None:
     """Emit piano grand-staff content with per-note <staff> tags."""
     slices_by_voice: dict[int, list[_RenderedSlice]] = {}
 
@@ -233,7 +324,9 @@ def _append_measure_content_piano(measure_el: ET.Element, part: "Part", measure:
                         dur_tick=slice_.start_tick - cursor,
                     ),
                     string_count=0,
+                    include_fingering=False,
                     staff=current_staff,
+                    tpq=tpq,
                 )
             staff = staff_for_onset.get((voice_id, slice_.start_tick), current_staff)
             if slice_.event is not None and slice_.event.pitch_midi is not None:
@@ -243,7 +336,15 @@ def _append_measure_content_piano(measure_el: ET.Element, part: "Part", measure:
                 and slice_.event.pitch_midi is not None
                 and last_pitched_onset == slice_.start_tick
             )
-            _append_note(measure_el, slice_, string_count=0, staff=staff, is_chord=is_chord)
+            _append_note(
+                measure_el,
+                slice_,
+                string_count=0,
+                include_fingering=False,
+                staff=staff,
+                is_chord=is_chord,
+                tpq=tpq,
+            )
             if slice_.event is not None and slice_.event.pitch_midi is not None:
                 last_pitched_onset = slice_.start_tick
             cursor = max(cursor, slice_.start_tick + slice_.dur_tick)
@@ -258,7 +359,9 @@ def _append_measure_content_piano(measure_el: ET.Element, part: "Part", measure:
                     dur_tick=measure.end_tick - cursor,
                 ),
                 string_count=0,
+                include_fingering=False,
                 staff=current_staff,
+                tpq=tpq,
             )
 
 
@@ -290,10 +393,38 @@ def _slice_for_measure(event: Event, measure: Measure) -> _RenderedSlice | None:
     )
 
 
+# Ordered longest → shortest so we match the most specific type first.
+# Each entry: (quarter-note multiples, type name)
+_NOTE_TYPE_TABLE = [
+    (4.0, "whole"),
+    (2.0, "half"),
+    (1.0, "quarter"),
+    (0.5, "eighth"),
+    (0.25, "16th"),
+    (0.125, "32nd"),
+    (0.0625, "64th"),
+]
+
+
+def _note_type_for_dur(dur_tick: int, tpq: int) -> tuple[str, bool]:
+    """Return (MusicXML type name, is_dotted) for a duration in ticks."""
+    ratio = dur_tick / tpq
+    for mult, name in _NOTE_TYPE_TABLE:
+        if abs(ratio - mult * 1.5) < 0.02:
+            return name, True
+        if abs(ratio - mult) < 0.02:
+            return name, False
+    # Fallback: pick the closest undotted type
+    best = min(_NOTE_TYPE_TABLE, key=lambda t: abs(ratio - t[0]))
+    return best[1], False
+
+
 def _append_note(
     measure_el: ET.Element,
     slice_: _RenderedSlice,
     string_count: int,
+    include_fingering: bool,
+    tpq: int,
     staff: int | None = None,
     is_chord: bool = False,
 ) -> None:
@@ -316,11 +447,19 @@ def _append_note(
     ET.SubElement(note_el, "duration").text = str(slice_.dur_tick)
     ET.SubElement(note_el, "voice").text = str(slice_.voice_id + 1)
 
+    note_type, is_dotted = _note_type_for_dur(slice_.dur_tick, tpq)
+    ET.SubElement(note_el, "type").text = note_type
+    if is_dotted:
+        ET.SubElement(note_el, "dot")
+
     if staff is not None:
         ET.SubElement(note_el, "staff").text = str(staff)
 
     if slice_.tie_stop or slice_.tie_start or (
-        slice_.event is not None and slice_.event.pitch_midi is not None and slice_.event.fingering is not None
+        include_fingering
+        and slice_.event is not None
+        and slice_.event.pitch_midi is not None
+        and slice_.event.fingering is not None
     ):
         notations_el = ET.SubElement(note_el, "notations")
         if slice_.tie_stop:
@@ -329,7 +468,12 @@ def _append_note(
         if slice_.tie_start:
             ET.SubElement(note_el, "tie", type="start")
             ET.SubElement(notations_el, "tied", type="start")
-        if slice_.event is not None and slice_.event.pitch_midi is not None and slice_.event.fingering is not None:
+        if (
+            include_fingering
+            and slice_.event is not None
+            and slice_.event.pitch_midi is not None
+            and slice_.event.fingering is not None
+        ):
             technical_el = ET.SubElement(notations_el, "technical")
             ET.SubElement(technical_el, "string").text = str(_musicxml_string_number(slice_.event, string_count))
             ET.SubElement(technical_el, "fret").text = str(slice_.event.fingering.fret)

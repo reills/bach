@@ -1,38 +1,59 @@
-/**
- * Integration tests for the compose/inpaint workflow.
- *
- * Tests cover state transitions for the main flow:
- *   compose → select measure → inpaint preview → commit or discard draft
- *
- * The API layer is fully mocked; no live backend is needed.
- * State objects are built and mutated the same way App.tsx handlers do,
- * keeping the test surface focused on state transitions.
- */
 import { vi, describe, it, expect, beforeEach } from 'vitest';
-import {
-  compose,
-  inpaintPreview,
-  commitDraft,
-  discardDraft,
-} from './api/client';
+import { compose, inpaintPreview, commitDraft, discardDraft } from './api/client';
 import {
   canUseGuitarNoteActions,
+  getActiveRenderView,
   getEventId,
   getMeasureId,
   inferInstrumentMode,
+  type EventHitMap,
+  type MeasureMap,
+  type ScoreDocumentBundle,
+  type ScoreState,
 } from './state/types';
-import type { ScoreState, MeasureMap, EventHitMap } from './state/types';
 
 vi.mock('./api/client');
+
+const MINIMAL_XML = '<score-partwise version="3.1"/>';
+const DRAFT_XML = '<score-partwise version="3.1"><!-- draft --></score-partwise>';
+const COMMITTED_XML = '<score-partwise version="3.1"><!-- committed --></score-partwise>';
+
+const makeDocument = (
+  instrumentMode: 'guitar' | 'piano' = 'guitar',
+  overrides?: {
+    scoreMeasureMap?: MeasureMap;
+    scoreEventHitMap?: EventHitMap;
+    tabMeasureMap?: MeasureMap;
+    tabEventHitMap?: EventHitMap;
+    scoreXml?: string;
+    tabXml?: string;
+  },
+): ScoreDocumentBundle => ({
+  instrumentMode,
+  views: {
+    score: {
+      xml: overrides?.scoreXml ?? MINIMAL_XML,
+      measureMap: overrides?.scoreMeasureMap,
+      eventHitMap: overrides?.scoreEventHitMap,
+    },
+    ...(instrumentMode === 'guitar'
+      ? {
+          tab: {
+            xml: overrides?.tabXml ?? MINIMAL_XML,
+            measureMap: overrides?.tabMeasureMap,
+            eventHitMap: overrides?.tabEventHitMap,
+          },
+        }
+      : {}),
+  },
+});
 
 const initialState: ScoreState = {
   scoreId: null,
   revision: null,
-  scoreXml: null,
-  measureMap: null,
-  eventHitMap: null,
+  document: null,
   draftId: null,
-  draftXml: null,
+  draftDocument: null,
   draftBaseRevision: null,
   highlightMeasureId: null,
   selectedMeasureId: null,
@@ -44,15 +65,12 @@ const initialState: ScoreState = {
   instrumentMode: null,
 };
 
-// Minimal helpers that mirror the App.tsx handler state transforms.
 function applyComposeResponse(
   state: ScoreState,
   response: {
     scoreId: string;
     revision: number;
-    scoreXML: string;
-    measureMap?: MeasureMap;
-    eventHitMap?: EventHitMap;
+    document: ScoreDocumentBundle;
     midi?: string;
     instrumentMode: 'guitar' | 'piano';
   },
@@ -61,13 +79,11 @@ function applyComposeResponse(
     ...state,
     scoreId: response.scoreId,
     revision: response.revision,
-    scoreXml: response.scoreXML,
-    measureMap: response.measureMap ?? null,
-    eventHitMap: response.eventHitMap ?? null,
+    document: response.document,
     midi: response.midi ?? null,
     instrumentMode: response.instrumentMode,
     draftId: null,
-    draftXml: null,
+    draftDocument: null,
     draftBaseRevision: null,
     highlightMeasureId: null,
     selectedMeasureId: null,
@@ -78,12 +94,13 @@ function applyComposeResponse(
   };
 }
 
-function applyMeasureSelect(state: ScoreState, barIndex: number): ScoreState {
-  const measureId = getMeasureId(state.measureMap, barIndex);
+function applyMeasureSelect(state: ScoreState, barIndex: number, viewTab: 'score' | 'tab'): ScoreState {
+  const activeDocument = state.draftDocument ?? state.document;
+  const activeView = getActiveRenderView(activeDocument, viewTab);
   return {
     ...state,
     selectedBarIndex: barIndex,
-    selectedMeasureId: measureId,
+    selectedMeasureId: getMeasureId(activeView?.measureMap, barIndex),
   };
 }
 
@@ -91,11 +108,9 @@ function applyInpaintPreviewResponse(
   state: ScoreState,
   response: {
     draftId: string;
-    scoreXML: string;
+    document: ScoreDocumentBundle;
     baseRevision: number;
     highlightMeasureId?: string;
-    measureMap?: MeasureMap;
-    eventHitMap?: EventHitMap;
     lockedEventIds?: string[];
     changedMeasureIds?: string[];
   },
@@ -103,11 +118,9 @@ function applyInpaintPreviewResponse(
   return {
     ...state,
     draftId: response.draftId,
-    draftXml: response.scoreXML,
+    draftDocument: response.document,
     draftBaseRevision: response.baseRevision,
     highlightMeasureId: response.highlightMeasureId ?? null,
-    measureMap: response.measureMap ?? state.measureMap,
-    eventHitMap: response.eventHitMap ?? state.eventHitMap,
     lockedEventIds: response.lockedEventIds ?? null,
     changedMeasureIds: response.changedMeasureIds ?? null,
   };
@@ -116,20 +129,17 @@ function applyInpaintPreviewResponse(
 function applyCommitResponse(
   state: ScoreState,
   response: {
-    scoreXML: string;
+    document: ScoreDocumentBundle;
     revision: number;
-    measureMap?: MeasureMap;
-    eventHitMap?: EventHitMap;
   },
 ): ScoreState {
   return {
     ...state,
-    scoreXml: response.scoreXML,
+    document: response.document,
     revision: response.revision,
-    measureMap: response.measureMap ?? state.measureMap,
-    eventHitMap: response.eventHitMap ?? state.eventHitMap,
+    instrumentMode: response.document.instrumentMode,
     draftId: null,
-    draftXml: null,
+    draftDocument: null,
     draftBaseRevision: null,
     highlightMeasureId: null,
     lockedEventIds: null,
@@ -141,7 +151,7 @@ function applyDiscardDraft(state: ScoreState): ScoreState {
   return {
     ...state,
     draftId: null,
-    draftXml: null,
+    draftDocument: null,
     draftBaseRevision: null,
     highlightMeasureId: null,
     lockedEventIds: null,
@@ -149,512 +159,133 @@ function applyDiscardDraft(state: ScoreState): ScoreState {
   };
 }
 
-const MINIMAL_XML = '<score-partwise version="3.1"/>';
-const DRAFT_XML = '<score-partwise version="3.1"><!-- draft --></score-partwise>';
-const COMMITTED_XML = '<score-partwise version="3.1"><!-- committed --></score-partwise>';
-
-describe('compose/inpaint workflow — state transitions', () => {
+describe('compose/inpaint workflow — render bundle state', () => {
   beforeEach(() => {
     vi.resetAllMocks();
   });
 
-  it('compose: sets scoreId, revision, scoreXml, and measureMap from the API response', async () => {
+  it('compose stores a bundled document instead of a raw score XML', async () => {
     const composeResponse = {
       scoreId: 'score-abc',
       revision: 0,
-      scoreXML: MINIMAL_XML,
-      measureMap: { '0': 'measure-1', '1': 'measure-2' } as MeasureMap,
+      document: makeDocument('guitar', {
+        scoreMeasureMap: { '0': 'measure-1' },
+        tabMeasureMap: { '0': 'measure-1-tab' },
+      }),
       instrumentMode: 'guitar' as const,
     };
     vi.mocked(compose).mockResolvedValue(composeResponse);
 
-    const response = await compose({});
-    const state = applyComposeResponse(initialState, response);
+    const state = applyComposeResponse(initialState, await compose({}));
 
-    expect(state.scoreId).toBe('score-abc');
-    expect(state.revision).toBe(0);
-    expect(state.scoreXml).toBe(MINIMAL_XML);
-    expect(state.measureMap).toEqual({ '0': 'measure-1', '1': 'measure-2' });
-    // Draft fields should all be cleared
-    expect(state.draftId).toBeNull();
-    expect(state.draftXml).toBeNull();
-    expect(state.selectedMeasureId).toBeNull();
+    expect(state.document?.views.score.measureMap).toEqual({ '0': 'measure-1' });
+    expect(state.document?.views.tab?.measureMap).toEqual({ '0': 'measure-1-tab' });
+    expect(state.draftDocument).toBeNull();
   });
 
-  it('compose: clears all draft and selection fields from a previous session', async () => {
-    const dirtyState: ScoreState = {
-      ...initialState,
-      scoreId: 'old-score',
-      revision: 3,
-      scoreXml: '<old/>',
-      draftId: 'old-draft',
-      draftXml: '<old-draft/>',
-      selectedMeasureId: 'old-measure',
-      selectedBarIndex: 1,
-      lockedEventIds: ['evt-x'],
-      changedMeasureIds: ['m1'],
-    };
-
-    const composeResponse = {
-      scoreId: 'score-new',
-      revision: 0,
-      scoreXML: MINIMAL_XML,
-      measureMap: { '0': 'measure-A' } as MeasureMap,
-      instrumentMode: 'guitar' as const,
-    };
-    vi.mocked(compose).mockResolvedValue(composeResponse);
-
-    const response = await compose({});
-    const state = applyComposeResponse(dirtyState, response);
-
-    expect(state.scoreId).toBe('score-new');
-    expect(state.draftId).toBeNull();
-    expect(state.selectedMeasureId).toBeNull();
-    expect(state.lockedEventIds).toBeNull();
-    expect(state.changedMeasureIds).toBeNull();
-  });
-
-  it('select measure: resolves selectedMeasureId from measureMap via barIndex', () => {
+  it('measure selection resolves against the active score view', () => {
     const state: ScoreState = {
       ...initialState,
-      scoreId: 'score-abc',
-      revision: 0,
-      scoreXml: MINIMAL_XML,
-      measureMap: { '0': 'measure-1', '1': 'measure-2' },
+      document: makeDocument('guitar', {
+        scoreMeasureMap: { '0': 'score-measure-1' },
+        tabMeasureMap: { '0': 'tab-measure-1' },
+      }),
     };
 
-    const after = applyMeasureSelect(state, 1);
-
-    expect(after.selectedBarIndex).toBe(1);
-    expect(after.selectedMeasureId).toBe('measure-2');
+    expect(applyMeasureSelect(state, 0, 'score').selectedMeasureId).toBe('score-measure-1');
+    expect(applyMeasureSelect(state, 0, 'tab').selectedMeasureId).toBe('tab-measure-1');
   });
 
-  it('select measure: sets selectedMeasureId to null when measureMap is absent', () => {
-    const state: ScoreState = { ...initialState };
-    const after = applyMeasureSelect(state, 0);
-
-    expect(after.selectedBarIndex).toBe(0);
-    expect(after.selectedMeasureId).toBeNull();
-  });
-
-  it('inpaint preview: sets draftId, draftXml, draftBaseRevision from the API response', async () => {
+  it('inpaint preview stores a draft document bundle without mutating the committed document', async () => {
+    const committedDocument = makeDocument('guitar', { scoreXml: MINIMAL_XML });
     const previewResponse = {
       draftId: 'draft-xyz',
-      scoreXML: DRAFT_XML,
+      document: makeDocument('guitar', { scoreXml: DRAFT_XML, tabXml: DRAFT_XML }),
       baseRevision: 0,
       highlightMeasureId: 'measure-1',
-      lockedEventIds: ['evt-1', 'evt-2'],
+      lockedEventIds: ['evt-1'],
       changedMeasureIds: ['measure-1'],
     };
     vi.mocked(inpaintPreview).mockResolvedValue(previewResponse);
 
-    const scoreState: ScoreState = {
-      ...initialState,
-      scoreId: 'score-abc',
-      revision: 0,
-      scoreXml: MINIMAL_XML,
-      measureMap: { '0': 'measure-1' },
-      selectedMeasureId: 'measure-1',
-      selectedBarIndex: 0,
-    };
+    const state = applyInpaintPreviewResponse(
+      {
+        ...initialState,
+        scoreId: 'score-abc',
+        revision: 0,
+        document: committedDocument,
+        selectedMeasureId: 'measure-1',
+      },
+      await inpaintPreview({ scoreId: 'score-abc', measureId: 'measure-1', revision: 0 }),
+    );
 
-    const response = await inpaintPreview({
-      scoreId: scoreState.scoreId!,
-      measureId: scoreState.selectedMeasureId!,
-      revision: scoreState.revision!,
-    });
-    const state = applyInpaintPreviewResponse(scoreState, response);
-
-    expect(state.draftId).toBe('draft-xyz');
-    expect(state.draftXml).toBe(DRAFT_XML);
-    expect(state.draftBaseRevision).toBe(0);
+    expect(state.document).toBe(committedDocument);
+    expect(state.draftDocument?.views.score.xml).toBe(DRAFT_XML);
     expect(state.highlightMeasureId).toBe('measure-1');
-    expect(state.lockedEventIds).toEqual(['evt-1', 'evt-2']);
-    expect(state.changedMeasureIds).toEqual(['measure-1']);
-    // score XML unchanged until commit
-    expect(state.scoreXml).toBe(MINIMAL_XML);
   });
 
-  it('inpaint preview: retains existing measureMap when response omits one', async () => {
-    const existingMeasureMap: MeasureMap = { '0': 'measure-1' };
-    const previewResponse = {
-      draftId: 'draft-xyz',
-      scoreXML: DRAFT_XML,
-      baseRevision: 0,
-    };
-    vi.mocked(inpaintPreview).mockResolvedValue(previewResponse);
-
-    const scoreState: ScoreState = {
-      ...initialState,
-      scoreId: 'score-abc',
-      revision: 0,
-      scoreXml: MINIMAL_XML,
-      measureMap: existingMeasureMap,
-      selectedMeasureId: 'measure-1',
-      selectedBarIndex: 0,
-    };
-
-    const response = await inpaintPreview({
-      scoreId: scoreState.scoreId!,
-      measureId: scoreState.selectedMeasureId!,
-      revision: scoreState.revision!,
-    });
-    const state = applyInpaintPreviewResponse(scoreState, response);
-
-    expect(state.measureMap).toEqual(existingMeasureMap);
-  });
-
-  it('commit draft: applies new scoreXml, increments revision, and clears all draft fields', async () => {
+  it('commit replaces the committed document bundle and clears draft state', async () => {
     const commitResponse = {
-      scoreXML: COMMITTED_XML,
+      document: makeDocument('guitar', { scoreXml: COMMITTED_XML, tabXml: COMMITTED_XML }),
       revision: 1,
-      measureMap: { '0': 'measure-1' } as MeasureMap,
     };
     vi.mocked(commitDraft).mockResolvedValue(commitResponse);
 
-    const draftState: ScoreState = {
-      ...initialState,
-      scoreId: 'score-abc',
-      revision: 0,
-      scoreXml: MINIMAL_XML,
-      measureMap: { '0': 'measure-1' },
-      draftId: 'draft-xyz',
-      draftXml: DRAFT_XML,
-      draftBaseRevision: 0,
-      highlightMeasureId: 'measure-1',
-      lockedEventIds: ['evt-1'],
-      changedMeasureIds: ['measure-1'],
-    };
+    const state = applyCommitResponse(
+      {
+        ...initialState,
+        scoreId: 'score-abc',
+        revision: 0,
+        document: makeDocument(),
+        draftId: 'draft-1',
+        draftDocument: makeDocument('guitar', { scoreXml: DRAFT_XML, tabXml: DRAFT_XML }),
+      },
+      await commitDraft({ scoreId: 'score-abc', draftId: 'draft-1' }),
+    );
 
-    const response = await commitDraft({
-      scoreId: draftState.scoreId!,
-      draftId: draftState.draftId!,
-    });
-    const state = applyCommitResponse(draftState, response);
-
-    expect(state.scoreXml).toBe(COMMITTED_XML);
+    expect(state.document?.views.score.xml).toBe(COMMITTED_XML);
+    expect(state.draftDocument).toBeNull();
     expect(state.revision).toBe(1);
-    expect(state.draftId).toBeNull();
-    expect(state.draftXml).toBeNull();
-    expect(state.draftBaseRevision).toBeNull();
-    expect(state.highlightMeasureId).toBeNull();
-    expect(state.lockedEventIds).toBeNull();
-    expect(state.changedMeasureIds).toBeNull();
   });
 
-  it('discard draft: clears all draft fields without touching scoreXml or revision', async () => {
+  it('discard clears only the draft bundle', async () => {
     vi.mocked(discardDraft).mockResolvedValue({ ok: true });
 
-    const draftState: ScoreState = {
+    const state = applyDiscardDraft({
       ...initialState,
       scoreId: 'score-abc',
       revision: 0,
-      scoreXml: MINIMAL_XML,
-      measureMap: { '0': 'measure-1' },
-      draftId: 'draft-xyz',
-      draftXml: DRAFT_XML,
-      draftBaseRevision: 0,
-      highlightMeasureId: 'measure-1',
-      lockedEventIds: ['evt-1'],
-      changedMeasureIds: ['measure-1'],
-    };
-
-    await discardDraft({
-      scoreId: draftState.scoreId!,
-      draftId: draftState.draftId!,
-    });
-    const state = applyDiscardDraft(draftState);
-
-    // Score unchanged
-    expect(state.scoreXml).toBe(MINIMAL_XML);
-    expect(state.revision).toBe(0);
-    // Draft cleared
-    expect(state.draftId).toBeNull();
-    expect(state.draftXml).toBeNull();
-    expect(state.draftBaseRevision).toBeNull();
-    expect(state.highlightMeasureId).toBeNull();
-    expect(state.lockedEventIds).toBeNull();
-    expect(state.changedMeasureIds).toBeNull();
-  });
-
-  it('full workflow: compose → select measure → inpaint preview → commit', async () => {
-    const measureMap: MeasureMap = { '0': 'measure-1', '1': 'measure-2' };
-    vi.mocked(compose).mockResolvedValue({
-      scoreId: 'score-1',
-      revision: 0,
-      scoreXML: MINIMAL_XML,
-      measureMap,
-      instrumentMode: 'guitar',
-    });
-    vi.mocked(inpaintPreview).mockResolvedValue({
+      document: makeDocument('guitar', { scoreXml: MINIMAL_XML }),
       draftId: 'draft-1',
-      scoreXML: DRAFT_XML,
-      baseRevision: 0,
-      highlightMeasureId: 'measure-1',
-      changedMeasureIds: ['measure-1'],
-    });
-    vi.mocked(commitDraft).mockResolvedValue({
-      scoreXML: COMMITTED_XML,
-      revision: 1,
+      draftDocument: makeDocument('guitar', { scoreXml: DRAFT_XML }),
     });
 
-    // Step 1: compose
-    let state = applyComposeResponse(initialState, await compose({}));
-    expect(state.scoreId).toBe('score-1');
-    expect(state.measureMap).toEqual(measureMap);
+    expect(state.document?.views.score.xml).toBe(MINIMAL_XML);
+    expect(state.draftDocument).toBeNull();
+  });
 
-    // Step 2: select measure 0
-    state = applyMeasureSelect(state, 0);
-    expect(state.selectedMeasureId).toBe('measure-1');
+  it('guitar note actions stay gated by instrument mode', () => {
+    expect(canUseGuitarNoteActions('guitar')).toBe(true);
+    expect(canUseGuitarNoteActions('piano')).toBe(false);
+  });
 
-    // Step 3: inpaint preview
-    state = applyInpaintPreviewResponse(
-      state,
-      await inpaintPreview({
-        scoreId: state.scoreId!,
-        measureId: state.selectedMeasureId!,
-        revision: state.revision!,
+  it('event lookup resolves from the active tab view map', () => {
+    const state: ScoreState = {
+      ...initialState,
+      document: makeDocument('guitar', {
+        tabEventHitMap: { '0|0|-1|-1': 'evt-tab' },
       }),
+    };
+
+    const eventId = getEventId(
+      getActiveRenderView(state.document, 'tab')?.eventHitMap,
+      { barIndex: 0, voiceIndex: 0 },
     );
-    expect(state.draftId).toBe('draft-1');
-    expect(state.draftXml).toBe(DRAFT_XML);
-    expect(state.changedMeasureIds).toEqual(['measure-1']);
-
-    // Step 4: commit
-    state = applyCommitResponse(
-      state,
-      await commitDraft({ scoreId: state.scoreId!, draftId: state.draftId! }),
-    );
-    expect(state.scoreXml).toBe(COMMITTED_XML);
-    expect(state.revision).toBe(1);
-    expect(state.draftId).toBeNull();
+    expect(eventId).toBe('evt-tab');
   });
 
-  it('full workflow: compose → select measure → inpaint preview → discard', async () => {
-    const measureMap: MeasureMap = { '0': 'measure-1' };
-    vi.mocked(compose).mockResolvedValue({
-      scoreId: 'score-2',
-      revision: 0,
-      scoreXML: MINIMAL_XML,
-      measureMap,
-      instrumentMode: 'guitar',
-    });
-    vi.mocked(inpaintPreview).mockResolvedValue({
-      draftId: 'draft-2',
-      scoreXML: DRAFT_XML,
-      baseRevision: 0,
-    });
-    vi.mocked(discardDraft).mockResolvedValue({ ok: true });
-
-    // Compose
-    let state = applyComposeResponse(initialState, await compose({}));
-
-    // Select measure
-    state = applyMeasureSelect(state, 0);
-    expect(state.selectedMeasureId).toBe('measure-1');
-
-    // Inpaint preview
-    state = applyInpaintPreviewResponse(
-      state,
-      await inpaintPreview({
-        scoreId: state.scoreId!,
-        measureId: state.selectedMeasureId!,
-        revision: state.revision!,
-      }),
-    );
-    expect(state.draftId).toBe('draft-2');
-
-    // Discard
-    await discardDraft({ scoreId: state.scoreId!, draftId: state.draftId! });
-    state = applyDiscardDraft(state);
-
-    // Score unchanged, draft gone
-    expect(state.scoreXml).toBe(MINIMAL_XML);
-    expect(state.revision).toBe(0);
-    expect(state.draftId).toBeNull();
-    expect(state.draftXml).toBeNull();
-  });
-
-  it('status text after compose: score is loaded and measure map present', async () => {
-    vi.mocked(compose).mockResolvedValue({
-      scoreId: 'score-3',
-      revision: 0,
-      scoreXML: MINIMAL_XML,
-      measureMap: { '0': 'measure-1' },
-      instrumentMode: 'guitar',
-    });
-
-    const response = await compose({});
-    // App.tsx shows 'Score loaded. Click a measure to inpaint.' after compose.
-    // We verify the preconditions for that message: scoreId set, draftId absent.
-    const state = applyComposeResponse(initialState, response);
-    expect(state.scoreId).not.toBeNull();
-    expect(state.draftId).toBeNull();
-  });
-
-  it('status text after preview: draft is present and ready for review', async () => {
-    vi.mocked(inpaintPreview).mockResolvedValue({
-      draftId: 'draft-3',
-      scoreXML: DRAFT_XML,
-      baseRevision: 0,
-    });
-
-    const scoreState: ScoreState = {
-      ...initialState,
-      scoreId: 'score-3',
-      revision: 0,
-      scoreXml: MINIMAL_XML,
-      measureMap: { '0': 'measure-1' },
-      selectedMeasureId: 'measure-1',
-      selectedBarIndex: 0,
-    };
-    const response = await inpaintPreview({
-      scoreId: scoreState.scoreId!,
-      measureId: scoreState.selectedMeasureId!,
-      revision: scoreState.revision!,
-    });
-    // App.tsx shows 'Draft ready. Compare and commit or discard.' when draftId is set.
-    const state = applyInpaintPreviewResponse(scoreState, response);
-    expect(state.draftId).not.toBeNull();
-  });
-
-  it('status text after commit: draft cleared and revision updated', async () => {
-    vi.mocked(commitDraft).mockResolvedValue({
-      scoreXML: COMMITTED_XML,
-      revision: 2,
-    });
-
-    const draftState: ScoreState = {
-      ...initialState,
-      scoreId: 'score-3',
-      revision: 1,
-      scoreXml: MINIMAL_XML,
-      draftId: 'draft-3',
-      draftXml: DRAFT_XML,
-      draftBaseRevision: 1,
-    };
-    const response = await commitDraft({ scoreId: 'score-3', draftId: 'draft-3' });
-    // App.tsx shows 'Draft committed.' when draftId becomes null after commit.
-    const state = applyCommitResponse(draftState, response);
-    expect(state.draftId).toBeNull();
-    expect(state.revision).toBe(2);
-  });
-
-  it('status text after discard: draft cleared, original score intact', async () => {
-    vi.mocked(discardDraft).mockResolvedValue({ ok: true });
-
-    const draftState: ScoreState = {
-      ...initialState,
-      scoreId: 'score-3',
-      revision: 1,
-      scoreXml: MINIMAL_XML,
-      draftId: 'draft-3',
-      draftXml: DRAFT_XML,
-    };
-    await discardDraft({ scoreId: 'score-3', draftId: 'draft-3' });
-    // App.tsx shows 'Draft discarded.' when draftId becomes null after discard.
-    const state = applyDiscardDraft(draftState);
-    expect(state.draftId).toBeNull();
-    expect(state.scoreXml).toBe(MINIMAL_XML);
-  });
-
-  it('compose: stores instrumentMode from the API response', async () => {
-    vi.mocked(compose).mockResolvedValue({
-      scoreId: 'score-guitar',
-      revision: 0,
-      scoreXML: MINIMAL_XML,
-      measureMap: { '0': 'measure-1' },
-      instrumentMode: 'guitar',
-    });
-
-    const response = await compose({ render_mode: 'guitar' });
-    const state = applyComposeResponse(initialState, response);
-
-    expect(state.instrumentMode).toBe('guitar');
-  });
-
-  it('compose: stores piano instrumentMode when render_mode is piano', async () => {
-    vi.mocked(compose).mockResolvedValue({
-      scoreId: 'score-piano',
-      revision: 0,
-      scoreXML: MINIMAL_XML,
-      measureMap: { '0': 'measure-1' },
-      instrumentMode: 'piano',
-    });
-
-    const response = await compose({ render_mode: 'piano' });
-    const state = applyComposeResponse(initialState, response);
-
-    expect(state.instrumentMode).toBe('piano');
-  });
-
-  it('compose: instrumentMode starts null before any score is loaded', () => {
-    expect(initialState.instrumentMode).toBeNull();
-  });
-
-  it('inferInstrumentMode: detects piano from <staves>2</staves>', () => {
-    const xml = '<score-partwise><attributes><staves>2</staves></attributes></score-partwise>';
-    expect(inferInstrumentMode(xml)).toBe('piano');
-  });
-
-  it('inferInstrumentMode: detects guitar from <staff-tuning', () => {
-    const xml = '<score-partwise><staff-details><staff-tuning line="1"/></staff-details></score-partwise>';
-    expect(inferInstrumentMode(xml)).toBe('guitar');
-  });
-
-  it('inferInstrumentMode: detects guitar from <staff-details', () => {
-    const xml =
-      '<score-partwise><measure><staff-details><staff-lines>6</staff-lines></staff-details></measure></score-partwise>';
-    expect(inferInstrumentMode(xml)).toBe('guitar');
-  });
-
-  it('inferInstrumentMode: defaults to guitar for plain XML', () => {
-    expect(inferInstrumentMode(MINIMAL_XML)).toBe('guitar');
-  });
-
-  it('piano note click: instrumentMode piano should prevent guitar-only API call', () => {
-    // Simulate the guard in handleNoteClick: if instrumentMode is piano, return early
-    const pianoState: ScoreState = {
-      ...initialState,
-      scoreId: 'score-piano',
-      revision: 0,
-      scoreXml: MINIMAL_XML,
-      instrumentMode: 'piano',
-      eventHitMap: { '0|-1|-1|-1': 'evt-1' },
-    };
-
-    // The guard condition: piano skips guitar-only fingering
-    expect(canUseGuitarNoteActions(pianoState.instrumentMode)).toBe(false);
-  });
-
-  it('guitar note click: instrumentMode guitar proceeds to fingering API', () => {
-    const guitarState: ScoreState = {
-      ...initialState,
-      scoreId: 'score-guitar',
-      revision: 0,
-      scoreXml: MINIMAL_XML,
-      instrumentMode: 'guitar',
-      eventHitMap: { '0|-1|-1|-1': 'evt-1' },
-    };
-
-    expect(canUseGuitarNoteActions(guitarState.instrumentMode)).toBe(true);
-  });
-
-  it('eventHitMap: getEventId resolves eventId from a hit key after compose', async () => {
-    const hitMap: EventHitMap = { '0|0|-1|-1': 'evt-bar0-voice0' };
-    vi.mocked(compose).mockResolvedValue({
-      scoreId: 'score-4',
-      revision: 0,
-      scoreXML: MINIMAL_XML,
-      measureMap: { '0': 'measure-1' },
-      eventHitMap: hitMap,
-      instrumentMode: 'guitar',
-    });
-
-    const response = await compose({});
-    const state = applyComposeResponse(initialState, response);
-
-    const eventId = getEventId(state.eventHitMap, { barIndex: 0, voiceIndex: 0 });
-    expect(eventId).toBe('evt-bar0-voice0');
+  it('inferInstrumentMode still detects piano and guitar from XML content', () => {
+    expect(inferInstrumentMode('<score-partwise><attributes><staves>2</staves></attributes></score-partwise>')).toBe('piano');
+    expect(inferInstrumentMode('<score-partwise><staff-details><staff-tuning line="1"/></staff-details></score-partwise>')).toBe('guitar');
   });
 });

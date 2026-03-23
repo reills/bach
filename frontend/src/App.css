@@ -510,6 +510,20 @@
   box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.02);
 }
 
+.score-viewer__canvas--sheet {
+  padding: 0.5rem 1rem 1rem;
+}
+
+.score-viewer__score-title {
+  text-align: center;
+  font-family: 'Fraunces', 'Times New Roman', serif;
+  font-size: 1.35rem;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+  color: var(--bg-ink);
+  padding: 0.25rem 0 0.1rem;
+}
+
 .score-viewer__tab-section--hidden {
   display: none;
 }

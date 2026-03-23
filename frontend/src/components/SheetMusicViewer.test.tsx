@@ -10,6 +10,7 @@ const {
     getPageCount: vi.fn(() => 2),
     loadData: vi.fn(() => true),
     redoLayout: vi.fn(),
+    renderToMIDI: vi.fn(() => ''),
     renderToSVG: vi.fn((pageNumber: number) => `<svg data-page="${pageNumber}"></svg>`),
     setOptions: vi.fn(),
   };
@@ -33,7 +34,9 @@ vi.mock('verovio/esm', () => ({
 
 import SheetMusicViewer, {
   __testing__,
+  getScoreTitle,
   getVerovioToolkit,
+  prepareSheetMusicXml,
   renderVerovioScore,
   resolveVerovioPageWidth,
 } from './SheetMusicViewer';
@@ -60,6 +63,7 @@ beforeEach(() => {
   toolkitMock.getPageCount.mockReturnValue(2);
   toolkitMock.loadData.mockClear();
   toolkitMock.redoLayout.mockClear();
+  toolkitMock.renderToMIDI.mockClear();
   toolkitMock.renderToSVG.mockReset();
   toolkitMock.renderToSVG.mockImplementation(
     (pageNumber: number) => `<svg data-page="${pageNumber}"></svg>`,
@@ -145,7 +149,7 @@ describe('SheetMusicViewer', () => {
         footer: 'none',
         header: 'none',
         pageWidth: 840,
-        scale: 42,
+        scale: 34,
       }),
     );
     expect(toolkitMock.loadData).toHaveBeenCalledWith('<score-partwise/>');
@@ -157,7 +161,25 @@ describe('SheetMusicViewer', () => {
   });
 
   it('keeps a minimum Verovio page width for narrow containers', () => {
-    expect(resolveVerovioPageWidth(250.2)).toBe(320);
-    expect(resolveVerovioPageWidth(912.9)).toBe(912);
+    // 250.2px * 7.782 ≈ 1947 VU, which is less than A4 minimum (2100), so clamp to 2100
+    expect(resolveVerovioPageWidth(250.2)).toBe(2100);
+    // 912.9px * (25.4 / (96 * 0.1 * 0.34)) ≈ 7104 VU
+    expect(resolveVerovioPageWidth(912.9)).toBe(7104);
+  });
+
+  it('extracts the rendered score title from part-name', () => {
+    expect(
+      getScoreTitle(
+        '<score-partwise><part-list><score-part><part-name>Classical Guitar</part-name></score-part></part-list></score-partwise>',
+      ),
+    ).toBe('Classical Guitar');
+  });
+
+  it('removes inline part labels from the rendered sheet-music xml', () => {
+    expect(
+      prepareSheetMusicXml(
+        '<score-partwise><part-list><score-part><part-name>Classical Guitar</part-name><part-abbreviation>Gtr.</part-abbreviation></score-part></part-list></score-partwise>',
+      ),
+    ).not.toContain('Classical Guitar');
   });
 });

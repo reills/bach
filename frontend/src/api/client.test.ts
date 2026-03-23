@@ -12,7 +12,14 @@ describe('compose client', () => {
       json: async () => ({
         scoreId: 'score-1',
         revision: 0,
-        scoreXML: '<score-partwise version="3.1"/>',
+        document: {
+          instrumentMode: 'guitar',
+          views: {
+            score: {
+              xml: '<score-partwise version="3.1"/>',
+            },
+          },
+        },
         instrumentMode: 'guitar',
       }),
     });

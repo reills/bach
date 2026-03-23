@@ -177,6 +177,64 @@ def test_compose_baseline_trims_incomplete_generated_voice_event_suffix():
     assert len(result.score.parts[0].events) == 1
 
 
+def test_compose_baseline_trims_non_eos_trailing_bar_events_that_overrun_bar_end():
+    generated_tokens = [
+        "KEY_C",
+        "MEAS_4",
+        "BAR",
+        "TIME_SIG_2_2",
+        "KEY_C",
+        "ABS_VOICE_0_60",
+        "POS_0",
+        "VOICE_0",
+        "DUR_48",
+        "MEL_INT12_0",
+        "HARM_OCT_0",
+        "HARM_CLASS_0",
+        "POS_48",
+        "VOICE_0",
+        "DUR_48",
+        "MEL_INT12_0",
+        "HARM_OCT_0",
+        "HARM_CLASS_0",
+        "POS_72",
+        "VOICE_0",
+        "DUR_48",
+        "MEL_INT12_0",
+        "HARM_OCT_0",
+        "HARM_CLASS_0",
+    ]
+
+    def fake_generator(
+        checkpoint_path,
+        *,
+        seed_tokens,
+        generation_config,
+        vocab_path=None,
+        device="cpu",
+    ):
+        return GenerationResult(
+            ids=list(range(len(generated_tokens))),
+            tokens=generated_tokens,
+            stopped_on_eos=False,
+        )
+
+    result = compose_baseline(
+        Path("/tmp/fake-checkpoint.pt"),
+        seed_tokens=["KEY_C", "MEAS_4"],
+        generation_config=GenerationConfig(max_length=32),
+        render_mode="piano",
+        generator=fake_generator,
+    )
+
+    assert result.generation.tokens == generated_tokens[:-6]
+    assert [measure.index for measure in result.score.measures] == [0]
+    assert [(event.start_tick, event.dur_tick) for event in result.score.parts[0].events] == [
+        (0, 48),
+        (48, 48),
+    ]
+
+
 def test_compose_baseline_skips_generated_events_without_pos_or_anchor():
     generated_tokens = [
         "KEY_C",
@@ -345,6 +403,41 @@ def test_compose_baseline_piano_mode_skips_tabbing_and_overrides_part_info():
     # Piano mode: no fingering
     assert result.score.parts[0].events[0].fingering is None
     # Part overridden to piano with empty tuning
+    assert result.score.parts[0].info.instrument == "piano"
+    assert result.score.parts[0].info.tuning == []
+
+
+def test_compose_baseline_falls_back_to_piano_when_generated_voicing_needs_duplicate_string_use():
+    duplicate_string_tokens = [
+        "BAR",
+        "TIME_SIG_4_4",
+        "KEY_C",
+        "ABS_VOICE_0_40",
+        "ABS_VOICE_1_41",
+        "POS_0",
+        "VOICE_0",
+        "DUR_24",
+        "MEL_INT12_0",
+        "HARM_OCT_0",
+        "HARM_CLASS_0",
+        "VOICE_1",
+        "DUR_24",
+        "MEL_INT12_0",
+        "HARM_OCT_0",
+        "HARM_CLASS_1",
+    ]
+
+    result = compose_baseline(
+        Path("/tmp/fake.pt"),
+        seed_tokens=["KEY_C"],
+        generation_config=GenerationConfig(max_length=32),
+        generator=_make_fake_generator(duplicate_string_tokens),
+    )
+
+    assert result.render_mode == "piano"
+    assert result.document.instrument_mode == "piano"
+    assert "tab" not in result.document.views
+    assert all(event.fingering is None for event in result.score.parts[0].events)
     assert result.score.parts[0].info.instrument == "piano"
     assert result.score.parts[0].info.tuning == []
 

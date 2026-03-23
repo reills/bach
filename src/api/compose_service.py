@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 import os
 import xml.etree.ElementTree as ET
@@ -11,9 +13,16 @@ import torch
 
 from src.api.canonical import CanonicalScore, PartInfo, tokens_to_canonical_score
 from src.api.canonical.from_tokens import ParseDiagnostics
-from src.api.render import canonical_score_to_midi, canonical_score_to_musicxml
+from src.api.render import (
+    canonical_score_to_midi,
+    canonical_score_to_musicxml,
+    canonical_score_to_standard_musicxml,
+    canonical_score_to_tab_musicxml,
+)
 from src.inference.generate_v1 import GenerationConfig, GenerationResult, generate_v1
 from src.tabber import DEFAULT_MAX_FRET, tab_events
+from src.tokens.roundtrip import parse_time_sig_token, parse_token_int
+from src.tokens.tokenizer import parse_voice_event
 from src.tokens.validator import validate_harm_tokens
 
 # Lowest open string on a standard-tuned guitar (low E2)
@@ -24,22 +33,90 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_FAILURE_DIR = REPO_ROOT / "out" / "compose_failures"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, init=False)
 class ComposeServiceResult:
     generation: GenerationResult
     score: CanonicalScore
-    score_xml: str
+    document: "ScoreDocumentBundleExport"
     midi: bytes
-    measure_map: dict[str, str]
-    event_hit_map: dict[str, str]
     render_mode: Literal["guitar", "piano"] = "guitar"
+
+    def __init__(
+        self,
+        *,
+        generation: GenerationResult,
+        score: CanonicalScore,
+        document: "ScoreDocumentBundleExport" | None = None,
+        midi: bytes,
+        render_mode: Literal["guitar", "piano"] = "guitar",
+        score_xml: str | None = None,
+        measure_map: dict[str, str] | None = None,
+        event_hit_map: dict[str, str] | None = None,
+    ) -> None:
+        if document is None:
+            if score_xml is None or measure_map is None or event_hit_map is None:
+                raise TypeError(
+                    "ComposeServiceResult requires either document or score_xml/measure_map/event_hit_map"
+                )
+            legacy_view = RenderViewExport(
+                xml=score_xml,
+                measure_map=measure_map,
+                event_hit_map=event_hit_map,
+            )
+            views = {"score": legacy_view}
+            if render_mode == "guitar":
+                views["tab"] = legacy_view
+            document = ScoreDocumentBundleExport(
+                instrument_mode=render_mode,
+                views=views,
+            )
+
+        object.__setattr__(self, "generation", generation)
+        object.__setattr__(self, "score", score)
+        object.__setattr__(self, "document", document)
+        object.__setattr__(self, "midi", midi)
+        object.__setattr__(self, "render_mode", render_mode)
+
+    @property
+    def score_xml(self) -> str:
+        return self.document.score_xml
+
+    @property
+    def measure_map(self) -> dict[str, str]:
+        return self.document.measure_map
+
+    @property
+    def event_hit_map(self) -> dict[str, str]:
+        return self.document.event_hit_map
 
 
 @dataclass(frozen=True)
-class ScoreExport:
-    score_xml: str
+class RenderViewExport:
+    xml: str
     measure_map: dict[str, str]
     event_hit_map: dict[str, str]
+
+
+@dataclass(frozen=True)
+class ScoreDocumentBundleExport:
+    instrument_mode: Literal["guitar", "piano"]
+    views: dict[str, RenderViewExport]
+
+    @property
+    def primary_view(self) -> RenderViewExport:
+        return self.views.get("tab") or self.views["score"]
+
+    @property
+    def score_xml(self) -> str:
+        return self.primary_view.xml
+
+    @property
+    def measure_map(self) -> dict[str, str]:
+        return self.primary_view.measure_map
+
+    @property
+    def event_hit_map(self) -> dict[str, str]:
+        return self.primary_view.event_hit_map
 
 
 class ComposeDiagnosticsError(ValueError):
@@ -76,7 +153,8 @@ def compose_baseline(
     trimmed_generation: GenerationResult | None = None
     parse_diagnostics = ParseDiagnostics()
     score: CanonicalScore | None = None
-    exported: ScoreExport | None = None
+    exported: ScoreDocumentBundleExport | None = None
+    resolved_render_mode = render_mode
 
     try:
         generation = generator(
@@ -96,7 +174,7 @@ def compose_baseline(
         ) from exc
 
     try:
-        trimmed_generation = _trim_incomplete_generation(generation)
+        trimmed_generation = _trim_incomplete_generation(generation, tpq=tpq)
     except Exception as exc:
         raise _compose_failure(
             stage="trim",
@@ -131,6 +209,22 @@ def compose_baseline(
         try:
             score = _normalize_to_guitar_range(score)
             score = _tab_score(score, max_fret=max_fret)
+        except ValueError as exc:
+            if _should_fallback_to_piano_score(exc):
+                score = _to_piano_score(score)
+                resolved_render_mode = "piano"
+            else:
+                raise _compose_failure(
+                    stage="tab",
+                    exc=exc,
+                    checkpoint_path=checkpoint_path,
+                    seed_tokens=seed_tokens,
+                    generation_config=generation_config,
+                    generation=generation,
+                    effective_tokens=trimmed_generation.tokens,
+                    parse_diagnostics=parse_diagnostics,
+                    score=score,
+                ) from exc
         except Exception as exc:
             raise _compose_failure(
                 stage="tab",
@@ -144,11 +238,8 @@ def compose_baseline(
                 score=score,
             ) from exc
     else:
-        # Piano path: override PartInfo to remove string-instrument semantics
         try:
-            part = score.parts[0]
-            piano_info = replace(part.info, instrument="piano", tuning=[], capo=0)
-            score = replace(score, parts=[replace(part, info=piano_info)])
+            score = _to_piano_score(score)
         except Exception as exc:
             raise _compose_failure(
                 stage="tab",
@@ -181,11 +272,9 @@ def compose_baseline(
     return ComposeServiceResult(
         generation=trimmed_generation,
         score=score,
-        score_xml=exported.score_xml,
+        document=exported,
         midi=midi,
-        measure_map=exported.measure_map,
-        event_hit_map=exported.event_hit_map,
-        render_mode=render_mode,
+        render_mode=resolved_render_mode,
     )
 
 
@@ -377,8 +466,10 @@ def _write_tokens_file(path: Path, tokens: Sequence[str] | None) -> Path | None:
     return path
 
 
-def _trim_incomplete_generation(generation: GenerationResult) -> GenerationResult:
+def _trim_incomplete_generation(generation: GenerationResult, *, tpq: int) -> GenerationResult:
     complete_tokens = _trim_incomplete_suffix(generation.tokens)
+    if not generation.stopped_on_eos:
+        complete_tokens = _trim_trailing_bar_overflow(complete_tokens, tpq=tpq)
     if len(complete_tokens) == len(generation.tokens):
         return generation
     if not complete_tokens:
@@ -447,6 +538,65 @@ def _next_complete_voice_event_index(tokens: Sequence[str], idx: int) -> int | N
     return next_idx
 
 
+def _trim_trailing_bar_overflow(tokens: Sequence[str], tpq: int = 24) -> list[str]:
+    if not tokens:
+        return []
+
+    last_bar_idx = -1
+    current_time_sig: tuple[int, int] | None = None
+    for idx, token in enumerate(tokens):
+        if token == "BAR":
+            last_bar_idx = idx
+        elif token.startswith("TIME_SIG_"):
+            current_time_sig = parse_time_sig_token(token)
+
+    if last_bar_idx < 0 or current_time_sig is None:
+        return list(tokens)
+
+    numerator, denominator = current_time_sig
+    bar_len_ticks = int(round(numerator * (4.0 / denominator) * tpq))
+
+    safe_end = last_bar_idx + 1
+    current_pos_tick: int | None = None
+    overflow_detected = False
+    idx = last_bar_idx + 1
+
+    while idx < len(tokens):
+        token = tokens[idx]
+
+        if token.startswith("POS_"):
+            pos_tick = parse_token_int(token)
+            if pos_tick >= bar_len_ticks:
+                overflow_detected = True
+                break
+            current_pos_tick = pos_tick
+            idx += 1
+            continue
+
+        if token.startswith("VOICE_"):
+            try:
+                voice_event, next_idx = parse_voice_event(tokens, idx)
+            except ValueError:
+                break
+
+            if current_pos_tick is not None:
+                duration_ticks = voice_event.rest_ticks if voice_event.is_rest else voice_event.duration_ticks
+                if current_pos_tick + duration_ticks > bar_len_ticks:
+                    overflow_detected = True
+                    break
+
+            safe_end = next_idx
+            idx = next_idx
+            continue
+
+        safe_end = idx + 1
+        idx += 1
+
+    if not overflow_detected:
+        return list(tokens)
+    return list(tokens[:safe_end])
+
+
 def _normalize_to_guitar_range(score: CanonicalScore) -> CanonicalScore:
     """Shift pitches below the lowest guitar string up by whole octaves."""
     if len(score.parts) != 1:
@@ -479,18 +629,51 @@ def _tab_score(score: CanonicalScore, *, max_fret: int) -> CanonicalScore:
     return replace(score, parts=[tabbed_part])
 
 
-def export_score(score: CanonicalScore | str) -> ScoreExport:
+def _to_piano_score(score: CanonicalScore) -> CanonicalScore:
+    """Remove string-instrument semantics so the score can render without tablature."""
+    if len(score.parts) != 1:
+        raise ValueError("compose service supports exactly one part")
+    part = score.parts[0]
+    piano_info = replace(part.info, instrument="piano", tuning=[], capo=0)
+    piano_events = [replace(event, fingering=None) for event in part.events]
+    return replace(score, parts=[replace(part, info=piano_info, events=piano_events)])
+
+
+def _should_fallback_to_piano_score(exc: ValueError) -> bool:
+    message = str(exc)
+    return "duplicate string use required" in message
+
+
+def export_render_view(score_xml: str) -> RenderViewExport:
+    root = ET.fromstring(score_xml)
+    return RenderViewExport(
+        xml=score_xml,
+        measure_map=_build_measure_map(root),
+        event_hit_map=_build_event_hit_map(root),
+    )
+
+
+def export_score(score: CanonicalScore | str) -> ScoreDocumentBundleExport:
     if isinstance(score, CanonicalScore):
         if len(score.parts) != 1:
             raise ValueError("compose service supports exactly one part")
-        score_xml = canonical_score_to_musicxml(score)
-    else:
-        score_xml = score
-    root = ET.fromstring(score_xml)
-    return ScoreExport(
-        score_xml=score_xml,
-        measure_map=_build_measure_map(root),
-        event_hit_map=_build_event_hit_map(root),
+        part = score.parts[0]
+        instrument_mode: Literal["guitar", "piano"] = (
+            "piano" if part.info.instrument == "piano" else "guitar"
+        )
+        views = {
+            "score": export_render_view(canonical_score_to_standard_musicxml(score)),
+        }
+        if instrument_mode == "guitar":
+            views["tab"] = export_render_view(canonical_score_to_tab_musicxml(score))
+        return ScoreDocumentBundleExport(
+            instrument_mode=instrument_mode,
+            views=views,
+        )
+
+    return ScoreDocumentBundleExport(
+        instrument_mode="guitar",
+        views={"score": export_render_view(score)},
     )
 
 

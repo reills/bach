@@ -13,7 +13,11 @@ from src.api.canonical import (
     measure_by_id,
     replace_events_in_measure,
 )
-from src.api.compose_service import _normalize_to_guitar_range, export_score
+from src.api.compose_service import (
+    ScoreDocumentBundleExport,
+    _normalize_to_guitar_range,
+    export_score,
+)
 from src.api.store import ScoreDraftRepository
 from src.tabber import DEFAULT_MAX_FRET, tab_events
 
@@ -24,13 +28,23 @@ ReplacementPlanner = Callable[[Part, Measure, list[Event], list[Event]], list[Ev
 class InpaintWindowResult:
     draft_id: str
     score: CanonicalScore
-    score_xml: str
-    measure_map: dict[str, str]
-    event_hit_map: dict[str, str]
+    document: ScoreDocumentBundleExport
     base_revision: int
     highlight_measure_id: str
     locked_event_ids: list[str]
     changed_measure_ids: list[str]
+
+    @property
+    def score_xml(self) -> str:
+        return self.document.score_xml
+
+    @property
+    def measure_map(self) -> dict[str, str]:
+        return self.document.measure_map
+
+    @property
+    def event_hit_map(self) -> dict[str, str]:
+        return self.document.event_hit_map
 
 
 def preview_window_inpaint(
@@ -55,9 +69,7 @@ def preview_window_inpaint(
     return InpaintWindowResult(
         draft_id=saved_draft.draft_id,
         score=saved_draft.score,
-        score_xml=exported.score_xml,
-        measure_map=exported.measure_map,
-        event_hit_map=exported.event_hit_map,
+        document=exported,
         base_revision=saved_draft.base_revision,
         highlight_measure_id=measure_id,
         locked_event_ids=effective_locked_ids,

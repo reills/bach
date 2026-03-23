@@ -1,4 +1,4 @@
-import type { EventHitMap, InstrumentMode, MeasureMap } from '../state/types';
+import type { InstrumentMode, ScoreDocumentBundle } from '../state/types';
 
 export interface ComposeRequest {
   prompt?: string;
@@ -9,9 +9,7 @@ export interface ComposeRequest {
 export interface ComposeResponse {
   scoreId: string;
   revision: number;
-  scoreXML: string;
-  measureMap?: MeasureMap;
-  eventHitMap?: EventHitMap;
+  document: ScoreDocumentBundle;
   midi?: string;
   instrumentMode: InstrumentMode;
 }
@@ -40,11 +38,9 @@ export interface InpaintPreviewRequest {
 
 export interface InpaintPreviewResponse {
   draftId: string;
-  scoreXML: string;
+  document: ScoreDocumentBundle;
   baseRevision: number;
   highlightMeasureId?: string;
-  measureMap?: MeasureMap;
-  eventHitMap?: EventHitMap;
   lockedEventIds?: string[];
   changedMeasureIds?: string[];
 }
@@ -55,10 +51,8 @@ export interface CommitDraftRequest {
 }
 
 export interface CommitDraftResponse {
-  scoreXML: string;
+  document: ScoreDocumentBundle;
   revision: number;
-  measureMap?: MeasureMap;
-  eventHitMap?: EventHitMap;
 }
 
 export interface DiscardDraftRequest {
@@ -97,6 +91,6 @@ export interface ApplyFingeringRequest {
 }
 
 export interface ApplyFingeringResponse {
-  scoreXML: string;
+  document: ScoreDocumentBundle;
   revision: number;
 }

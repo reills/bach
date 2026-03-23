@@ -150,6 +150,7 @@ def tokens_to_canonical_score(
         time_sig_map=time_sig_map,
     )
     events.sort(key=lambda e: e.start_tick)
+    events = _compact_event_voice_ids(events)
     if ignore_invalid_events:
         events = _ensure_unique_event_ids(events, part_info.id)
 
@@ -352,6 +353,21 @@ def _ensure_unique_event_ids(events: list[Event], part_id: str) -> list[Event]:
         seen_ids.add(event_id)
         deduped.append(event)
     return deduped
+
+
+def _compact_event_voice_ids(events: list[Event]) -> list[Event]:
+    used_voice_ids = sorted({event.voice_id for event in events})
+    if used_voice_ids == list(range(len(used_voice_ids))):
+        return events
+
+    remapped_voice_ids = {
+        original_voice_id: compact_voice_id
+        for compact_voice_id, original_voice_id in enumerate(used_voice_ids)
+    }
+    return [
+        replace(event, voice_id=remapped_voice_ids[event.voice_id])
+        for event in events
+    ]
 
 
 def _to_fingering(string_number: int | None, fret: int | None, string_count: int) -> GuitarFingering | None:

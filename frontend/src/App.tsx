@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react';
 import './App.css';
 import ScoreViewer from './components/ScoreViewer';
-import SheetMusicViewer from './components/SheetMusicViewer';
+import SheetMusicViewer, { type SheetMusicPlayerAPI } from './components/SheetMusicViewer';
 import FingeringPicker from './components/FingeringPicker';
 import { compose, inpaintPreview, commitDraft, discardDraft, altPositions, applyFingering } from './api/client';
 import {
   canUseGuitarNoteActions,
+  getActiveRenderView,
   getEventId,
   getMeasureId,
   inferInstrumentMode,
@@ -15,9 +16,8 @@ import {
   type ScoreState,
 } from './state/types';
 import {
-  buildMeasureMap,
+  buildDocumentBundle,
   loadLocalData,
-  parseScoreXml,
   pickRandomSnippet,
   replaceMeasureAtIndex,
   type LocalManifest,
@@ -155,11 +155,9 @@ const DEMO_XML = `<?xml version="1.0" encoding="UTF-8"?>
 const initialState: ScoreState = {
   scoreId: null,
   revision: null,
-  scoreXml: null,
-  measureMap: null,
-  eventHitMap: null,
+  document: null,
   draftId: null,
-  draftXml: null,
+  draftDocument: null,
   draftBaseRevision: null,
   highlightMeasureId: null,
   selectedMeasureId: null,
@@ -181,6 +179,8 @@ const App = () => {
   const [state, setState] = useState<ScoreState>(initialState);
   const [alphaTabApi, setAlphaTabApi] = useState<any>(null);
   const [playerReady, setPlayerReady] = useState(false);
+  const [sheetPlayerApi, setSheetPlayerApi] = useState<SheetMusicPlayerAPI | null>(null);
+  const [sheetPlayerReady, setSheetPlayerReady] = useState(false);
   const [playbackPos, setPlaybackPos] = useState<{ current: number; total: number } | null>(null);
   const [prompt, setPrompt] = useState('');
   const [dataSource, setDataSource] = useState<DataSource>(defaultSource);
@@ -205,11 +205,17 @@ const App = () => {
   } | null>(null);
   const [fingeringBusy, setFingeringBusy] = useState(false);
 
-  const renderXml = state.draftXml ?? state.scoreXml;
-  const showSheetMusic = state.instrumentMode === 'piano';
-  const measureCount = state.measureMap ? Object.keys(state.measureMap).length : 0;
-  const eventMapCount = state.eventHitMap
-    ? Object.keys(state.eventHitMap).length
+  const activeDocument = state.draftDocument ?? state.document;
+  const effectiveViewTab =
+    viewTab === 'tab' && activeDocument?.views.tab ? 'tab' : 'score';
+  const activeView = getActiveRenderView(activeDocument, effectiveViewTab);
+  const renderXml = activeView?.xml ?? null;
+  const showSheetMusic =
+    activeDocument?.instrumentMode === 'piano' ||
+    (activeDocument?.instrumentMode === 'guitar' && effectiveViewTab === 'score');
+  const measureCount = activeView?.measureMap ? Object.keys(activeView.measureMap).length : 0;
+  const eventMapCount = activeView?.eventHitMap
+    ? Object.keys(activeView.eventHitMap).length
     : 0;
 
   const setStatus = (tone: StatusTone, message: string) => {
@@ -222,6 +228,7 @@ const App = () => {
     setFingeringPicker(null);
     setFingeringBusy(false);
     setPlaybackPos(null);
+    setSheetPlayerReady(false);
   };
 
   const handleCompose = async () => {
@@ -234,13 +241,11 @@ const App = () => {
         ...prev,
         scoreId: response.scoreId,
         revision: response.revision,
-        scoreXml: response.scoreXML,
-        measureMap: response.measureMap ?? null,
-        eventHitMap: response.eventHitMap ?? null,
+        document: response.document,
         midi: response.midi ?? null,
         instrumentMode: response.instrumentMode,
         draftId: null,
-        draftXml: null,
+        draftDocument: null,
         draftBaseRevision: null,
         highlightMeasureId: null,
         selectedMeasureId: null,
@@ -263,8 +268,6 @@ const App = () => {
     setStatus('busy', 'Loading local test-data...');
     try {
       const bundle = await loadLocalData();
-      const baseDoc = parseScoreXml(bundle.baseXml);
-      const measureMap = buildMeasureMap(baseDoc);
       const loadedInstrumentMode = inferInstrumentMode(bundle.baseXml);
 
       resetLoadedScoreUi();
@@ -272,13 +275,11 @@ const App = () => {
         ...prev,
         scoreId: `local:${bundle.manifest.baseScore}`,
         revision: 0,
-        scoreXml: bundle.baseXml,
-        measureMap,
-        eventHitMap: null,
+        document: buildDocumentBundle(bundle.baseXml, loadedInstrumentMode),
         midi: null,
         instrumentMode: loadedInstrumentMode,
         draftId: null,
-        draftXml: null,
+        draftDocument: null,
         draftBaseRevision: null,
         highlightMeasureId: null,
         selectedMeasureId: null,
@@ -311,15 +312,10 @@ const App = () => {
       ...prev,
       scoreId: 'demo',
       revision: 0,
-      scoreXml: DEMO_XML,
-      measureMap: {
-        '0': 'demo-measure-1',
-        '1': 'demo-measure-2',
-      },
-      eventHitMap: null,
+      document: buildDocumentBundle(DEMO_XML, inferInstrumentMode(DEMO_XML)),
       instrumentMode: inferInstrumentMode(DEMO_XML),
       draftId: null,
-      draftXml: null,
+      draftDocument: null,
       draftBaseRevision: null,
       highlightMeasureId: null,
       selectedMeasureId: null,
@@ -333,7 +329,7 @@ const App = () => {
   };
 
   const handleMeasureClick = (barIndex: number) => {
-    const measureId = getMeasureId(state.measureMap, barIndex);
+    const measureId = getMeasureId(activeView?.measureMap, barIndex);
     if (!measureId) {
       setStatus(
         'error',
@@ -348,7 +344,7 @@ const App = () => {
   };
 
   const handleNoteClick = async (hit: HitKey) => {
-    const eventId = getEventId(state.eventHitMap, hit);
+    const eventId = getEventId(activeView?.eventHitMap, hit);
     setState((prev) => ({
       ...prev,
       lastEventId: eventId,
@@ -360,7 +356,7 @@ const App = () => {
     }
 
     if (!eventId || !state.scoreId) return;
-    const measureId = getMeasureId(state.measureMap, hit.barIndex);
+    const measureId = getMeasureId(activeView?.measureMap, hit.barIndex);
     if (!measureId) return;
 
     setFingeringBusy(true);
@@ -385,7 +381,8 @@ const App = () => {
       });
       setState((prev) => ({
         ...prev,
-        scoreXml: resp.scoreXML,
+        document: resp.document,
+        instrumentMode: resp.document.instrumentMode,
         revision: resp.revision,
       }));
       setFingeringPicker(null);
@@ -400,7 +397,7 @@ const App = () => {
 
   const handleInpaintPreview = async () => {
     if (dataSource === 'local') {
-      if (!state.scoreXml) {
+      if (!state.document?.views.score.xml) {
         setStatus('error', 'Load local test-data first.');
         return;
       }
@@ -421,7 +418,7 @@ const App = () => {
           throw new Error('No snippet measures available.');
         }
         const result = replaceMeasureAtIndex(
-          state.scoreXml,
+          state.document.views.tab?.xml ?? state.document.views.score.xml,
           state.selectedBarIndex,
           snippet,
         );
@@ -429,11 +426,13 @@ const App = () => {
         setState((prev) => ({
           ...prev,
           draftId: `local-${Date.now()}`,
-          draftXml: result.xml,
+          draftDocument: buildDocumentBundle(
+            result.xml,
+            prev.instrumentMode ?? 'guitar',
+          ),
           draftBaseRevision: prev.revision,
           highlightMeasureId:
             result.measureId ?? prev.selectedMeasureId ?? null,
-          measureMap: result.measureMap,
           lockedEventIds: null,
           changedMeasureIds: result.measureId
             ? [result.measureId]
@@ -474,11 +473,9 @@ const App = () => {
       setState((prev) => ({
         ...prev,
         draftId: response.draftId,
-        draftXml: response.scoreXML,
+        draftDocument: response.document,
         draftBaseRevision: response.baseRevision,
         highlightMeasureId: response.highlightMeasureId ?? null,
-        measureMap: response.measureMap ?? prev.measureMap,
-        eventHitMap: response.eventHitMap ?? prev.eventHitMap,
         lockedEventIds: response.lockedEventIds ?? null,
         changedMeasureIds: response.changedMeasureIds ?? null,
       }));
@@ -494,16 +491,16 @@ const App = () => {
 
   const handleCommitDraft = async () => {
     if (dataSource === 'local') {
-      if (!state.draftXml) {
+      if (!state.draftDocument) {
         setStatus('error', 'No draft to commit.');
         return;
       }
       setState((prev) => ({
         ...prev,
-        scoreXml: prev.draftXml,
+        document: prev.draftDocument,
         revision: (prev.revision ?? 0) + 1,
         draftId: null,
-        draftXml: null,
+        draftDocument: null,
         draftBaseRevision: null,
         highlightMeasureId: null,
         lockedEventIds: null,
@@ -527,12 +524,11 @@ const App = () => {
       });
       setState((prev) => ({
         ...prev,
-        scoreXml: response.scoreXML,
+        document: response.document,
+        instrumentMode: response.document.instrumentMode,
         revision: response.revision,
-        measureMap: response.measureMap ?? prev.measureMap,
-        eventHitMap: response.eventHitMap ?? prev.eventHitMap,
         draftId: null,
-        draftXml: null,
+        draftDocument: null,
         draftBaseRevision: null,
         highlightMeasureId: null,
         lockedEventIds: null,
@@ -549,14 +545,14 @@ const App = () => {
 
   const handleDiscardDraft = async () => {
     if (dataSource === 'local') {
-      if (!state.draftXml) {
+      if (!state.draftDocument) {
         setStatus('error', 'No draft to discard.');
         return;
       }
       setState((prev) => ({
         ...prev,
         draftId: null,
-        draftXml: null,
+        draftDocument: null,
         draftBaseRevision: null,
         highlightMeasureId: null,
         lockedEventIds: null,
@@ -581,7 +577,7 @@ const App = () => {
       setState((prev) => ({
         ...prev,
         draftId: null,
-        draftXml: null,
+        draftDocument: null,
         draftBaseRevision: null,
         highlightMeasureId: null,
         lockedEventIds: null,
@@ -625,16 +621,30 @@ const App = () => {
     link.click();
   };
 
+  const activePlayerReady = showSheetMusic ? sheetPlayerReady : playerReady;
+
   const handlePlay = () => {
-    alphaTabApi?.playPause();
+    if (showSheetMusic) {
+      sheetPlayerApi?.playPause();
+    } else {
+      alphaTabApi?.playPause();
+    }
   };
 
   const handlePause = () => {
-    alphaTabApi?.playPause();
+    if (showSheetMusic) {
+      sheetPlayerApi?.playPause();
+    } else {
+      alphaTabApi?.playPause();
+    }
   };
 
   const handleStop = () => {
-    alphaTabApi?.stop();
+    if (showSheetMusic) {
+      sheetPlayerApi?.stop();
+    } else {
+      alphaTabApi?.stop();
+    }
     setPlaybackPos(null);
   };
 
@@ -912,15 +922,15 @@ const App = () => {
                   <button
                     className="btn btn--icon-only"
                     onClick={handlePlay}
-                    disabled={!renderXml || !playerReady}
-                    title={playerReady ? 'Play' : 'Loading soundfont…'}
+                    disabled={!renderXml || !activePlayerReady}
+                    title={activePlayerReady ? 'Play' : 'Loading…'}
                   >
                     ▶
                   </button>
                   <button
                     className="btn btn--icon-only"
                     onClick={handlePause}
-                    disabled={!renderXml || !playerReady}
+                    disabled={!renderXml || !activePlayerReady}
                     title="Pause"
                   >
                     ⏸
@@ -928,7 +938,7 @@ const App = () => {
                   <button
                     className="btn btn--icon-only"
                     onClick={handleStop}
-                    disabled={!renderXml || !playerReady}
+                    disabled={!renderXml || !activePlayerReady}
                     title="Stop"
                   >
                     ⏹
@@ -966,16 +976,19 @@ const App = () => {
             <SheetMusicViewer
               scoreXml={renderXml}
               highlightMeasureId={state.highlightMeasureId}
-              instrumentMode={state.instrumentMode}
-              viewTab={viewTab}
+              instrumentMode={activeDocument?.instrumentMode ?? state.instrumentMode}
+              viewTab={effectiveViewTab}
               onViewTabChange={setViewTab}
+              onApiReady={setSheetPlayerApi}
+              onPlayerReady={() => setSheetPlayerReady(true)}
+              onPositionChanged={(current, total) => setPlaybackPos({ current, total })}
             />
           ) : (
             <ScoreViewer
               scoreXml={renderXml}
               highlightMeasureId={state.highlightMeasureId}
-              instrumentMode={state.instrumentMode}
-              viewTab={viewTab}
+              instrumentMode={activeDocument?.instrumentMode ?? state.instrumentMode}
+              viewTab={effectiveViewTab}
               onViewTabChange={setViewTab}
               onMeasureClick={handleMeasureClick}
               onNoteClick={handleNoteClick}

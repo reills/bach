@@ -7,6 +7,7 @@ const renderTab = (viewTab: 'score' | 'tab' = 'tab') =>
     <ScoreViewer
       scoreXml="<score-partwise version='3.1'/>"
       highlightMeasureId={null}
+      instrumentMode="guitar"
       viewTab={viewTab}
       onViewTabChange={() => {}}
     />,

@@ -42,7 +42,8 @@ class ComposeRequest(BaseModel):
 class ComposeResponse(BaseModel):
     scoreId: str
     revision: int
-    scoreXML: str
+    document: dict[str, Any]
+    scoreXML: str | None = None
     name: str
     createdAt: str
     updatedAt: str
@@ -82,7 +83,8 @@ class InpaintPreviewRequest(BaseModel):
 
 class InpaintPreviewResponse(BaseModel):
     draftId: str
-    scoreXML: str
+    document: dict[str, Any]
+    scoreXML: str | None = None
     baseRevision: int
     highlightMeasureId: str | None = None
     measureMap: dict[str, str] | None = None
@@ -97,7 +99,8 @@ class CommitDraftRequest(BaseModel):
 
 
 class CommitDraftResponse(BaseModel):
-    scoreXML: str
+    document: dict[str, Any]
+    scoreXML: str | None = None
     revision: int
     measureMap: dict[str, str] | None = None
     eventHitMap: dict[str, str] | None = None
@@ -149,7 +152,8 @@ class ApplyFingeringRequest(BaseModel):
 
 
 class ApplyFingeringResponse(BaseModel):
-    scoreXML: str
+    document: dict[str, Any]
+    scoreXML: str | None = None
     revision: int
 
 
@@ -180,13 +184,14 @@ def create_router(
         return ComposeResponse(
             scoreId=stored_score.score_id,
             revision=stored_score.revision,
-            scoreXML=result.score_xml,
+            document=_bundle_to_response_dict(result.document),
+            scoreXML=result.document.score_xml,
             name=stored_score.name,
             createdAt=(stored_score.created_at.isoformat() if stored_score.created_at else ""),
             updatedAt=(stored_score.updated_at.isoformat() if stored_score.updated_at else ""),
-            instrumentMode=result.render_mode,
-            measureMap=result.measure_map,
-            eventHitMap=result.event_hit_map,
+            instrumentMode=result.document.instrument_mode,
+            measureMap=result.document.measure_map,
+            eventHitMap=result.document.event_hit_map,
             midi=base64.b64encode(result.midi).decode("ascii"),
         )
 
@@ -217,11 +222,12 @@ def create_router(
 
         return InpaintPreviewResponse(
             draftId=result.draft_id,
-            scoreXML=result.score_xml,
+            document=_bundle_to_response_dict(result.document),
+            scoreXML=result.document.score_xml,
             baseRevision=result.base_revision,
             highlightMeasureId=result.highlight_measure_id,
-            measureMap=result.measure_map,
-            eventHitMap=result.event_hit_map,
+            measureMap=result.document.measure_map,
+            eventHitMap=result.document.event_hit_map,
             lockedEventIds=result.locked_event_ids,
             changedMeasureIds=result.changed_measure_ids,
         )
@@ -237,6 +243,7 @@ def create_router(
 
         exported = export_score(committed.score)
         return CommitDraftResponse(
+            document=_bundle_to_response_dict(exported),
             scoreXML=exported.score_xml,
             revision=committed.revision,
             measureMap=exported.measure_map,
@@ -268,7 +275,8 @@ def create_router(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
         exported = export_score(stored_score.score)
-        resolved_measure_id = exported.measure_map.get(str(request.eventHitKey.barIndex))
+        event_view = _event_lookup_view(exported)
+        resolved_measure_id = event_view.measure_map.get(str(request.eventHitKey.barIndex))
         if resolved_measure_id != request.measureId:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -279,7 +287,7 @@ def create_router(
             )
 
         hit_key = _to_request_hit_key(request.eventHitKey)
-        event_id = exported.event_hit_map.get(hit_key)
+        event_id = event_view.event_hit_map.get(hit_key)
         if event_id is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -344,6 +352,7 @@ def create_router(
 
         exported = export_score(committed.score)
         return ApplyFingeringResponse(
+            document=_bundle_to_response_dict(exported),
             scoreXML=exported.score_xml,
             revision=committed.revision,
         )
@@ -403,3 +412,21 @@ def _to_request_hit_key(hit_key: EventHitKeyRequest) -> str:
     beat_index = -1 if hit_key.beatIndex is None else hit_key.beatIndex
     note_index = -1 if hit_key.noteIndex is None else hit_key.noteIndex
     return f"{hit_key.barIndex}|{voice_index}|{beat_index}|{note_index}"
+
+
+def _bundle_to_response_dict(bundle: Any) -> dict[str, Any]:
+    return {
+        "instrumentMode": bundle.instrument_mode,
+        "views": {
+            name: {
+                "xml": view.xml,
+                "measureMap": view.measure_map,
+                "eventHitMap": view.event_hit_map,
+            }
+            for name, view in bundle.views.items()
+        },
+    }
+
+
+def _event_lookup_view(exported: Any) -> Any:
+    return exported.views.get("tab") or exported.views["score"]

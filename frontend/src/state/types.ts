@@ -3,6 +3,20 @@ export type EventHitMap = Record<string, string>;
 export type InstrumentMode = 'guitar' | 'piano';
 export type ScoreViewTab = 'score' | 'tab';
 
+export interface RenderView {
+  xml: string;
+  measureMap?: MeasureMap;
+  eventHitMap?: EventHitMap;
+}
+
+export interface ScoreDocumentBundle {
+  instrumentMode: InstrumentMode;
+  views: {
+    score: RenderView;
+    tab?: RenderView;
+  };
+}
+
 export interface HitKey {
   barIndex: number;
   voiceIndex?: number;
@@ -13,11 +27,9 @@ export interface HitKey {
 export interface ScoreState {
   scoreId: string | null;
   revision: number | null;
-  scoreXml: string | null;
-  measureMap: MeasureMap | null;
-  eventHitMap: EventHitMap | null;
+  document: ScoreDocumentBundle | null;
   draftId: string | null;
-  draftXml: string | null;
+  draftDocument: ScoreDocumentBundle | null;
   draftBaseRevision: number | null;
   highlightMeasureId: string | null;
   selectedMeasureId: string | null;
@@ -48,6 +60,22 @@ export const inferInstrumentMode = (xml: string): InstrumentMode => {
 export const canUseGuitarNoteActions = (
   instrumentMode: InstrumentMode | null,
 ): instrumentMode is 'guitar' => instrumentMode === 'guitar';
+
+export const getActiveRenderView = (
+  document: ScoreDocumentBundle | null | undefined,
+  viewTab: ScoreViewTab,
+): RenderView | null => {
+  if (!document) {
+    return null;
+  }
+  if (document.instrumentMode === 'piano') {
+    return document.views.score;
+  }
+  if (viewTab === 'tab' && document.views.tab) {
+    return document.views.tab;
+  }
+  return document.views.score;
+};
 
 export const toHitKey = (hit: HitKey): string => {
   const voice = hit.voiceIndex ?? -1;

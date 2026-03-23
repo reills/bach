@@ -1,12 +1,6 @@
 import { useEffect, useRef } from 'react';
 import * as alphaTab from '@coderline/alphatab';
 import type { HitKey, InstrumentMode, ScoreViewTab } from '../state/types';
-import {
-  getScoreViewerLabel,
-  getStaffVisibility,
-  resolveStaveProfile,
-  shouldShowTabSwitcher,
-} from './scoreViewerStaves';
 
 interface ScoreViewerProps {
   scoreXml: string | null;
@@ -60,34 +54,6 @@ const resolveHitKey = (args: any): HitKey | null => {
   };
 };
 
-const applyStaffVisibility = (
-  api: any,
-  instrumentMode: InstrumentMode | null,
-  viewTab: ScoreViewTab,
-) => {
-  const tracks =
-    (Array.isArray(api?.tracks) && api.tracks.length > 0 ? api.tracks : null) ??
-    (Array.isArray(api?.score?.tracks) ? api.score.tracks : null) ??
-    [];
-
-  if (!tracks.length) return;
-
-  const visibility = getStaffVisibility(instrumentMode, viewTab);
-  for (const track of tracks) {
-    for (const staff of track?.staves ?? []) {
-      staff.showStandardNotation = visibility.showStandardNotation;
-      staff.showTablature = visibility.showTablature;
-    }
-  }
-
-  if (api?.settings?.display != null) {
-    api.settings.display.staveProfile = resolveStaveProfile(alphaTab, instrumentMode, viewTab);
-    api.updateSettings?.();
-  }
-
-  api.renderTracks?.(tracks);
-};
-
 const ScoreViewer = ({
   scoreXml,
   highlightMeasureId,
@@ -134,7 +100,7 @@ const ScoreViewer = ({
         stretchForce: 0.6,
         justifyLastSystem: false,
         padding: [36, 8, 64, 24],
-        staveProfile: resolveStaveProfile(alphaTab, instrumentMode, viewTab),
+        staveProfile: (alphaTab as any).StaveProfile?.TabMixed ?? 7,
         resources: {
           copyrightFont: '11px Arial',
         },
@@ -159,13 +125,6 @@ const ScoreViewer = ({
         onPositionChangedRef.current?.(args?.currentTime ?? 0, args?.endTime ?? 0);
       });
     }
-
-    if (api?.scoreLoaded?.on) {
-      api.scoreLoaded.on(() => {
-        applyStaffVisibility(api, instrumentMode, viewTab);
-      });
-    }
-
     if (api?.noteMouseDown?.on) {
       api.noteMouseDown.on((args: unknown) => {
         const hit = resolveHitKey(args);
@@ -196,16 +155,9 @@ const ScoreViewer = ({
     if (!scoreXml || !apiRef.current) return;
     loadScoreXml(apiRef.current, scoreXml);
   }, [scoreXml]);
-
-  useEffect(() => {
-    if (!apiRef.current) {
-      return;
-    }
-    applyStaffVisibility(apiRef.current, instrumentMode, viewTab);
-  }, [instrumentMode, viewTab]);
-
-  const label = getScoreViewerLabel(instrumentMode, viewTab);
-  const showSwitcher = shouldShowTabSwitcher(instrumentMode);
+  const label =
+    instrumentMode === 'guitar' ? 'Guitar Tab' : instrumentMode === 'piano' ? 'Piano Tab' : 'Tab';
+  const showSwitcher = instrumentMode === 'guitar';
 
   return (
     <div className="score-viewer">
