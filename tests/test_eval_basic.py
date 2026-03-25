@@ -48,6 +48,97 @@ TOKENS_BAD_INTERVAL = [
     "VOICE_0", "DUR_24", "MEL_INT12_+30",   # out of [-24, 24]
 ]
 
+# C major pitch-class set: {0, 2, 4, 5, 7, 9, 11}
+# ABS_VOICE_0_60 anchors voice 0 at MIDI 60 (C4, PC=0).
+# +2 -> D4 (62, PC=2, in key), +3 -> F4 (65, PC=5, in key),
+# +1 -> F#4 (66, PC=6, NOT in key), -3 -> Eb4 (63, PC=3, NOT in key) -> rate = 2/4 = 0.5
+OFF_KEY_TOKENS = [
+    "BAR",
+    "ABS_VOICE_0_60",
+    "POS_0",
+    "VOICE_0", "DUR_24", "MEL_INT12_+2", "HARM_OCT_NA", "HARM_CLASS_NA",
+    "VOICE_0", "DUR_24", "MEL_INT12_+3", "HARM_OCT_NA", "HARM_CLASS_NA",
+    "VOICE_0", "DUR_24", "MEL_INT12_+1", "HARM_OCT_NA", "HARM_CLASS_NA",
+    "VOICE_0", "DUR_24", "MEL_INT12_-3", "HARM_OCT_NA", "HARM_CLASS_NA",
+]
+
+# Stream that declares its own key via KEY_ token — no --key arg needed.
+# KEY_C -> C major; same pitch sequence as OFF_KEY_TOKENS -> rate = 0.5
+OFF_KEY_STREAM_KEY_TOKENS = ["KEY_C"] + OFF_KEY_TOKENS
+
+# All four pitches land in C major: D4(+2->62), F4(+3->65), G4(+2->67), A4(+2->69)
+IN_KEY_TOKENS = [
+    "BAR",
+    "ABS_VOICE_0_60",
+    "POS_0",
+    "VOICE_0", "DUR_24", "MEL_INT12_+2", "HARM_OCT_NA", "HARM_CLASS_NA",
+    "VOICE_0", "DUR_24", "MEL_INT12_+3", "HARM_OCT_NA", "HARM_CLASS_NA",
+    "VOICE_0", "DUR_24", "MEL_INT12_+2", "HARM_OCT_NA", "HARM_CLASS_NA",
+    "VOICE_0", "DUR_24", "MEL_INT12_+2", "HARM_OCT_NA", "HARM_CLASS_NA",
+]
+
+# HARM tokens that are intentionally wrong.
+# Solo voice, ABS anchor at 60. ref_pitch = 60, diff = 0 -> expected HARM_OCT_0, HARM_CLASS_0.
+# Stream writes HARM_CLASS_4 -> 1 mismatch.
+HARM_MISMATCH_TOKENS = [
+    "BAR",
+    "ABS_VOICE_0_60",
+    "POS_0",
+    "VOICE_0", "DUR_24", "MEL_INT12_0", "HARM_OCT_0", "HARM_CLASS_4",
+]
+
+# Correct HARM tokens for a solo note: ref = pitch, diff = 0 -> HARM_OCT_0, HARM_CLASS_0.
+HARM_VALID_TOKENS = [
+    "BAR",
+    "ABS_VOICE_0_60",
+    "POS_0",
+    "VOICE_0", "DUR_24", "MEL_INT12_0", "HARM_OCT_0", "HARM_CLASS_0",
+]
+
+# 3 bars: first two identical, third different -> duplicate_bar_rate = 1/3
+DUPLICATE_BAR_TOKENS = [
+    "BAR", "POS_0", "VOICE_0", "REST_24",
+    "BAR", "POS_0", "VOICE_0", "REST_24",
+    "BAR", "POS_0", "VOICE_0", "REST_48",
+]
+
+# 2 keyed bars:
+# Bar 1 final onset lands on G in C major -> cadence proxy hit
+# Bar 2 final onset lands on E in C major -> not a cadence proxy hit
+CADENCE_TOKENS = [
+    "KEY_C",
+    "BAR",
+    "ABS_VOICE_0_62",
+    "POS_0",
+    "VOICE_0", "DUR_24", "MEL_INT12_+5", "HARM_OCT_NA", "HARM_CLASS_NA",
+    "BAR",
+    "ABS_VOICE_0_60",
+    "POS_0",
+    "VOICE_0", "DUR_24", "MEL_INT12_+4", "HARM_OCT_NA", "HARM_CLASS_NA",
+]
+
+# Key changes should affect off-key scoring at the point of the change.
+KEY_CHANGE_TOKENS = [
+    "BAR", "KEY_C", "ABS_VOICE_0_60", "POS_0",
+    "VOICE_0", "DUR_24", "MEL_INT12_0", "HARM_OCT_0", "HARM_CLASS_0",
+    "BAR", "KEY_G", "ABS_VOICE_0_66", "POS_0",
+    "VOICE_0", "DUR_24", "MEL_INT12_0", "HARM_OCT_0", "HARM_CLASS_0",
+]
+
+# Grammar violations are only malformed VOICE_* events, not random standalone tokens.
+GRAMMAR_VIOLATION_TOKENS = [
+    "BAR",
+    "POS_0",
+    "VOICE_0", "DUR_24", "HARM_OCT_0", "HARM_CLASS_0",
+]
+
+GRAMMAR_TAB_VIOLATION_TOKENS = [
+    "BAR",
+    "ABS_VOICE_0_60",
+    "POS_0",
+    "VOICE_0", "DUR_24", "MEL_INT12_0", "HARM_OCT_0", "HARM_CLASS_0", "STR_2",
+]
+
 
 # ---------------------------------------------------------------------------
 # Unit tests for evaluate()
@@ -185,3 +276,216 @@ def test_cli_json_output_keys(tmp_path):
     for key in ("token_count", "bar_count", "interval_range_ok",
                 "voice_event_count", "rest_event_count", "tab_present"):
         assert key in data, f"missing key: {key}"
+
+
+# ---------------------------------------------------------------------------
+# off_key_rate
+# ---------------------------------------------------------------------------
+
+def test_off_key_rate_no_key_returns_none():
+    # No --key and no KEY_* in stream -> cannot compute, should be None
+    m = evaluate(MINIMAL_TOKENS_NO_TAB)
+    assert m["off_key_rate"] is None
+
+
+def test_off_key_rate_all_in_key():
+    m = evaluate(IN_KEY_TOKENS, key="C")
+    assert m["off_key_rate"] == 0.0
+
+
+def test_off_key_rate_partial():
+    m = evaluate(OFF_KEY_TOKENS, key="C")
+    assert m["off_key_rate"] is not None
+    assert m["off_key_count"] == 2
+    assert m["pitched_onset_count"] == 4
+    assert abs(m["off_key_rate"] - 0.5) < 0.001
+
+
+def test_off_key_rate_from_stream_key_token():
+    # KEY_C is prepended to stream; no explicit key arg
+    m = evaluate(OFF_KEY_STREAM_KEY_TOKENS)
+    assert m["off_key_rate"] is not None
+    assert abs(m["off_key_rate"] - 0.5) < 0.001
+
+
+def test_off_key_rate_explicit_key_overrides_nothing():
+    # Explicit key arg is used; stream has no KEY_ token
+    m = evaluate(OFF_KEY_TOKENS, key="C")
+    assert m["off_key_rate"] is not None
+    # Same fixture -> same result
+    assert abs(m["off_key_rate"] - 0.5) < 0.001
+
+
+def test_off_key_rate_minor_key():
+    # A minor natural: {0, 2, 3, 5, 7, 8, 10}
+    # ABS_VOICE_0_69 = A4 (MIDI 69, PC=9 – wait that's A, need tonic A minor)
+    # Anchor at 69 (A4). MEL_INT12_+2 -> 71 (B4, PC=11, in Am). MEL_INT12_+1 -> 72 (C5, PC=0, in Am).
+    tokens = [
+        "BAR", "ABS_VOICE_0_69", "POS_0",
+        "VOICE_0", "DUR_24", "MEL_INT12_+2", "HARM_OCT_NA", "HARM_CLASS_NA",
+        "VOICE_0", "DUR_24", "MEL_INT12_+1", "HARM_OCT_NA", "HARM_CLASS_NA",
+    ]
+    m = evaluate(tokens, key="Am")
+    assert m["off_key_count"] == 0
+    assert m["pitched_onset_count"] == 2
+    assert m["off_key_rate"] == 0.0
+
+
+def test_off_key_rate_uses_latest_stream_key():
+    m = evaluate(KEY_CHANGE_TOKENS)
+    assert m["off_key_count"] == 0
+    assert m["pitched_onset_count"] == 2
+    assert m["off_key_rate"] == 0.0
+
+
+def test_off_key_rate_cli_key_flag(tmp_path):
+    tok_file = tmp_path / "stream.txt"
+    tok_file.write_text(" ".join(OFF_KEY_TOKENS), encoding="utf-8")
+    out = tmp_path / "metrics.json"
+    rc = main(["--token-file", str(tok_file), "--key", "C", "--output-json", str(out), "--quiet"])
+    assert rc == 0
+    data = json.loads(out.read_text())
+    assert data["off_key_rate"] is not None
+    assert abs(data["off_key_rate"] - 0.5) < 0.001
+
+
+# ---------------------------------------------------------------------------
+# harm_mismatch_count
+# ---------------------------------------------------------------------------
+
+def test_harm_mismatch_count_present_in_output():
+    m = evaluate(MINIMAL_TOKENS_NO_TAB)
+    assert "harm_mismatch_count" in m
+
+
+def test_harm_mismatch_count_valid_stream():
+    m = evaluate(HARM_VALID_TOKENS)
+    if m["harm_mismatch_count"] is None:
+        pytest.skip("validator not available")
+    assert m["harm_mismatch_count"] == 0
+
+
+def test_harm_mismatch_count_detects_mismatch():
+    m = evaluate(HARM_MISMATCH_TOKENS)
+    if m["harm_mismatch_count"] is None:
+        pytest.skip("validator not available")
+    assert m["harm_mismatch_count"] >= 1
+
+
+# ---------------------------------------------------------------------------
+# duplicate_bar_rate
+# ---------------------------------------------------------------------------
+
+def test_duplicate_bar_rate_no_duplicates():
+    m = evaluate(MINIMAL_TOKENS_NO_TAB)
+    assert m["duplicate_bar_rate"] == 0.0
+
+
+def test_duplicate_bar_rate_with_duplicate():
+    m = evaluate(DUPLICATE_BAR_TOKENS)
+    assert m["duplicate_bar_count"] == 1
+    assert m["duplicate_bar_rate"] is not None
+    # 3 bars, 1 duplicate -> 1/3
+    assert abs(m["duplicate_bar_rate"] - (1 / 3)) < 0.001
+
+
+def test_duplicate_bar_rate_empty_stream():
+    m = evaluate([])
+    assert m["duplicate_bar_rate"] is None
+
+
+def test_duplicate_bar_rate_all_duplicate():
+    tokens = [
+        "BAR", "POS_0", "VOICE_0", "REST_24",
+        "BAR", "POS_0", "VOICE_0", "REST_24",
+        "BAR", "POS_0", "VOICE_0", "REST_24",
+    ]
+    m = evaluate(tokens)
+    # bars: [same, same, same] -> 2 duplicates / 3 total = 0.6667
+    assert m["duplicate_bar_count"] == 2
+    assert m["duplicate_bar_rate"] is not None
+    assert abs(m["duplicate_bar_rate"] - (2 / 3)) < 0.001
+
+
+# ---------------------------------------------------------------------------
+# cadence_proxy_rate
+# ---------------------------------------------------------------------------
+
+def test_cadence_proxy_rate_present():
+    m = evaluate(MINIMAL_TOKENS_NO_TAB)
+    assert "cadence_proxy_rate" in m
+
+
+def test_cadence_proxy_rate_correct():
+    m = evaluate(CADENCE_TOKENS)
+    assert m["cadence_proxy_hits"] == 1
+    assert m["cadence_proxy_eligible_bars"] == 2
+    assert m["cadence_proxy_rate"] is not None
+    assert abs(m["cadence_proxy_rate"] - 0.5) < 0.001
+
+
+def test_cadence_proxy_rate_all_cadence():
+    tokens = [
+        "KEY_C",
+        "BAR", "ABS_VOICE_0_60", "POS_0",
+        "VOICE_0", "DUR_24", "MEL_INT12_0", "HARM_OCT_0", "HARM_CLASS_0",
+        "BAR", "ABS_VOICE_0_60", "POS_0",
+        "VOICE_0", "DUR_24", "MEL_INT12_+7", "HARM_OCT_0", "HARM_CLASS_7",
+    ]
+    m = evaluate(tokens)
+    assert m["cadence_proxy_hits"] == 2
+    assert m["cadence_proxy_eligible_bars"] == 2
+    assert m["cadence_proxy_rate"] == 1.0
+
+
+def test_cadence_proxy_rate_no_mel_events():
+    tokens = ["KEY_C", "BAR", "POS_0", "VOICE_0", "REST_24", "BAR", "POS_0", "VOICE_0", "REST_48"]
+    m = evaluate(tokens)
+    assert m["cadence_proxy_hits"] == 0
+    assert m["cadence_proxy_eligible_bars"] == 0
+    assert m["cadence_proxy_rate"] is None
+
+
+def test_cadence_proxy_rate_without_key_is_none():
+    tokens = [
+        "BAR", "ABS_VOICE_0_60", "POS_0",
+        "VOICE_0", "DUR_24", "MEL_INT12_0", "HARM_OCT_0", "HARM_CLASS_0",
+    ]
+    m = evaluate(tokens)
+    assert m["cadence_proxy_eligible_bars"] == 0
+    assert m["cadence_proxy_rate"] is None
+
+
+# ---------------------------------------------------------------------------
+# token_grammar_violations
+# ---------------------------------------------------------------------------
+
+def test_grammar_violations_zero_on_valid_stream():
+    m = evaluate(MINIMAL_TOKENS_NO_TAB)
+    assert m["token_grammar_violations"] == 0
+
+
+def test_grammar_violations_zero_on_valid_with_tab():
+    m = evaluate(MINIMAL_TOKENS_WITH_TAB)
+    assert m["token_grammar_violations"] == 0
+
+
+def test_grammar_violations_dur_without_voice():
+    m = evaluate(GRAMMAR_VIOLATION_TOKENS)
+    assert m["token_grammar_violations"] >= 1
+
+
+def test_grammar_violations_missing_fret_after_str():
+    m = evaluate(GRAMMAR_TAB_VIOLATION_TOKENS)
+    assert m["token_grammar_violations"] >= 1
+
+
+def test_grammar_violations_ignore_non_voice_standalone_tokens():
+    tokens = ["BAR", "POS_0", "HARM_OCT_0", "HARM_CLASS_0"]
+    m = evaluate(tokens)
+    assert m["token_grammar_violations"] == 0
+
+
+def test_grammar_violations_empty_stream():
+    m = evaluate([])
+    assert m["token_grammar_violations"] == 0

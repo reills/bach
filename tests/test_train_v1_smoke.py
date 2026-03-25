@@ -251,6 +251,18 @@ def test_default_multibar_path_runs_with_prefix_headroom(tmp_path):
         ]
     )
     assert result.returncode == 0, result.stderr
+
+
+def test_desc_embed_dry_run_completes(synthetic_data, tmp_path):
+    """--desc-embed should run through a dry batch on the synthetic dataset."""
+    base_dir, vocab_path, events_path = synthetic_data
+    out_dir = tmp_path / "out"
+    result = _run_trainer(
+        _base_args(vocab_path, events_path, out_dir)
+        + ["--dry-run-batches", "1", "--log-every", "1", "--desc-embed"]
+    )
+    assert result.returncode == 0, result.stderr
+    assert "Dry-run complete" in result.stderr or "Dry-run complete" in result.stdout
     combined = result.stderr + result.stdout
     assert "Dry-run complete" in combined
 

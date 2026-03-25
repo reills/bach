@@ -189,6 +189,9 @@ class NoteLM(nn.Module):
         if self.desc_proj is None:
             raise ValueError("desc_embed was provided but desc_embed_dim is 0")
 
+        if desc_embed.dim() == 2:
+            desc_embed = desc_embed.unsqueeze(1)
+
         if desc_embed.dim() != 3:
             raise ValueError("desc_embed must be (batch, num_bars, desc_dim)")
 

@@ -5,6 +5,20 @@
 - Optional venv fallback: `python -m venv .venv && source .venv/bin/activate`
 - Environment/test helper: `bash docs/skills/python-test-env/scripts/run_tests.sh --check`
 - Tests: `bash docs/skills/python-test-env/scripts/run_tests.sh`
+- Front end: run with npm run dev
+
+
+ run the backend using compose_app.py, not app.py. From the repo root:                            
+                                                                                                               
+  conda activate bach                                                                                        
+uvicorn src.api.compose_app:app --reload --port 8001                                                   
+                                                                                                               
+  Or with the environment variables if you want a different checkpoint:                                        
+  BACH_GEN_CHECKPOINT=out/notelm_v1/notelm_step5000.pt uvicorn src.api.compose_app:app --reload --port 8001    
+                                                                                                               
+  Then start the frontend dev server separately:                                                               
+  cd frontend && npm run dev                                                                                   
+                                              
 
 ## Rules
 - Prefer small diffs; don't refactor unrelated code.

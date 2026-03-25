@@ -1,3 +1,4 @@
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, Sequence, Union
@@ -5,10 +6,11 @@ from typing import List, Optional, Sequence, Union
 import torch
 
 from src.models.notelm import LoadedNoteLM, load_notelm_checkpoint
-from src.utils.decoding.rules import MusicRules
+from src.utils.decoding.rules import MusicRules, grammar_constraints
 from src.utils.decoding.sampler import Sampler
-from src.utils.decoding.scg import SCGSampler
+from src.utils.decoding.scg import SCGSampler, build_grammar_mask
 
+_log = logging.getLogger(__name__)
 
 TokenLike = Union[int, str]
 
@@ -16,11 +18,12 @@ TokenLike = Union[int, str]
 @dataclass(frozen=True)
 class GenerationConfig:
     max_length: int
-    temperature: float = 1.0
-    top_p: float = 0.9
+    temperature: float = 0.75
+    top_p: float = 0.85
     repetition_penalty: float = 1.0
     no_repeat_ngram_size: int = 0
     use_scg: bool = False
+    use_grammar_mask: bool = False
     alpha: float = 0.6
     gamma: float = 0.4
     eos_token: Optional[TokenLike] = None
@@ -106,16 +109,38 @@ def _generate_from_loaded(
     sampler = _build_sampler(loaded.vocab, generation_config)
     eos_id = _resolve_eos_id(generation_config, loaded.vocab)
     stopped_on_eos = False
+    inv_vocab = {idx: token for token, idx in loaded.vocab.items()}
+    grammar_fallbacks = 0
 
     with torch.no_grad():
         while generated.size(1) < generation_config.max_length:
             window = generated[:, -loaded.config.max_seq_len :]
             logits = model(window)
+
+            if generation_config.use_grammar_mask:
+                decoded_so_far = [inv_vocab.get(int(t), str(int(t))) for t in generated[0].tolist()]
+                constraints = grammar_constraints(decoded_so_far)
+                mask = build_grammar_mask(
+                    decoded_so_far,
+                    loaded.vocab,
+                    allowed_categories=set(constraints.allowed_categories),
+                    allow_eos=constraints.allow_eos,
+                ).to(device)
+                # Apply mask by setting disallowed tokens to -inf
+                if mask.any():
+                    logits[:, -1, :] = logits[:, -1, :].masked_fill(~mask, float("-inf"))
+                else:
+                    grammar_fallbacks += 1
+                    _log.debug("Grammar mask produced empty allowed set; skipping mask at step %d", generated.size(1))
+
             next_token = sampler.sample(logits[:, -1, :], input_ids=window)
             generated = torch.cat([generated, next_token.to(device=device)], dim=1)
             if eos_id is not None and int(next_token.item()) == eos_id:
                 stopped_on_eos = True
                 break
+
+    if grammar_fallbacks > 0:
+        _log.warning("Grammar mask fell back (empty allowed set) %d times during generation.", grammar_fallbacks)
 
     token_ids = generated[0].detach().cpu().tolist()
     return GenerationResult(

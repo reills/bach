@@ -22,6 +22,7 @@ sys.path.insert(0, str(ROOT))
 
 from src.dataio.dataset import BarDataset
 from src.dataio.collate_miditok import (
+    DESC_EMBED_DIM,
     MidiTokCollator,
     PackedBarDataset,
     PrefixControlConfig,
@@ -140,6 +141,9 @@ def _compute_val_loss(
             ids = batch.ids.to(device)
             attn_mask = batch.attn_mask.to(device)
             prefix_len = batch.prefix_len.to(device)
+            desc_embed = None
+            if model.config.desc_embed_dim > 0 and batch.desc_embed is not None:
+                desc_embed = batch.desc_embed.to(device)
             inputs = ids[:, :-1].contiguous()
             labels = ids[:, 1:].contiguous()
             attn_mask = attn_mask[:, :-1]
@@ -148,7 +152,7 @@ def _compute_val_loss(
                 mask_len = torch.clamp(prefix_len - 1, min=0, max=max_len)
                 range_idx = torch.arange(max_len, device=device)[None, :]
                 labels = labels.masked_fill(range_idx < mask_len[:, None], pad_id)
-            logits = model(inputs, attn_mask=attn_mask)
+            logits = model(inputs, attn_mask=attn_mask, desc_embed=desc_embed)
             loss = F.cross_entropy(
                 logits.reshape(-1, logits.size(-1)),
                 labels.reshape(-1),
@@ -258,6 +262,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--no-key-from-plan", dest="key_from_plan", action="store_false")
     parser.set_defaults(key_from_plan=True)
     parser.add_argument("--mask-prefix-loss", action="store_true")
+    parser.add_argument("--desc-embed", action="store_true",
+                        help="Include bar-level descriptor embeddings in the model.")
 
     parser.add_argument("--pad-token", default="<pad>")
     parser.add_argument("--bos-token", default=None)
@@ -440,6 +446,7 @@ def main() -> None:
         rotary_base=args.rotary_base,
         bar_token_id=vocab[bar_token],
         tie_weights=args.tie_weights,
+        desc_embed_dim=DESC_EMBED_DIM if args.desc_embed else 0,
     )
 
     device = _normalize_device(args.device)
@@ -496,6 +503,9 @@ def main() -> None:
             ids = batch.ids.to(device)
             attn_mask = batch.attn_mask.to(device)
             prefix_len = batch.prefix_len.to(device)
+            desc_embed = None
+            if args.desc_embed and batch.desc_embed is not None:
+                desc_embed = batch.desc_embed.to(device)
 
             inputs = ids[:, :-1].contiguous()
             labels = ids[:, 1:].contiguous()
@@ -515,7 +525,7 @@ def main() -> None:
                 mask = range_idx < mask_len[:, None]
                 labels = labels.masked_fill(mask, pad_id)
 
-            logits = model(inputs, attn_mask=attn_mask)
+            logits = model(inputs, attn_mask=attn_mask, desc_embed=desc_embed)
             loss = F.cross_entropy(
                 logits.reshape(-1, logits.size(-1)),
                 labels.reshape(-1),
