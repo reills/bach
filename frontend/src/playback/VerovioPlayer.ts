@@ -256,6 +256,35 @@ export class VerovioPlayer {
     return this.midi !== null;
   }
 
+  get totalDurationMs(): number {
+    return this.totalMs;
+  }
+
+  setVolume(volume: number): void {
+    const { gain } = getOrCreateAudio();
+    gain.gain.value = Math.max(0, volume);
+  }
+
+  seekTo(timeMs: number): void {
+    const nextOffsetMs = Math.max(0, Math.min(timeMs, this.totalMs));
+    const wasPlaying = this.state === 'playing';
+
+    if (wasPlaying) {
+      if (sharedCtx) {
+        sharedWafPlayer?.cancelQueue(sharedCtx);
+      }
+      this.stopTicker();
+      this.state = 'paused';
+    }
+
+    this.pauseOffsetMs = nextOffsetMs;
+    this.onPositionChanged?.(this.pauseOffsetMs, this.totalMs);
+
+    if (wasPlaying && this.midi) {
+      void this.play();
+    }
+  }
+
   /** Release references. Does not close the shared AudioContext. */
   dispose(): void {
     this.stop();

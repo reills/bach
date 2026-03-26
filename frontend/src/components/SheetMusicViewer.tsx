@@ -1,10 +1,18 @@
 import { useEffect, useRef } from 'react';
-import createVerovioModule from 'verovio/wasm';
-import { VerovioToolkit } from 'verovio/esm';
 import type { ScoreViewTab } from '../state/types';
 import { VerovioPlayer } from '../playback/VerovioPlayer';
+import { getVerovioCursorIds, type VerovioElementsAtTime } from '../playback/verovioCursor';
+import {
+  getVerovioToolkit,
+  resetVerovioToolkitCache,
+  type VerovioToolkitLike,
+} from '../playback/verovioToolkit';
+
+export { getVerovioToolkit };
 
 export interface SheetMusicPlayerAPI {
+  play: () => void;
+  pause: () => void;
   playPause: () => void;
   stop: () => void;
 }
@@ -17,13 +25,8 @@ interface SheetMusicViewerProps {
   onViewTabChange?: (tab: ScoreViewTab) => void;
   onPlayerReady?: () => void;
   onPositionChanged?: (currentMs: number, totalMs: number) => void;
-  onApiReady?: (api: SheetMusicPlayerAPI) => void;
+  onApiReady?: (api: SheetMusicPlayerAPI | null) => void;
 }
-
-type VerovioToolkitLike = Pick<
-  VerovioToolkit,
-  'getPageCount' | 'loadData' | 'redoLayout' | 'renderToSVG' | 'setOptions' | 'renderToMIDI'
->;
 
 // Verovio pageWidth is in units of 1/10 mm. Default A4 = 2100 (210 mm).
 // To fill the container at scale=34 on a 96dpi screen we multiply pixels by:
@@ -31,7 +34,10 @@ type VerovioToolkitLike = Pick<
 const VEROVIO_SCALE = 34;
 const PIXELS_TO_VU = 25.4 / (96 * 0.1 * (VEROVIO_SCALE / 100));
 const MIN_PAGE_WIDTH = 2100; // A4 minimum so narrow containers still look reasonable
-let verovioToolkitPromise: Promise<VerovioToolkitLike> | null = null;
+const MAX_PAGE_WIDTH = 2600;
+const MIN_MEASURES_PER_SYSTEM = 4;
+const DEFAULT_MEASURES_PER_SYSTEM = 5;
+const MAX_MEASURES_PER_SYSTEM = 6;
 
 export const getScoreTitle = (scoreXml: string | null): string | null => {
   if (!scoreXml) {
@@ -42,42 +48,88 @@ export const getScoreTitle = (scoreXml: string | null): string | null => {
   return match?.[1]?.trim() || null;
 };
 
-export const prepareSheetMusicXml = (scoreXml: string): string =>
-  scoreXml
-    .replace(/<part-name>[\s\S]*?<\/part-name>/gi, '<part-name></part-name>')
-    .replace(
-      /<part-abbreviation>[\s\S]*?<\/part-abbreviation>/gi,
-      '<part-abbreviation></part-abbreviation>',
-    );
-
-const createToolkit = async (): Promise<VerovioToolkitLike> => {
-  const verovioModule = await createVerovioModule();
-  return new VerovioToolkit(verovioModule);
-};
-
-export const getVerovioToolkit = (): Promise<VerovioToolkitLike> => {
-  if (!verovioToolkitPromise) {
-    verovioToolkitPromise = createToolkit();
+const addSystemBreakToMeasure = (measureXml: string): string => {
+  if (/<print\b[^>]*new-system\s*=\s*['"]yes['"][^>]*\/?>/i.test(measureXml)) {
+    return measureXml;
   }
-  return verovioToolkitPromise;
+
+  if (/<print\b/i.test(measureXml)) {
+    return measureXml.replace(/<print\b([^>]*?)(\/?)>/i, (_match, rawAttrs = '', selfClosing = '') => {
+      const attrs = String(rawAttrs);
+      const nextAttrs = /new-system\s*=/i.test(attrs)
+        ? attrs.replace(/new-system\s*=\s*(['"])[^'"]*\1/i, 'new-system="yes"')
+        : `${attrs.trimEnd()} new-system="yes"`;
+      const normalizedAttrs = nextAttrs.trim().length > 0 ? ` ${nextAttrs.trim()}` : '';
+      return `<print${normalizedAttrs}${selfClosing}>`;
+    });
+  }
+
+  return measureXml.replace(
+    /(<measure(?=[\s>])[^>]*>)(\s*(?:<attributes\b[\s\S]*?<\/attributes>\s*)?)/i,
+    (_match, openTag: string, prefix: string) => `${openTag}${prefix}<print new-system="yes"/>`,
+  );
 };
+
+export const insertSystemBreaks = (scoreXml: string, measuresPerSystem: number): string => {
+  if (!Number.isFinite(measuresPerSystem) || measuresPerSystem < 2) {
+    return scoreXml;
+  }
+
+  return scoreXml.replace(/<part(?=[\s>])[^>]*>[\s\S]*?<\/part>/gi, (partXml) => {
+    let measureIndex = 0;
+
+    return partXml.replace(/<measure(?=[\s>])[^>]*>[\s\S]*?<\/measure>/gi, (measureXml) => {
+      measureIndex += 1;
+      if (measureIndex === 1 || (measureIndex - 1) % measuresPerSystem !== 0) {
+        return measureXml;
+      }
+      return addSystemBreakToMeasure(measureXml);
+    });
+  });
+};
+
+export const prepareSheetMusicXml = (
+  scoreXml: string,
+  measuresPerSystem = DEFAULT_MEASURES_PER_SYSTEM,
+): string =>
+  insertSystemBreaks(
+    scoreXml
+      .replace(/<part-name>[\s\S]*?<\/part-name>/gi, '<part-name></part-name>')
+      .replace(
+        /<part-abbreviation>[\s\S]*?<\/part-abbreviation>/gi,
+        '<part-abbreviation></part-abbreviation>',
+      ),
+    measuresPerSystem,
+  );
 
 export const resolveVerovioPageWidth = (containerWidth: number): number =>
-  Math.max(Math.floor(containerWidth * PIXELS_TO_VU), MIN_PAGE_WIDTH);
+  Math.min(MAX_PAGE_WIDTH, Math.max(Math.floor(containerWidth * PIXELS_TO_VU), MIN_PAGE_WIDTH));
+
+export const resolveMeasuresPerSystem = (containerWidth: number): number => {
+  if (containerWidth < 720) {
+    return MIN_MEASURES_PER_SYSTEM;
+  }
+  if (containerWidth < 1080) {
+    return DEFAULT_MEASURES_PER_SYSTEM;
+  }
+  return MAX_MEASURES_PER_SYSTEM;
+};
 
 export const renderVerovioScore = (
   toolkit: VerovioToolkitLike,
   scoreXml: string,
   pageWidth: number,
+  measuresPerSystem = DEFAULT_MEASURES_PER_SYSTEM,
 ): string => {
   toolkit.setOptions({
     adjustPageHeight: true,
+    breaks: 'encoded',
     footer: 'none',
     header: 'none',
     pageWidth,
     scale: 34,
   });
-  toolkit.loadData(prepareSheetMusicXml(scoreXml));
+  toolkit.loadData(prepareSheetMusicXml(scoreXml, measuresPerSystem));
   toolkit.redoLayout();
 
   const pageCount = toolkit.getPageCount();
@@ -90,7 +142,7 @@ export const renderVerovioScore = (
 
 export const __testing__ = {
   resetVerovioToolkitCache() {
-    verovioToolkitPromise = null;
+    resetVerovioToolkitCache();
   },
 };
 
@@ -106,19 +158,70 @@ const SheetMusicViewer = ({
 }: SheetMusicViewerProps) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const playerRef = useRef<VerovioPlayer | null>(null);
+  const toolkitRef = useRef<VerovioToolkitLike | null>(null);
+  const activeCursorIdsRef = useRef<string[]>([]);
   const onPlayerReadyRef = useRef(onPlayerReady);
   const onPositionChangedRef = useRef(onPositionChanged);
   useEffect(() => { onPlayerReadyRef.current = onPlayerReady; }, [onPlayerReady]);
   useEffect(() => { onPositionChangedRef.current = onPositionChanged; }, [onPositionChanged]);
 
+  const clearPlaybackCursor = () => {
+    const container = containerRef.current;
+    if (!container) {
+      activeCursorIdsRef.current = [];
+      return;
+    }
+
+    for (const id of activeCursorIdsRef.current) {
+      container
+        .querySelectorAll<SVGElement>(`#${CSS.escape(id)}`)
+        .forEach((element) => element.classList.remove('sheet-music-viewer__playback-cursor'));
+    }
+    activeCursorIdsRef.current = [];
+  };
+
+  const updatePlaybackCursor = (elementsAtTime: VerovioElementsAtTime | null | undefined) => {
+    const container = containerRef.current;
+    if (!container) {
+      activeCursorIdsRef.current = [];
+      return;
+    }
+
+    const nextCursorIds = getVerovioCursorIds(elementsAtTime);
+    const previousIds = activeCursorIdsRef.current;
+
+    for (const id of previousIds) {
+      if (nextCursorIds.includes(id)) {
+        continue;
+      }
+      container
+        .querySelectorAll<SVGElement>(`#${CSS.escape(id)}`)
+        .forEach((element) => element.classList.remove('sheet-music-viewer__playback-cursor'));
+    }
+
+    for (const id of nextCursorIds) {
+      if (previousIds.includes(id)) {
+        continue;
+      }
+      container
+        .querySelectorAll<SVGElement>(`#${CSS.escape(id)}`)
+        .forEach((element) => element.classList.add('sheet-music-viewer__playback-cursor'));
+    }
+
+    activeCursorIdsRef.current = nextCursorIds;
+  };
+
   // Expose stable API to parent on mount
   useEffect(() => {
-    if (!onApiReady) return;
-    onApiReady({
+    onApiReady?.({
+      play: () => void playerRef.current?.play(),
+      pause: () => playerRef.current?.pause(),
       playPause: () => playerRef.current?.playPause(),
       stop: () => playerRef.current?.stop(),
     });
     return () => {
+      onApiReady?.(null);
+      clearPlaybackCursor();
       playerRef.current?.dispose();
       playerRef.current = null;
     };
@@ -132,6 +235,8 @@ const SheetMusicViewer = ({
     }
 
     if (!scoreXml) {
+      clearPlaybackCursor();
+      toolkitRef.current = null;
       container.innerHTML = '';
       playerRef.current?.stop();
       return;
@@ -146,11 +251,13 @@ const SheetMusicViewer = ({
         if (cancelled || !containerRef.current) {
           return;
         }
+        toolkitRef.current = toolkit;
 
         const svg = renderVerovioScore(
           toolkit,
           scoreXml,
           resolveVerovioPageWidth(containerRef.current.clientWidth),
+          resolveMeasuresPerSystem(containerRef.current.clientWidth),
         );
 
         if (!cancelled) {
@@ -162,10 +269,15 @@ const SheetMusicViewer = ({
         if (!cancelled && midiBase64) {
           if (!playerRef.current) {
             playerRef.current = new VerovioPlayer({
-              onPositionChanged: (cur, tot) => onPositionChangedRef.current?.(cur, tot),
+              onPositionChanged: (cur, tot) => {
+                onPositionChangedRef.current?.(cur, tot);
+                updatePlaybackCursor(toolkitRef.current?.getElementsAtTime(cur));
+              },
+              onStopped: clearPlaybackCursor,
             });
           } else {
             playerRef.current.stop();
+            clearPlaybackCursor();
           }
           playerRef.current.load(midiBase64);
           onPlayerReadyRef.current?.();
@@ -193,6 +305,8 @@ const SheetMusicViewer = ({
 
     return () => {
       cancelled = true;
+      clearPlaybackCursor();
+      toolkitRef.current = null;
       if (animationFrameId !== null) {
         cancelAnimationFrame(animationFrameId);
       }

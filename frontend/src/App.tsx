@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import './App.css';
-import ScoreViewer from './components/ScoreViewer';
+import ScoreViewer, { type ScoreViewerPlaybackAPI } from './components/ScoreViewer';
 import SheetMusicViewer, { type SheetMusicPlayerAPI } from './components/SheetMusicViewer';
 import FingeringPicker from './components/FingeringPicker';
 import { compose, inpaintPreview, commitDraft, discardDraft, altPositions, applyFingering } from './api/client';
@@ -177,7 +177,7 @@ const defaultSource: DataSource =
 
 const App = () => {
   const [state, setState] = useState<ScoreState>(initialState);
-  const [alphaTabApi, setAlphaTabApi] = useState<any>(null);
+  const [alphaTabApi, setAlphaTabApi] = useState<ScoreViewerPlaybackAPI | null>(null);
   const [playerReady, setPlayerReady] = useState(false);
   const [sheetPlayerApi, setSheetPlayerApi] = useState<SheetMusicPlayerAPI | null>(null);
   const [sheetPlayerReady, setSheetPlayerReady] = useState(false);
@@ -228,6 +228,7 @@ const App = () => {
     setFingeringPicker(null);
     setFingeringBusy(false);
     setPlaybackPos(null);
+    setPlayerReady(false);
     setSheetPlayerReady(false);
   };
 
@@ -625,17 +626,17 @@ const App = () => {
 
   const handlePlay = () => {
     if (showSheetMusic) {
-      sheetPlayerApi?.playPause();
+      sheetPlayerApi?.play();
     } else {
-      alphaTabApi?.playPause();
+      alphaTabApi?.play();
     }
   };
 
   const handlePause = () => {
     if (showSheetMusic) {
-      sheetPlayerApi?.playPause();
+      sheetPlayerApi?.pause();
     } else {
-      alphaTabApi?.playPause();
+      alphaTabApi?.pause();
     }
   };
 

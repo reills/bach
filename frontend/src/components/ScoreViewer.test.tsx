@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import ScoreViewer from './ScoreViewer';
+import ScoreViewer, { createScoreViewerPlaybackController } from './ScoreViewer';
 
 const renderTab = (viewTab: 'score' | 'tab' = 'tab') =>
   renderToStaticMarkup(
@@ -34,5 +34,59 @@ describe('ScoreViewer (guitar tab renderer)', () => {
     const markup = renderTab('score');
     // The Sheet Music button should have aria-selected="true"
     expect(markup).toMatch(/Sheet Music[\s\S]*?aria-selected="true"|aria-selected="true"[\s\S]*?Sheet Music/);
+  });
+
+  it('pauses and stops the shared MIDI player directly while keeping AlphaTab in sync', () => {
+    const alphaTabApiRef = {
+      current: {
+        pause: vi.fn(),
+        play: vi.fn(async () => undefined),
+        playPause: vi.fn(),
+        stop: vi.fn(),
+      },
+    };
+    const midiPlayerRef = {
+      current: {
+        pause: vi.fn(),
+        play: vi.fn(async () => undefined),
+        stop: vi.fn(),
+      },
+    };
+    const updatePosition = vi.fn();
+
+    const controller = createScoreViewerPlaybackController({
+      alphaTabApiRef,
+      midiPlayerRef: midiPlayerRef as any,
+      updatePosition,
+    });
+
+    controller.pause();
+    controller.stop();
+
+    expect(midiPlayerRef.current.pause).toHaveBeenCalledTimes(1);
+    expect(alphaTabApiRef.current.pause).toHaveBeenCalledTimes(1);
+    expect(midiPlayerRef.current.stop).toHaveBeenCalledTimes(1);
+    expect(alphaTabApiRef.current.stop).toHaveBeenCalledTimes(1);
+    expect(updatePosition).toHaveBeenCalledWith(0);
+  });
+
+  it('falls back to the shared MIDI player when AlphaTab transport is unavailable', async () => {
+    const midiPlayerRef = {
+      current: {
+        pause: vi.fn(),
+        play: vi.fn(async () => undefined),
+        stop: vi.fn(),
+      },
+    };
+
+    const controller = createScoreViewerPlaybackController({
+      alphaTabApiRef: { current: null } as any,
+      midiPlayerRef: midiPlayerRef as any,
+      updatePosition: vi.fn(),
+    });
+
+    controller.play();
+
+    expect(midiPlayerRef.current.play).toHaveBeenCalledTimes(1);
   });
 });

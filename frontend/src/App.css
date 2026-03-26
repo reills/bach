@@ -514,6 +514,15 @@
   padding: 0.5rem 1rem 1rem;
 }
 
+.score-viewer__canvas--sheet svg {
+  display: block;
+  margin: 0 auto 1rem;
+}
+
+.score-viewer__canvas--sheet svg:last-child {
+  margin-bottom: 0;
+}
+
 .score-viewer__score-title {
   text-align: center;
   font-family: 'Fraunces', 'Times New Roman', serif;
@@ -548,6 +557,13 @@
 .at-highlight * {
   fill: #0d6efd;
   stroke: #0d6efd;
+}
+
+.sheet-music-viewer__playback-cursor {
+  fill: #c34f2f !important;
+  stroke: #c34f2f !important;
+  filter: drop-shadow(0 0 2px rgba(195, 79, 47, 0.45));
+  transition: fill 80ms linear, stroke 80ms linear;
 }
 
 .score-viewer__empty {
