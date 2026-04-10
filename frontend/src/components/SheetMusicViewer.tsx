@@ -28,15 +28,15 @@ interface SheetMusicViewerProps {
   onApiReady?: (api: SheetMusicPlayerAPI | null) => void;
 }
 
-// Verovio pageWidth is in units of 1/10 mm. Default A4 = 2100 (210 mm).
-// To fill the container at scale=34 on a 96dpi screen we multiply pixels by:
-//   25.4 / (96 * 0.1 * 0.34) ≈ 7.782
+// Verovio pageWidth is in units of 1/10 mm (VU). The SVG output width is
+// determined by pageWidth alone (scale only affects notation/staff size).
+// To convert container pixels → VU: px * 25.4 / (96 * 0.1) ≈ px * 2.646
 const VEROVIO_SCALE = 34;
-const PIXELS_TO_VU = 25.4 / (96 * 0.1 * (VEROVIO_SCALE / 100));
-const MIN_PAGE_WIDTH = 2100; // A4 minimum so narrow containers still look reasonable
-const MAX_PAGE_WIDTH = 2600;
-const MIN_MEASURES_PER_SYSTEM = 4;
-const DEFAULT_MEASURES_PER_SYSTEM = 5;
+const PIXELS_TO_VU = 25.4 / (96 * 0.1);
+const MIN_PAGE_WIDTH = 1600;
+const MAX_PAGE_WIDTH = 4200;
+const MIN_MEASURES_PER_SYSTEM = 3;
+const DEFAULT_MEASURES_PER_SYSTEM = 4;
 const MAX_MEASURES_PER_SYSTEM = 6;
 
 export const getScoreTitle = (scoreXml: string | null): string | null => {
@@ -106,11 +106,14 @@ export const resolveVerovioPageWidth = (containerWidth: number): number =>
   Math.min(MAX_PAGE_WIDTH, Math.max(Math.floor(containerWidth * PIXELS_TO_VU), MIN_PAGE_WIDTH));
 
 export const resolveMeasuresPerSystem = (containerWidth: number): number => {
-  if (containerWidth < 720) {
+  if (containerWidth < 500) {
     return MIN_MEASURES_PER_SYSTEM;
   }
-  if (containerWidth < 1080) {
+  if (containerWidth < 800) {
     return DEFAULT_MEASURES_PER_SYSTEM;
+  }
+  if (containerWidth < 1200) {
+    return DEFAULT_MEASURES_PER_SYSTEM + 1;
   }
   return MAX_MEASURES_PER_SYSTEM;
 };

@@ -512,11 +512,15 @@
 
 .score-viewer__canvas--sheet {
   padding: 0.5rem 1rem 1rem;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .score-viewer__canvas--sheet svg {
   display: block;
   margin: 0 auto 1rem;
+  max-width: 100%;
+  height: auto;
 }
 
 .score-viewer__canvas--sheet svg:last-child {

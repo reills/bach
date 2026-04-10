@@ -26,6 +26,12 @@ Musical quality metrics (optional):
                          scale degree 1 or 5. Labeled as proxy only.
 * token_grammar_violations : count of malformed VOICE_* event parses.
 
+Polyphony metrics:
+* avg_voices_per_bar      : average distinct VOICE indices per bar
+* avg_notes_per_onset     : average note events per POS (onset position)
+* pct_bars_2plus_voices   : percent of bars with 2+ distinct voices
+* pct_bars_3plus_voices   : percent of bars with 3+ distinct voices
+
 Usage
 -----
     # score a raw token file (one token per line or space-separated)
@@ -324,6 +330,57 @@ def _cadence_proxy_stats(
     return hits, eligible_bars
 
 
+_VOICE_RE = re.compile(r"^VOICE_(\d+)$")
+_POS_RE = re.compile(r"^POS_(\d+)$")
+
+
+def _polyphony_stats(tokens: Sequence[str]) -> Dict:
+    """Compute per-bar voice counts and per-onset note counts."""
+    bars = _split_bars(tokens)
+    voices_per_bar: List[int] = []
+    notes_per_onset: List[int] = []
+
+    for bar_tokens in bars:
+        voices_in_bar: Set[int] = set()
+        notes_at_current_pos = 0
+        saw_pos = False
+        for tok in bar_tokens:
+            vm = _VOICE_RE.match(tok)
+            if vm:
+                voices_in_bar.add(int(vm.group(1)))
+                notes_at_current_pos += 1
+            elif _POS_RE.match(tok):
+                if saw_pos and notes_at_current_pos > 0:
+                    notes_per_onset.append(notes_at_current_pos)
+                notes_at_current_pos = 0
+                saw_pos = True
+        # flush last position
+        if saw_pos and notes_at_current_pos > 0:
+            notes_per_onset.append(notes_at_current_pos)
+        voices_per_bar.append(len(voices_in_bar))
+
+    total_bars = len(voices_per_bar)
+    if total_bars == 0:
+        return {
+            "avg_voices_per_bar": None,
+            "avg_notes_per_onset": None,
+            "pct_bars_2plus_voices": None,
+            "pct_bars_3plus_voices": None,
+        }
+
+    avg_voices = sum(voices_per_bar) / total_bars
+    bars_2plus = sum(1 for v in voices_per_bar if v >= 2)
+    bars_3plus = sum(1 for v in voices_per_bar if v >= 3)
+    avg_notes = (sum(notes_per_onset) / len(notes_per_onset)) if notes_per_onset else 0.0
+
+    return {
+        "avg_voices_per_bar": round(avg_voices, 3),
+        "avg_notes_per_onset": round(avg_notes, 3),
+        "pct_bars_2plus_voices": round(100.0 * bars_2plus / total_bars, 2),
+        "pct_bars_3plus_voices": round(100.0 * bars_3plus / total_bars, 2),
+    }
+
+
 def _load_tokens_from_text(path: Path) -> List[str]:
     raw = path.read_text(encoding="utf-8")
     tokens: List[str] = []
@@ -471,6 +528,8 @@ def evaluate(
             cadence_proxy_hits / cadence_proxy_eligible_bars, 4
         )
 
+    polyphony = _polyphony_stats(tokens)
+
     result: Dict = {
         "token_count": total,
         "bar_count": bar_count,
@@ -491,6 +550,7 @@ def evaluate(
         "cadence_proxy_eligible_bars": cadence_proxy_eligible_bars,
         "cadence_proxy_rate": cadence_proxy_rate,
         "token_grammar_violations": grammar_violations,
+        **polyphony,
     }
     if tab_present:
         result["tab_span_mean"] = round(tab_span_mean, 3) if tab_span_mean is not None else None

@@ -164,13 +164,14 @@ describe('SheetMusicViewer', () => {
   });
 
   it('keeps a minimum Verovio page width for narrow containers', () => {
-    // 250.2px * 7.782 ≈ 1947 VU, which is less than A4 minimum (2100), so clamp to 2100
-    expect(resolveVerovioPageWidth(250.2)).toBe(2100);
+    // 250px * 2.646 ≈ 661 VU, which is less than minimum (1600), so clamp to 1600
+    expect(resolveVerovioPageWidth(250.2)).toBe(1600);
     // Wide containers should not expand the virtual page indefinitely.
-    expect(resolveVerovioPageWidth(912.9)).toBe(2600);
+    expect(resolveVerovioPageWidth(1800)).toBe(4200);
   });
 
-  it('chooses 4 to 6 measures per system from the available width', () => {
+  it('chooses 3 to 6 measures per system from the available width', () => {
+    expect(resolveMeasuresPerSystem(400)).toBe(3);
     expect(resolveMeasuresPerSystem(640)).toBe(4);
     expect(resolveMeasuresPerSystem(900)).toBe(5);
     expect(resolveMeasuresPerSystem(1280)).toBe(6);

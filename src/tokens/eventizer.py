@@ -243,37 +243,30 @@ def _extract_events(part: music21.stream.Part, tpq: int, shift_ticks: int = 0) -
     for el in flat_part.notesAndRests:
         if el.isRest:
             continue
-        if el.isChord:
-            pitch = max(p.midi for p in el.pitches)
-        else:
-            pitch = el.pitch.midi
         onset = ql_to_ticks(el.offset, tpq) + shift_ticks
         dur = ql_to_ticks(el.duration.quarterLength, tpq)
         if dur <= 0:
             continue
-        events.append(NoteEvent(onset_tick=onset, duration_tick=dur, pitch=pitch))
+        if el.isChord:
+            for p in el.pitches:
+                events.append(NoteEvent(onset_tick=onset, duration_tick=dur, pitch=p.midi))
+        else:
+            events.append(NoteEvent(onset_tick=onset, duration_tick=dur, pitch=el.pitch.midi))
     events.sort(key=lambda ev: ev.onset_tick)
     return events
 
 
 def _collapse_events(events: List[NoteEvent]) -> List[NoteEvent]:
+    """Dedupe exact duplicates (same onset + same pitch), keeping the longest duration."""
     if not events:
         return []
-    by_onset: Dict[int, NoteEvent] = {}
+    by_key: Dict[Tuple[int, int], NoteEvent] = {}
     for ev in events:
-        existing = by_onset.get(ev.onset_tick)
-        if existing is None:
-            by_onset[ev.onset_tick] = ev
-            continue
-        if ev.pitch > existing.pitch:
-            by_onset[ev.onset_tick] = ev
-        elif ev.pitch == existing.pitch and ev.duration_tick > existing.duration_tick:
-            by_onset[ev.onset_tick] = NoteEvent(
-                onset_tick=ev.onset_tick,
-                duration_tick=ev.duration_tick,
-                pitch=ev.pitch,
-            )
-    return sorted(by_onset.values(), key=lambda ev: ev.onset_tick)
+        key = (ev.onset_tick, ev.pitch)
+        existing = by_key.get(key)
+        if existing is None or ev.duration_tick > existing.duration_tick:
+            by_key[key] = ev
+    return sorted(by_key.values(), key=lambda ev: (ev.onset_tick, ev.pitch))
 
 
 def _sanitize_musicxml_text(xml_text: str) -> str:

@@ -301,16 +301,65 @@ def main():
             plans_df.to_csv(output_dir / "barplans.csv", index=False)
             print(f"Saved barplans to {output_dir / 'barplans.csv'}")
 
+    # Compute polyphony audit metrics per bar
+    import re
+    voice_re = re.compile(r"^VOICE_(\d+)$")
+    pos_re = re.compile(r"^POS_(\d+)$")
+
+    voices_per_bar = []
+    notes_per_onset = []
+    for _, row in df.iterrows():
+        bar_tokens = row["tokens"].split()
+        voices_in_bar = set()
+        notes_at_pos = 0
+        saw_pos = False
+        for tok in bar_tokens:
+            vm = voice_re.match(tok)
+            if vm:
+                voices_in_bar.add(int(vm.group(1)))
+                notes_at_pos += 1
+            elif pos_re.match(tok):
+                if saw_pos and notes_at_pos > 0:
+                    notes_per_onset.append(notes_at_pos)
+                notes_at_pos = 0
+                saw_pos = True
+        if saw_pos and notes_at_pos > 0:
+            notes_per_onset.append(notes_at_pos)
+        voices_per_bar.append(len(voices_in_bar))
+
+    total_bars = len(voices_per_bar)
+    avg_voices = sum(voices_per_bar) / total_bars if total_bars else 0
+    bars_2plus = sum(1 for v in voices_per_bar if v >= 2)
+    bars_3plus = sum(1 for v in voices_per_bar if v >= 3)
+    avg_notes_per_onset = (sum(notes_per_onset) / len(notes_per_onset)) if notes_per_onset else 0
+
+    polyphony_stats = {
+        "avg_voices_per_bar": round(avg_voices, 3),
+        "avg_notes_per_onset": round(avg_notes_per_onset, 3),
+        "pct_bars_2plus_voices": round(100.0 * bars_2plus / total_bars, 2) if total_bars else 0,
+        "pct_bars_3plus_voices": round(100.0 * bars_3plus / total_bars, 2) if total_bars else 0,
+    }
+
     # Compute and save simplified stats
     stats = {
         "total_bars": len(df),
         "total_pieces": df["piece_id"].nunique(),
         "avg_bar_len_ticks": float(df["bar_len_ticks"].mean()) if "bar_len_ticks" in df else 0,
         "total_files": len(files),
+        **polyphony_stats,
     }
     with open(output_dir / "stats.json", "w") as f:
         json.dump(stats, f, indent=2)
     print("Saved stats.json")
+
+    print("\n" + "=" * 50)
+    print("Polyphony audit")
+    print("=" * 50)
+    print(f"  Avg voices per bar:       {polyphony_stats['avg_voices_per_bar']}")
+    print(f"  Avg notes per onset:      {polyphony_stats['avg_notes_per_onset']}")
+    print(f"  Bars with 2+ voices:      {polyphony_stats['pct_bars_2plus_voices']}%")
+    print(f"  Bars with 3+ voices:      {polyphony_stats['pct_bars_3plus_voices']}%")
+    print("=" * 50)
 
     if tmp_dir is not None:
         tmp_dir.cleanup()

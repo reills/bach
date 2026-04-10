@@ -31,7 +31,7 @@ These are the main historical design decisions from the original planning docs t
 - `HARM_*` tokens are derived interval features, not the source of pitch truth.
 - Token timing uses `TPQ = 24` so binary and ternary subdivisions both quantize cleanly.
 - Generated output maps `VOICE_v` directly to canonical `voiceId = v` for the single guitar part.
-- Exact doublings may be collapsed during preprocessing, so round-trip reconstruction targets a collapsed symbolic score, not original orchestration detail.
+- Redundant octave doublings of the same pitch class may be collapsed during preprocessing (controlled by `max_octaves_per_pitch_class`, default 3). Genuine same-onset harmonic content and chord tones are preserved. Round-trip reconstruction targets a collapsed symbolic score, not original orchestration detail.
 
 Practical v1 token bundle shape for a pitched onset:
 
