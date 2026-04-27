@@ -106,6 +106,8 @@ def _generate_with_checkpoint(args) -> list:
         max_length=args.max_length,
         temperature=args.temperature,
         top_p=args.top_p,
+        use_grammar_mask=args.use_grammar_mask,
+        use_scg=args.use_scg,
     )
     result = compose_baseline(
         Path(args.checkpoint),
@@ -184,6 +186,10 @@ def main(argv=None) -> int:
                         help="max generation tokens (default: 512, used with --checkpoint)")
     parser.add_argument("--temperature", type=float, default=1.0)
     parser.add_argument("--top-p",       type=float, default=0.9)
+    parser.add_argument("--use-grammar-mask", action="store_true",
+                        help="apply token grammar masking during checkpoint generation")
+    parser.add_argument("--use-scg", action="store_true",
+                        help="apply soft music-rule guided sampling during checkpoint generation")
     parser.add_argument("--no-eval",  action="store_true",
                         help="skip eval_basic metrics")
     parser.add_argument("--quiet",    action="store_true",

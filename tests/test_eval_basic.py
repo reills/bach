@@ -278,6 +278,13 @@ def test_cli_json_output_keys(tmp_path):
         assert key in data, f"missing key: {key}"
 
 
+def test_evaluate_includes_counterpoint_metrics():
+    m = evaluate(HARM_VALID_TOKENS)
+    assert "counterpoint_parallel_fifths" in m
+    assert "counterpoint_avg_active_voices" in m
+    assert "counterpoint_harmonic_metadata_mismatches" in m
+
+
 # ---------------------------------------------------------------------------
 # off_key_rate
 # ---------------------------------------------------------------------------

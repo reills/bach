@@ -236,7 +236,11 @@ const App = () => {
     setBusy(true);
     setStatus('busy', 'Composing a new score...');
     try {
-      const response = await compose({ prompt, render_mode: instrumentMode });
+      const response = await compose({
+        prompt,
+        constraints: { useGrammarMask: true },
+        render_mode: instrumentMode,
+      });
       resetLoadedScoreUi();
       setState((prev) => ({
         ...prev,

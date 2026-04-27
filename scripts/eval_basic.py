@@ -25,6 +25,7 @@ Musical quality metrics (optional):
 * cadence_proxy_rate   : fraction of keyed bars whose final pitched onset lands on
                          scale degree 1 or 5. Labeled as proxy only.
 * token_grammar_violations : count of malformed VOICE_* event parses.
+* counterpoint_*       : voice-leading metrics from src.music.counterpoint.
 
 Polyphony metrics:
 * avg_voices_per_bar      : average distinct VOICE indices per bar
@@ -77,11 +78,13 @@ try:
         sys.path.insert(0, _PROJECT_ROOT)
     from src.tokens.tokenizer import parse_voice_event as _parse_voice_event
     from src.tokens.validator import validate_harm_tokens as _validate_harm_tokens
+    from src.music.counterpoint import evaluate_counterpoint_tokens as _evaluate_counterpoint_tokens
     _HAS_SRC_HELPERS = True
 except Exception:
     _HAS_SRC_HELPERS = False
     _parse_voice_event = None  # type: ignore[assignment]
     _validate_harm_tokens = None  # type: ignore[assignment]
+    _evaluate_counterpoint_tokens = None  # type: ignore[assignment]
 
 
 # ---------------------------------------------------------------------------
@@ -529,6 +532,15 @@ def evaluate(
         )
 
     polyphony = _polyphony_stats(tokens)
+    counterpoint: Dict[str, object] = {}
+    if _HAS_SRC_HELPERS and _evaluate_counterpoint_tokens is not None:
+        try:
+            counterpoint = {
+                f"counterpoint_{key}": value
+                for key, value in _evaluate_counterpoint_tokens(tokens).to_dict().items()
+            }
+        except Exception:
+            counterpoint = {}
 
     result: Dict = {
         "token_count": total,
@@ -551,6 +563,7 @@ def evaluate(
         "cadence_proxy_rate": cadence_proxy_rate,
         "token_grammar_violations": grammar_violations,
         **polyphony,
+        **counterpoint,
     }
     if tab_present:
         result["tab_span_mean"] = round(tab_span_mean, 3) if tab_span_mean is not None else None

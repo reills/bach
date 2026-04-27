@@ -29,6 +29,7 @@ class ComposeRuntimeConfig:
     repetition_penalty: float = 1.0
     no_repeat_ngram_size: int = 0
     use_scg: bool = False
+    use_grammar_mask: bool = True
     alpha: float = 0.6
     gamma: float = 0.4
     eos_token: Optional[str] = None
@@ -83,6 +84,12 @@ def build_compose_service(config: ComposeRuntimeConfig) -> ComposeHandler:
                 default=config.no_repeat_ngram_size,
             ),
             use_scg=_constraint_bool(constraints, "use_scg", "useScg", default=config.use_scg),
+            use_grammar_mask=_constraint_bool(
+                constraints,
+                "use_grammar_mask",
+                "useGrammarMask",
+                default=config.use_grammar_mask,
+            ),
             alpha=_constraint_float(constraints, "alpha", default=config.alpha),
             gamma=_constraint_float(constraints, "gamma", default=config.gamma),
             eos_token=_constraint_text(constraints, "eos_token", "eosToken", default=config.eos_token),
@@ -126,6 +133,7 @@ def _runtime_config_from_env() -> ComposeRuntimeConfig:
         repetition_penalty=_env_float("BACH_GEN_REPETITION_PENALTY", 1.0),
         no_repeat_ngram_size=_env_int("BACH_GEN_NO_REPEAT_NGRAM_SIZE", 0),
         use_scg=_env_bool("BACH_GEN_USE_SCG", False),
+        use_grammar_mask=_env_bool("BACH_GEN_USE_GRAMMAR_MASK", True),
         alpha=_env_float("BACH_GEN_ALPHA", 0.6),
         gamma=_env_float("BACH_GEN_GAMMA", 0.4),
         eos_token=os.environ.get("BACH_GEN_EOS_TOKEN"),

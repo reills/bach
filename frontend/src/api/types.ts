@@ -1,8 +1,16 @@
 import type { InstrumentMode, ScoreDocumentBundle } from '../state/types';
 
+export interface ComposeConstraints {
+  useGrammarMask?: boolean;
+  useScg?: boolean;
+  temperature?: number;
+  topP?: number;
+  maxLength?: number;
+}
+
 export interface ComposeRequest {
   prompt?: string;
-  constraints?: Record<string, unknown>;
+  constraints?: ComposeConstraints & Record<string, unknown>;
   render_mode?: InstrumentMode;
 }
 
