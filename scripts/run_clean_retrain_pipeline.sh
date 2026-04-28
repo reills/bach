@@ -18,7 +18,7 @@ cd "$ROOT_DIR"
 DATA_INPUT="data/tobis_xml"
 PROCESSED_DIR="data/processed_rebuilt"
 TRAIN_OUT_DIR="out/notelm_clean_v1"
-EXAMPLE_OUT_DIR=""
+EXAMPLE_OUT_DIR="${EXAMPLE_OUT_DIR:-}"
 LOG_DIR="out/pipeline_logs"
 
 CONDA_ENV="${CONDA_ENV:-bach}"
@@ -29,11 +29,12 @@ BARS_PER_SEQ="${BARS_PER_SEQ:-8}"
 VAL_EVERY="${VAL_EVERY:-500}"
 SAVE_EVERY="${SAVE_EVERY:-500}"
 VAL_SPLIT="${VAL_SPLIT:-0.1}"
+TRAIN_EPOCHS="${TRAIN_EPOCHS:-100000}"
 GEN_TEMPERATURE="${GEN_TEMPERATURE:-0.75}"
 GEN_TOP_P="${GEN_TOP_P:-0.85}"
 GEN_MAX_LENGTH="${GEN_MAX_LENGTH:-512}"
 GEN_KEY="${GEN_KEY:-C}"
-GEN_STYLE="${GEN_STYLE:-baroque}"
+GEN_STYLE="${GEN_STYLE:-}"
 GEN_MEASURES="${GEN_MEASURES:-8}"
 
 SMOKE=0
@@ -62,7 +63,7 @@ Options:
 
 Environment overrides:
   DATA_INPUT, PROCESSED_DIR, TRAIN_OUT_DIR, CONDA_ENV
-  MAX_STEPS, BATCH_SIZE, MAX_SEQ_LEN, BARS_PER_SEQ, VAL_EVERY, SAVE_EVERY
+  MAX_STEPS, BATCH_SIZE, MAX_SEQ_LEN, BARS_PER_SEQ, VAL_EVERY, SAVE_EVERY, TRAIN_EPOCHS
   GEN_TEMPERATURE, GEN_TOP_P, GEN_MAX_LENGTH, GEN_KEY, GEN_STYLE, GEN_MEASURES
 USAGE
 }
@@ -125,7 +126,7 @@ py() {
 EVENTS_PATH="$PROCESSED_DIR/events.parquet"
 DATASET_VOCAB_PATH="$PROCESSED_DIR/vocab.json"
 TRAIN_VOCAB_PATH="$TRAIN_OUT_DIR/vocab.json"
-CHECKPOINT_PATH="$TRAIN_OUT_DIR/notelm_step${MAX_STEPS}.pt"
+CHECKPOINT_PATH=""
 if [[ -z "$EXAMPLE_OUT_DIR" ]]; then
   EXAMPLE_OUT_DIR="out/examples/$(basename "$TRAIN_OUT_DIR")_step${MAX_STEPS}"
 fi
@@ -183,6 +184,7 @@ if [[ "$SKIP_TRAIN" == "0" ]]; then
     --val-split "$VAL_SPLIT"
     --val-every "$VAL_EVERY"
     --save-every "$SAVE_EVERY"
+    --epochs "$TRAIN_EPOCHS"
     --max-steps "$MAX_STEPS"
     --prepend-bos
     --append-eos
@@ -195,31 +197,55 @@ if [[ "$SKIP_TRAIN" == "0" ]]; then
   fi
   py "${TRAIN_ARGS[@]}"
 else
-  log "Skipping training; using checkpoint $CHECKPOINT_PATH"
+  log "Skipping training; will use latest checkpoint in $TRAIN_OUT_DIR"
 fi
 
 if [[ "$SKIP_GENERATE" == "0" ]]; then
-  if [[ ! -f "$CHECKPOINT_PATH" ]]; then
-    echo "Expected checkpoint not found: $CHECKPOINT_PATH" >&2
-    echo "Set MAX_STEPS to the checkpoint step, or use --skip-generate." >&2
+  CHECKPOINT_PATH="$(find "$TRAIN_OUT_DIR" -maxdepth 1 -type f -name 'notelm_step*.pt' \
+    | sort -V \
+    | tail -1)"
+  if [[ -z "$CHECKPOINT_PATH" ]]; then
+    echo "No checkpoints found in $TRAIN_OUT_DIR" >&2
     exit 1
   fi
+  CHECKPOINT_STEP="$(basename "$CHECKPOINT_PATH" .pt | sed 's/^notelm_step//')"
+  if [[ "$EXAMPLE_OUT_DIR" == "out/examples/$(basename "$TRAIN_OUT_DIR")_step${MAX_STEPS}" ]]; then
+    EXAMPLE_OUT_DIR="out/examples/$(basename "$TRAIN_OUT_DIR")_step${CHECKPOINT_STEP}"
+  fi
+  log "Generating from checkpoint: $CHECKPOINT_PATH"
   if [[ ! -f "$TRAIN_VOCAB_PATH" ]]; then
     echo "Expected trained vocab not found: $TRAIN_VOCAB_PATH" >&2
     exit 1
   fi
 
-  py scripts/generate_example.py \
+  GENERATE_ARGS=(
+    scripts/generate_example.py
     --checkpoint "$CHECKPOINT_PATH" \
     --vocab "$TRAIN_VOCAB_PATH" \
     --out-dir "$EXAMPLE_OUT_DIR" \
     --key "$GEN_KEY" \
-    --style "$GEN_STYLE" \
     --measures "$GEN_MEASURES" \
     --max-length "$GEN_MAX_LENGTH" \
     --temperature "$GEN_TEMPERATURE" \
     --top-p "$GEN_TOP_P" \
     --use-grammar-mask
+  )
+  if [[ -n "$GEN_STYLE" ]]; then
+    STYLE_TOKEN="STYLE_$(printf '%s' "$GEN_STYLE" | sed -E 's/[^A-Za-z0-9]+/_/g; s/^_+//; s/_+$//' | tr '[:lower:]' '[:upper:]')"
+    if CONDA_NO_PLUGINS=true conda run --no-capture-output -n "$CONDA_ENV" python - "$TRAIN_VOCAB_PATH" "$STYLE_TOKEN" <<'PY'
+import json
+import sys
+from pathlib import Path
+vocab = json.loads(Path(sys.argv[1]).read_text())
+raise SystemExit(0 if sys.argv[2] in vocab else 1)
+PY
+    then
+      GENERATE_ARGS+=(--style "$GEN_STYLE")
+    else
+      echo "Warning: skipping GEN_STYLE=$GEN_STYLE because $STYLE_TOKEN is not in $TRAIN_VOCAB_PATH"
+    fi
+  fi
+  py "${GENERATE_ARGS[@]}"
 
   py scripts/eval_basic.py \
     --token-file "$EXAMPLE_OUT_DIR/tokens.txt" \

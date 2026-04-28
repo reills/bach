@@ -248,6 +248,41 @@
   color: var(--muted);
 }
 
+.segmented-control {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--panel);
+}
+
+.segmented-control__item {
+  min-width: 0;
+  height: 34px;
+  border: 0;
+  border-right: 1px solid var(--border);
+  background: transparent;
+  color: var(--bg-ink);
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.segmented-control__item:last-child {
+  border-right: 0;
+}
+
+.segmented-control__item:hover {
+  background: rgba(43, 122, 120, 0.08);
+}
+
+.segmented-control__item--active {
+  background: var(--accent);
+  color: white;
+}
+
 .button-row {
   display: flex;
   flex-wrap: wrap;

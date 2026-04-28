@@ -85,7 +85,11 @@ def test_compose_baseline_runs_transformation_pipeline_with_stubbed_generation()
         "vocab_path": Path("/tmp/fake-vocab.json"),
         "device": "cpu",
     }
-    assert result.generation.tokens == generated_tokens
+    assert result.generation.tokens == [
+        *generated_tokens[:15],
+        "HARM_CLASS_0",
+        *generated_tokens[16:],
+    ]
 
     score = result.score
     assert [measure.index for measure in score.measures] == [0, 1]
@@ -124,6 +128,111 @@ def test_compose_baseline_runs_transformation_pipeline_with_stubbed_generation()
     midi_file.readstr(result.midi)
     assert result.midi.startswith(b"MThd")
     assert midi_file.ticksPerQuarterNote == score.header.tpq
+
+
+def test_compose_baseline_repairs_harmonic_metadata_before_returning_generation(tmp_path):
+    generated_tokens = [
+        "BAR",
+        "TIME_SIG_4_4",
+        "KEY_C",
+        "ABS_VOICE_0_60",
+        "POS_0",
+        "VOICE_0",
+        "DUR_24",
+        "MEL_INT12_0",
+        "HARM_OCT_0",
+        "HARM_CLASS_7",
+    ]
+    repaired_tokens = [*generated_tokens[:-1], "HARM_CLASS_0"]
+    vocab_path = tmp_path / "vocab.json"
+    vocab_path.write_text(
+        json.dumps({token: index for index, token in enumerate(sorted(set(repaired_tokens)))}),
+        encoding="utf-8",
+    )
+
+    result = compose_baseline(
+        Path("/tmp/fake-checkpoint.pt"),
+        seed_tokens=["KEY_C"],
+        generation_config=GenerationConfig(max_length=32),
+        vocab_path=vocab_path,
+        render_mode="piano",
+        generator=_make_fake_generator(generated_tokens),
+    )
+
+    assert result.generation.tokens == repaired_tokens
+    assert result.generation.ids == [
+        json.loads(vocab_path.read_text(encoding="utf-8"))[token]
+        for token in repaired_tokens
+    ]
+
+
+def test_compose_baseline_reranks_multiple_quality_passes():
+    crossing_candidate = [
+        "BAR",
+        "TIME_SIG_4_4",
+        "KEY_C",
+        "ABS_VOICE_0_72",
+        "ABS_VOICE_1_60",
+        "POS_0",
+        "VOICE_0",
+        "DUR_24",
+        "MEL_INT12_0",
+        "HARM_OCT_0",
+        "HARM_CLASS_0",
+        "VOICE_1",
+        "DUR_24",
+        "MEL_INT12_0",
+        "HARM_OCT_0",
+        "HARM_CLASS_0",
+    ]
+    clean_candidate = [
+        "BAR",
+        "TIME_SIG_4_4",
+        "KEY_C",
+        "ABS_VOICE_0_48",
+        "ABS_VOICE_1_60",
+        "POS_0",
+        "VOICE_0",
+        "DUR_24",
+        "MEL_INT12_0",
+        "HARM_OCT_0",
+        "HARM_CLASS_0",
+        "VOICE_1",
+        "DUR_24",
+        "MEL_INT12_0",
+        "HARM_OCT_1",
+        "HARM_CLASS_0",
+    ]
+    generated = [crossing_candidate, clean_candidate]
+    calls = []
+
+    def fake_generator(
+        checkpoint_path,
+        *,
+        seed_tokens,
+        generation_config,
+        vocab_path=None,
+        device="cpu",
+    ):
+        calls.append(list(seed_tokens))
+        tokens = generated[len(calls) - 1]
+        return GenerationResult(
+            ids=list(range(len(tokens))),
+            tokens=tokens,
+            stopped_on_eos=False,
+        )
+
+    result = compose_baseline(
+        Path("/tmp/fake-checkpoint.pt"),
+        seed_tokens=["KEY_C"],
+        generation_config=GenerationConfig(max_length=32),
+        render_mode="piano",
+        generator=fake_generator,
+        quality_passes=2,
+    )
+
+    assert len(calls) == 2
+    assert result.generation.tokens == clean_candidate
 
 
 def test_compose_baseline_trims_incomplete_generated_voice_event_suffix():

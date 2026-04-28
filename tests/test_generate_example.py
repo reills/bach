@@ -24,11 +24,13 @@ def test_generate_with_checkpoint_passes_grammar_mask_to_generation_config(monke
         seed_tokens,
         generation_config,
         vocab_path=None,
+        quality_passes=1,
     ):
         captured["checkpoint_path"] = checkpoint_path
         captured["seed_tokens"] = seed_tokens
         captured["generation_config"] = generation_config
         captured["vocab_path"] = vocab_path
+        captured["quality_passes"] = quality_passes
         return SimpleNamespace(generation=SimpleNamespace(tokens=["BAR"]))
 
     monkeypatch.setattr(
@@ -44,16 +46,31 @@ def test_generate_with_checkpoint_passes_grammar_mask_to_generation_config(monke
             style="baroque",
             difficulty=None,
             measures=8,
+            texture=3,
             max_length=128,
             temperature=0.7,
             top_p=0.85,
             use_grammar_mask=True,
             use_scg=True,
+            quality_passes=5,
         )
     )
 
     assert tokens == ["BAR"]
+    assert captured["seed_tokens"] == [
+        "KEY_C",
+        "STYLE_BAROQUE",
+        "MEAS_8",
+        "BAR",
+        "TIME_SIG_4_4",
+        "KEY_C",
+        "ABS_VOICE_0_48",
+        "ABS_VOICE_1_60",
+        "ABS_VOICE_2_67",
+        "POS_0",
+    ]
     assert captured["generation_config"].use_grammar_mask is True
     assert captured["generation_config"].use_scg is True
     assert captured["generation_config"].temperature == 0.7
     assert captured["generation_config"].top_p == 0.85
+    assert captured["quality_passes"] == 5

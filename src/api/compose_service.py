@@ -20,6 +20,11 @@ from src.api.render import (
     canonical_score_to_tab_musicxml,
 )
 from src.inference.generate_v1 import GenerationConfig, GenerationResult, generate_v1
+from src.inference.rerank import (
+    normalize_quality_passes,
+    repair_generation_harmonic_metadata,
+    rerank_generations,
+)
 from src.tabber import DEFAULT_MAX_FRET, tab_events
 from src.tokens.roundtrip import parse_time_sig_token, parse_token_int
 from src.tokens.tokenizer import parse_voice_event
@@ -148,6 +153,7 @@ def compose_baseline(
     max_fret: int = DEFAULT_MAX_FRET,
     render_mode: Literal["guitar", "piano"] = "guitar",
     generator: Callable[..., GenerationResult] = generate_v1,
+    quality_passes: int = 1,
 ) -> ComposeServiceResult:
     generation: GenerationResult | None = None
     trimmed_generation: GenerationResult | None = None
@@ -155,35 +161,84 @@ def compose_baseline(
     score: CanonicalScore | None = None
     exported: ScoreDocumentBundleExport | None = None
     resolved_render_mode = render_mode
+    quality_passes = normalize_quality_passes(quality_passes, default=1)
 
-    try:
-        generation = generator(
-            checkpoint_path,
-            seed_tokens=seed_tokens,
-            generation_config=generation_config,
-            vocab_path=vocab_path,
-            device=device,
-        )
-    except Exception as exc:  # pragma: no cover - exercised via route path
-        raise _compose_failure(
-            stage="generation",
-            exc=exc,
-            checkpoint_path=checkpoint_path,
-            seed_tokens=seed_tokens,
-            generation_config=generation_config,
-        ) from exc
+    if quality_passes > 1:
+        try:
+            rerank_result = rerank_generations(
+                checkpoint_path,
+                seed_tokens=seed_tokens,
+                generation_config=generation_config,
+                vocab_path=vocab_path,
+                device=device,
+                generator=generator,
+                quality_passes=quality_passes,
+                postprocess_generation=lambda candidate: _repair_generation_harmonic_metadata(
+                    _trim_incomplete_generation(candidate, tpq=tpq),
+                    vocab_path=vocab_path,
+                    tpq=tpq,
+                ),
+            )
+            generation = rerank_result.best.raw_generation
+            trimmed_generation = rerank_result.best.generation
+        except Exception as exc:
+            raise _compose_failure(
+                stage="rerank",
+                exc=exc,
+                checkpoint_path=checkpoint_path,
+                seed_tokens=seed_tokens,
+                generation_config=generation_config,
+                generation=generation,
+                effective_tokens=(
+                    trimmed_generation.tokens if trimmed_generation is not None else None
+                ),
+            ) from exc
+    else:
+        try:
+            generation = generator(
+                checkpoint_path,
+                seed_tokens=seed_tokens,
+                generation_config=generation_config,
+                vocab_path=vocab_path,
+                device=device,
+            )
+        except Exception as exc:  # pragma: no cover - exercised via route path
+            raise _compose_failure(
+                stage="generation",
+                exc=exc,
+                checkpoint_path=checkpoint_path,
+                seed_tokens=seed_tokens,
+                generation_config=generation_config,
+            ) from exc
 
-    try:
-        trimmed_generation = _trim_incomplete_generation(generation, tpq=tpq)
-    except Exception as exc:
-        raise _compose_failure(
-            stage="trim",
-            exc=exc,
-            checkpoint_path=checkpoint_path,
-            seed_tokens=seed_tokens,
-            generation_config=generation_config,
-            generation=generation,
-        ) from exc
+        try:
+            trimmed_generation = _trim_incomplete_generation(generation, tpq=tpq)
+        except Exception as exc:
+            raise _compose_failure(
+                stage="trim",
+                exc=exc,
+                checkpoint_path=checkpoint_path,
+                seed_tokens=seed_tokens,
+                generation_config=generation_config,
+                generation=generation,
+            ) from exc
+
+        try:
+            trimmed_generation = _repair_generation_harmonic_metadata(
+                trimmed_generation,
+                vocab_path=vocab_path,
+                tpq=tpq,
+            )
+        except Exception as exc:
+            raise _compose_failure(
+                stage="harm_repair",
+                exc=exc,
+                checkpoint_path=checkpoint_path,
+                seed_tokens=seed_tokens,
+                generation_config=generation_config,
+                generation=generation,
+                effective_tokens=trimmed_generation.tokens,
+            ) from exc
 
     try:
         score = tokens_to_canonical_score(
@@ -275,6 +330,19 @@ def compose_baseline(
         document=exported,
         midi=midi,
         render_mode=resolved_render_mode,
+    )
+
+
+def _repair_generation_harmonic_metadata(
+    generation: GenerationResult,
+    *,
+    vocab_path: str | Path | None,
+    tpq: int,
+) -> GenerationResult:
+    return repair_generation_harmonic_metadata(
+        generation,
+        vocab_path=vocab_path,
+        tpq=tpq,
     )
 
 

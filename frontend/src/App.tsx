@@ -171,6 +171,7 @@ const initialState: ScoreState = {
 
 type StatusTone = 'idle' | 'busy' | 'success' | 'error';
 type DataSource = 'api' | 'local';
+type VoiceCount = 1 | 2 | 3 | 4;
 
 const defaultSource: DataSource =
   import.meta.env.VITE_USE_LOCAL_DATA === 'true' ? 'local' : 'api';
@@ -189,6 +190,7 @@ const App = () => {
     null,
   );
   const [instrumentMode, setInstrumentMode] = useState<InstrumentMode>('guitar');
+  const [voiceCount, setVoiceCount] = useState<VoiceCount>(4);
   const [viewTab, setViewTab] = useState<ScoreViewTab>('score');
   const [mode, setMode] = useState<'window' | 'repair'>('window');
   const [constraints, setConstraints] = useState({
@@ -238,7 +240,7 @@ const App = () => {
     try {
       const response = await compose({
         prompt,
-        constraints: { useGrammarMask: true },
+        constraints: { texture: voiceCount, useGrammarMask: true },
         render_mode: instrumentMode,
       });
       resetLoadedScoreUi();
@@ -726,6 +728,23 @@ const App = () => {
                       <option value="piano">Piano</option>
                     </select>
                   </label>
+                  <div className="field">
+                    <span>Voices</span>
+                    <div className="segmented-control" role="group" aria-label="Voices">
+                      {([1, 2, 3, 4] as VoiceCount[]).map((count) => (
+                        <button
+                          key={count}
+                          type="button"
+                          className={`segmented-control__item ${
+                            voiceCount === count ? 'segmented-control__item--active' : ''
+                          }`}
+                          onClick={() => setVoiceCount(count)}
+                        >
+                          {count}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                   <label className="field">
                     <span>Prompt (optional)</span>
                     <textarea

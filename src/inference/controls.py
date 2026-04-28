@@ -11,6 +11,7 @@ class ComposeControls:
     style: Optional[str] = None
     difficulty: Optional[str] = None
     measures: Optional[int] = None
+    texture: Optional[int] = None
 
 
 def normalize_compose_key(value: str) -> str:
@@ -51,6 +52,42 @@ def build_control_prefix_tokens(
     return build_prefix_tokens(None, 0, config)
 
 
+def build_compose_seed_tokens(
+    controls: ComposeControls,
+    *,
+    measures_token_prefix: str = "MEAS",
+    default_key: str = "C",
+    default_time_sig: str = "4_4",
+) -> List[str]:
+    tokens = build_control_prefix_tokens(
+        controls,
+        measures_token_prefix=measures_token_prefix,
+    )
+    texture = normalize_texture(controls.texture)
+    if texture <= 1:
+        return tokens
+
+    key = _normalize_optional_key(controls.key) or normalize_compose_key(default_key)
+    tokens.extend(
+        [
+            "BAR",
+            f"TIME_SIG_{default_time_sig}",
+            f"KEY_{key}",
+            *_voice_anchor_tokens(texture),
+            "POS_0",
+        ]
+    )
+    return tokens
+
+
+def normalize_texture(value: Optional[int]) -> int:
+    if value is None:
+        return 1
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError("texture must be an integer")
+    return min(max(value, 1), 4)
+
+
 def _normalize_optional_key(value: Optional[str]) -> Optional[str]:
     stripped = _normalize_optional_text(value)
     if stripped is None:
@@ -73,3 +110,15 @@ def _normalize_measures(value: Optional[int]) -> Optional[int]:
     if isinstance(value, bool) or value <= 0:
         raise ValueError("measures must be a positive integer")
     return value
+
+
+def _voice_anchor_tokens(texture: int) -> List[str]:
+    anchor_pitches = {
+        2: [48, 67],
+        3: [48, 60, 67],
+        4: [48, 55, 64, 72],
+    }
+    return [
+        f"ABS_VOICE_{voice}_{pitch}"
+        for voice, pitch in enumerate(anchor_pitches[texture])
+    ]

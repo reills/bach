@@ -65,7 +65,8 @@ def test_audit_dataset_accepts_clean_parquet(tmp_path):
     assert report["mel_int_out_of_range_count"] == 0
     assert report["malformed_voice_event_count"] == 0
     assert report["harmonic_metadata_mismatch_count"] == 0
-    assert report["metrics"]["counterpoint_harmonic_metadata_mismatches"] == 0
+    assert report["metrics"]["harm_mismatch_count"] == 0
+    assert report["metrics"]["avg_voices_per_bar"] == 1.0
 
 
 def test_audit_dataset_reports_training_blockers(tmp_path):

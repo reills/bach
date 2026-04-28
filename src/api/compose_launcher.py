@@ -9,8 +9,9 @@ from fastapi import FastAPI
 from src.api.app import _default_repository, create_app
 from src.api.compose_service import ComposeServiceResult, compose_baseline
 from src.api.routes.scores import ComposeHandler, ComposeRequest
-from src.inference.controls import ComposeControls, build_control_prefix_tokens
+from src.inference.controls import ComposeControls, build_compose_seed_tokens, normalize_texture
 from src.inference.generate_v1 import GenerationConfig, GenerationResult, _generate_from_loaded
+from src.inference.rerank import QUALITY_PASSES_DEFAULT, normalize_quality_passes
 from src.models.notelm import load_notelm_checkpoint
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -33,6 +34,7 @@ class ComposeRuntimeConfig:
     alpha: float = 0.6
     gamma: float = 0.4
     eos_token: Optional[str] = None
+    quality_passes: int = QUALITY_PASSES_DEFAULT
 
 
 def build_compose_service(config: ComposeRuntimeConfig) -> ComposeHandler:
@@ -64,8 +66,9 @@ def build_compose_service(config: ComposeRuntimeConfig) -> ComposeHandler:
             style=_constraint_text(constraints, "style"),
             difficulty=_constraint_text(constraints, "difficulty"),
             measures=_constraint_int(constraints, "measures", default=4),
+            texture=_constraint_texture(constraints),
         )
-        seed_tokens = build_control_prefix_tokens(controls)
+        seed_tokens = build_compose_seed_tokens(controls)
 
         generation_config = GenerationConfig(
             max_length=_constraint_int(constraints, "max_length", "maxLength", default=config.max_length),
@@ -102,6 +105,7 @@ def build_compose_service(config: ComposeRuntimeConfig) -> ComposeHandler:
             device=config.device,
             render_mode=request.render_mode,
             generator=generator,
+            quality_passes=_constraint_quality_passes(constraints, default=config.quality_passes),
         )
 
     return compose_service
@@ -137,6 +141,9 @@ def _runtime_config_from_env() -> ComposeRuntimeConfig:
         alpha=_env_float("BACH_GEN_ALPHA", 0.6),
         gamma=_env_float("BACH_GEN_GAMMA", 0.4),
         eos_token=os.environ.get("BACH_GEN_EOS_TOKEN"),
+        quality_passes=normalize_quality_passes(
+            _env_int("BACH_GEN_QUALITY_PASSES", QUALITY_PASSES_DEFAULT)
+        ),
     )
 
 
@@ -169,6 +176,16 @@ def _constraint_int(constraints: dict[str, Any], *names: str, default: Optional[
             raise ValueError(f"{name} must be an integer")
         return value
     return default
+
+
+def _constraint_texture(constraints: dict[str, Any]) -> int:
+    value = _constraint_int(constraints, "texture", "voices", "voiceCount", default=1)
+    return normalize_texture(value)
+
+
+def _constraint_quality_passes(constraints: dict[str, Any], *, default: int) -> int:
+    value = _constraint_int(constraints, "quality_passes", "qualityPasses", default=default)
+    return normalize_quality_passes(value)
 
 
 def _constraint_float(constraints: dict[str, Any], *names: str, default: float) -> float:

@@ -245,6 +245,7 @@ def test_compose_launcher_binds_real_compose_service(monkeypatch):
         device="cpu",
         render_mode="guitar",
         generator=None,
+        quality_passes=1,
     ) -> ComposeServiceResult:
         captured["checkpoint_path"] = Path(checkpoint_path)
         captured["seed_tokens"] = list(seed_tokens)
@@ -252,6 +253,7 @@ def test_compose_launcher_binds_real_compose_service(monkeypatch):
         captured["vocab_path"] = None if vocab_path is None else Path(vocab_path)
         captured["device"] = device
         captured["generator"] = generator
+        captured["quality_passes"] = quality_passes
         return ComposeServiceResult(
             generation=GenerationResult(ids=[1, 2], tokens=["BAR", "EOS"], stopped_on_eos=True),
             score=score,
@@ -284,9 +286,11 @@ def test_compose_launcher_binds_real_compose_service(monkeypatch):
                     "style": "chorale",
                     "difficulty": "easy",
                     "measures": 8,
+                    "voiceCount": 9,
                     "temperature": 0.5,
                     "topP": 0.8,
                     "maxLength": 64,
+                    "qualityPasses": 6,
                 },
             },
         )
@@ -307,6 +311,14 @@ def test_compose_launcher_binds_real_compose_service(monkeypatch):
         "STYLE_CHORALE",
         "DIFFICULTY_EASY",
         "MEAS_8",
+        "BAR",
+        "TIME_SIG_4_4",
+        "KEY_Gm",
+        "ABS_VOICE_0_48",
+        "ABS_VOICE_1_55",
+        "ABS_VOICE_2_64",
+        "ABS_VOICE_3_72",
+        "POS_0",
     ]
     assert captured["generation_config"].max_length == 64
     assert captured["generation_config"].temperature == 0.5
@@ -315,6 +327,7 @@ def test_compose_launcher_binds_real_compose_service(monkeypatch):
     assert captured["vocab_path"] == Path("/tmp/runtime-vocab.json")
     assert captured["device"] == "cpu"
     assert callable(captured["generator"])
+    assert captured["quality_passes"] == 6
 
 
 def test_compose_launcher_uses_local_defaults_when_env_is_unset(monkeypatch):
@@ -355,9 +368,11 @@ def test_compose_launcher_defaults_seed_controls_when_request_has_no_constraints
         device="cpu",
         render_mode="guitar",
         generator=None,
+        quality_passes=1,
     ) -> ComposeServiceResult:
         captured["seed_tokens"] = list(seed_tokens)
         captured["generation_config"] = generation_config
+        captured["quality_passes"] = quality_passes
         return ComposeServiceResult(
             generation=GenerationResult(ids=[1, 2], tokens=["BAR", "EOS"], stopped_on_eos=True),
             score=score,
@@ -387,6 +402,7 @@ def test_compose_launcher_defaults_seed_controls_when_request_has_no_constraints
     assert captured["seed_tokens"] == ["KEY_C", "MEAS_4"]
     assert captured["generation_config"].max_length == 512
     assert captured["generation_config"].use_grammar_mask is True
+    assert captured["quality_passes"] == 4
 
 
 def test_compose_launcher_allows_grammar_mask_constraint_override(monkeypatch):
@@ -408,8 +424,10 @@ def test_compose_launcher_allows_grammar_mask_constraint_override(monkeypatch):
         device="cpu",
         render_mode="guitar",
         generator=None,
+        quality_passes=1,
     ) -> ComposeServiceResult:
         captured["generation_config"] = generation_config
+        captured["quality_passes"] = quality_passes
         return ComposeServiceResult(
             generation=GenerationResult(ids=[1, 2], tokens=["BAR", "EOS"], stopped_on_eos=True),
             score=score,

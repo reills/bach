@@ -39,6 +39,8 @@ from src.api.canonical import tokens_to_canonical_score
 from src.api.render import canonical_score_to_midi, canonical_score_to_musicxml
 from src.tabber import DEFAULT_MAX_FRET, render_ascii_tab, tab_events
 
+_GUITAR_LOWEST_MIDI = 40
+
 
 # ---------------------------------------------------------------------------
 # Built-in synthetic token stream: C major scale over two 4/4 bars.
@@ -89,7 +91,7 @@ def _load_eval_basic():
 def _generate_with_checkpoint(args) -> list:
     """Run the full compose pipeline using a trained NoteLM checkpoint."""
     from src.api.compose_service import compose_baseline
-    from src.inference.controls import ComposeControls, build_control_prefix_tokens
+    from src.inference.controls import ComposeControls, build_compose_seed_tokens
     from src.inference.generate_v1 import GenerationConfig
 
     controls = ComposeControls(
@@ -97,8 +99,9 @@ def _generate_with_checkpoint(args) -> list:
         style=args.style,
         difficulty=args.difficulty,
         measures=args.measures,
+        texture=args.texture,
     )
-    seed_tokens = build_control_prefix_tokens(controls)
+    seed_tokens = build_compose_seed_tokens(controls)
     if not seed_tokens:
         seed_tokens = ["KEY_C"]
 
@@ -114,6 +117,7 @@ def _generate_with_checkpoint(args) -> list:
         seed_tokens=seed_tokens,
         generation_config=config,
         vocab_path=Path(args.vocab) if args.vocab else None,
+        quality_passes=args.quality_passes,
     )
     return result.generation.tokens
 
@@ -122,7 +126,7 @@ def _run_pipeline(tokens: list, out_dir: Path) -> dict:
     """Convert tokens through the full pipeline and write all output files."""
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    score = tokens_to_canonical_score(tokens)
+    score = _normalize_score_to_guitar_range(tokens_to_canonical_score(tokens))
     part = score.parts[0]
 
     tabbed_part = replace(
@@ -151,6 +155,19 @@ def _run_pipeline(tokens: list, out_dir: Path) -> dict:
         "ascii_tab": tab_path,
         "tokens": tok_path,
     }
+
+
+def _normalize_score_to_guitar_range(score):
+    part = score.parts[0]
+    normalized_events = []
+    for event in part.events:
+        if event.pitch_midi is not None and event.pitch_midi < _GUITAR_LOWEST_MIDI:
+            pitch = event.pitch_midi
+            while pitch < _GUITAR_LOWEST_MIDI:
+                pitch += 12
+            event = replace(event, pitch_midi=pitch)
+        normalized_events.append(event)
+    return replace(score, parts=[replace(part, events=normalized_events)])
 
 
 # ---------------------------------------------------------------------------
@@ -182,6 +199,10 @@ def main(argv=None) -> int:
                         help="difficulty token, e.g. easy (used with --checkpoint)")
     parser.add_argument("--measures",   type=int, default=None, metavar="N",
                         help="number of measures to generate (used with --checkpoint)")
+    parser.add_argument("--texture",    type=int, default=4, metavar="N",
+                        help="voice texture seed to request, clamped to 1..4 (default: 4)")
+    parser.add_argument("--quality-passes", type=int, default=4, metavar="N",
+                        help="candidate generations to score and rerank (default: 4)")
     parser.add_argument("--max-length", type=int, default=512, metavar="N",
                         help="max generation tokens (default: 512, used with --checkpoint)")
     parser.add_argument("--temperature", type=float, default=1.0)

@@ -1,4 +1,5 @@
 import argparse
+import hashlib
 import json
 import random
 import sys
@@ -15,6 +16,33 @@ from src.tokens.eventizer import eventize_musicxml
 from src.tokens.roundtrip import tokens_to_midi
 from src.dataio.descriptors import compute_bar_plan
 from src.tokens.schema import BarPlan
+
+
+def _piece_id_for_path(path: Path, input_dir: Path) -> str:
+    try:
+        relative = path.relative_to(input_dir)
+    except ValueError:
+        relative = path.name
+    if isinstance(relative, Path):
+        relative = relative.with_suffix("").as_posix()
+    else:
+        relative = Path(str(relative)).with_suffix("").as_posix()
+    return relative.replace("/", "__")
+
+
+def _source_path_for_path(path: Path, input_dir: Path) -> str:
+    try:
+        return path.relative_to(input_dir).as_posix()
+    except ValueError:
+        return str(path)
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def _infer_num_voices(tokens: List[str]) -> int:
@@ -51,10 +79,17 @@ def process_file(
     path: Path,
     args: argparse.Namespace,
     roundtrip_state: Optional[Dict[str, Any]] = None,
+    source_sha256: Optional[str] = None,
 ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
     """
     Process a single MusicXML file into a list of bar records.
     """
+    input_dir = Path(args.input)
+    piece_id = _piece_id_for_path(path, input_dir)
+    source_path = _source_path_for_path(path, input_dir)
+    if source_sha256 is None:
+        source_sha256 = _sha256_file(path)
+
     try:
         # 1. Eventize
         tokens, meta = eventize_musicxml(
@@ -127,14 +162,18 @@ def process_file(
                 # Record
                 plan_json = json.dumps(plan.__dict__)
                 bars_data.append({
-                    "piece_id": path.stem,
+                    "piece_id": piece_id,
+                    "source_path": source_path,
+                    "source_sha256": source_sha256,
                     "bar_index": bar_index,
                     "tokens": " ".join(current_bar_tokens), # Space-separated string
                     "plan_json": plan_json,  # Serialized plan
                     "bar_len_ticks": running_state["bar_len_ticks"]
                 })
                 plans_data.append({
-                    "piece_id": path.stem,
+                    "piece_id": piece_id,
+                    "source_path": source_path,
+                    "source_sha256": source_sha256,
                     "bar_index": bar_index,
                     "plan_json": plan_json,
                 })
@@ -161,14 +200,18 @@ def process_file(
             )
             plan_json = json.dumps(plan.__dict__)
             bars_data.append({
-                "piece_id": path.stem,
+                "piece_id": piece_id,
+                "source_path": source_path,
+                "source_sha256": source_sha256,
                 "bar_index": bar_index,
                 "tokens": " ".join(current_bar_tokens),
                 "plan_json": plan_json,
                 "bar_len_ticks": running_state["bar_len_ticks"]
             })
             plans_data.append({
-                "piece_id": path.stem,
+                "piece_id": piece_id,
+                "source_path": source_path,
+                "source_sha256": source_sha256,
                 "bar_index": bar_index,
                 "plan_json": plan_json,
             })
@@ -231,6 +274,13 @@ def main():
         default=0,
         help="Roundtrip this many files to MIDI for a smoke check.",
     )
+    parser.add_argument(
+        "--no-dedupe-sha256",
+        dest="dedupe_sha256",
+        action="store_false",
+        help="Do not skip exact duplicate source files by SHA-256.",
+    )
+    parser.set_defaults(dedupe_sha256=True)
     
     args = parser.parse_args()
     
@@ -248,10 +298,37 @@ def main():
     if args.shuffle:
         rng = random.Random(args.seed)
         rng.shuffle(files)
+    total_files_found = len(files)
+
+    skipped_duplicate_files: List[Dict[str, str]] = []
+    source_hashes: Dict[Path, str] = {}
+    if args.dedupe_sha256:
+        unique_files = []
+        seen_hashes: Dict[str, Path] = {}
+        for path in files:
+            digest = _sha256_file(path)
+            source_hashes[path] = digest
+            existing = seen_hashes.get(digest)
+            if existing is not None:
+                skipped_duplicate_files.append(
+                    {
+                        "path": _source_path_for_path(path, input_dir),
+                        "duplicate_of": _source_path_for_path(existing, input_dir),
+                        "sha256": digest,
+                    }
+                )
+                continue
+            seen_hashes[digest] = path
+            unique_files.append(path)
+        files = unique_files
+
     if args.limit and args.limit > 0:
         files = files[: args.limit]
 
-    print(f"Found {len(files)} files in {input_dir}")
+    print(f"Found {total_files_found} files in {input_dir}")
+    if args.dedupe_sha256:
+        print(f"Skipped {len(skipped_duplicate_files)} exact duplicate files by SHA-256")
+    print(f"Processing {len(files)} files")
     
     roundtrip_state = None
     tmp_dir = None
@@ -264,7 +341,12 @@ def main():
         }
 
     for p in files:
-        records, plans = process_file(p, args, roundtrip_state=roundtrip_state)
+        records, plans = process_file(
+            p,
+            args,
+            roundtrip_state=roundtrip_state,
+            source_sha256=source_hashes.get(p),
+        )
         all_records.extend(records)
         all_plans.extend(plans)
         if len(records) > 0:
@@ -345,12 +427,19 @@ def main():
         "total_bars": len(df),
         "total_pieces": df["piece_id"].nunique(),
         "avg_bar_len_ticks": float(df["bar_len_ticks"].mean()) if "bar_len_ticks" in df else 0,
-        "total_files": len(files),
+        "total_files": total_files_found,
+        "processed_files": len(files),
+        "skipped_duplicate_files": len(skipped_duplicate_files),
         **polyphony_stats,
     }
     with open(output_dir / "stats.json", "w") as f:
         json.dump(stats, f, indent=2)
     print("Saved stats.json")
+
+    if skipped_duplicate_files:
+        dedupe_path = output_dir / "dedupe_skipped_files.json"
+        dedupe_path.write_text(json.dumps(skipped_duplicate_files, indent=2), encoding="utf-8")
+        print(f"Saved duplicate skip report to {dedupe_path}")
 
     print("\n" + "=" * 50)
     print("Polyphony audit")

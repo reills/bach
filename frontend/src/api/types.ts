@@ -3,9 +3,13 @@ import type { InstrumentMode, ScoreDocumentBundle } from '../state/types';
 export interface ComposeConstraints {
   useGrammarMask?: boolean;
   useScg?: boolean;
+  texture?: number;
+  voices?: number;
+  voiceCount?: number;
   temperature?: number;
   topP?: number;
   maxLength?: number;
+  qualityPasses?: number;
 }
 
 export interface ComposeRequest {
