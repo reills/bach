@@ -45,6 +45,7 @@ class ComposeServiceResult:
     document: "ScoreDocumentBundleExport"
     midi: bytes
     render_mode: Literal["guitar", "piano"] = "guitar"
+    diagnostics: dict[str, object] | None = None
 
     def __init__(
         self,
@@ -57,6 +58,7 @@ class ComposeServiceResult:
         score_xml: str | None = None,
         measure_map: dict[str, str] | None = None,
         event_hit_map: dict[str, str] | None = None,
+        diagnostics: dict[str, object] | None = None,
     ) -> None:
         if document is None:
             if score_xml is None or measure_map is None or event_hit_map is None:
@@ -81,6 +83,7 @@ class ComposeServiceResult:
         object.__setattr__(self, "document", document)
         object.__setattr__(self, "midi", midi)
         object.__setattr__(self, "render_mode", render_mode)
+        object.__setattr__(self, "diagnostics", diagnostics)
 
     @property
     def score_xml(self) -> str:

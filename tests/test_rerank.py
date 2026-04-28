@@ -3,6 +3,7 @@ from pathlib import Path
 
 from src.inference.generate_v1 import GenerationConfig, GenerationResult
 from src.inference.rerank import (
+    evaluate_quality_metrics,
     repair_generation_harmonic_metadata,
     rerank_generations,
     score_quality_metrics,
@@ -25,7 +26,70 @@ def test_score_quality_metrics_applies_counterpoint_weights():
         }
     )
 
-    assert score == 1311
+    assert score == 1381
+
+
+def test_evaluate_quality_metrics_includes_repetition_and_voice_dropout_metrics():
+    metrics = evaluate_quality_metrics(
+        [
+            "BAR",
+            "ABS_VOICE_0_48",
+            "ABS_VOICE_1_55",
+            "POS_0",
+            "VOICE_0",
+            "DUR_24",
+            "MEL_INT12_0",
+            "HARM_OCT_0",
+            "HARM_CLASS_0",
+            "VOICE_1",
+            "DUR_24",
+            "MEL_INT12_0",
+            "HARM_OCT_0",
+            "HARM_CLASS_7",
+            "POS_24",
+            "VOICE_0",
+            "DUR_24",
+            "MEL_INT12_0",
+            "HARM_OCT_0",
+            "HARM_CLASS_0",
+            "VOICE_1",
+            "DUR_24",
+            "MEL_INT12_0",
+            "HARM_OCT_0",
+            "HARM_CLASS_7",
+            "BAR",
+            "ABS_VOICE_0_48",
+            "ABS_VOICE_1_55",
+            "POS_0",
+            "VOICE_0",
+            "DUR_24",
+            "MEL_INT12_0",
+            "HARM_OCT_0",
+            "HARM_CLASS_0",
+            "VOICE_1",
+            "DUR_24",
+            "MEL_INT12_0",
+            "HARM_OCT_0",
+            "HARM_CLASS_7",
+            "POS_24",
+            "VOICE_0",
+            "DUR_24",
+            "MEL_INT12_0",
+            "HARM_OCT_0",
+            "HARM_CLASS_0",
+            "VOICE_1",
+            "DUR_24",
+            "MEL_INT12_0",
+            "HARM_OCT_0",
+            "HARM_CLASS_7",
+        ]
+    )
+
+    assert metrics["duplicate_bar_rate"] == 0.5
+    assert metrics["pct_bars_2plus_voices"] == 100.0
+    assert metrics["pct_bars_3plus_voices"] == 0.0
+    assert metrics["repeated_pitch_rate"] == 1.0
+    assert metrics["repeated_interval_rate"] == 1.0
 
 
 def test_rerank_generations_returns_lowest_score_postprocessed_candidate():

@@ -51,6 +51,7 @@ class ComposeResponse(BaseModel):
     measureMap: dict[str, str] | None = None
     eventHitMap: dict[str, str] | None = None
     midi: str | None = None
+    diagnostics: dict[str, Any] | None = None
 
 
 class InpaintConstraints(BaseModel):
@@ -193,6 +194,7 @@ def create_router(
             measureMap=result.document.measure_map,
             eventHitMap=result.document.event_hit_map,
             midi=base64.b64encode(result.midi).decode("ascii"),
+            diagnostics=result.diagnostics,
         )
 
     @router.post("/inpaint_preview", response_model=InpaintPreviewResponse)

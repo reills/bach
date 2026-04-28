@@ -11,8 +11,14 @@ from src.api.compose_service import ComposeServiceResult, compose_baseline
 from src.api.routes.scores import ComposeHandler, ComposeRequest
 from src.inference.controls import ComposeControls, build_compose_seed_tokens, normalize_texture
 from src.inference.generate_v1 import GenerationConfig, GenerationResult, _generate_from_loaded
-from src.inference.rerank import QUALITY_PASSES_DEFAULT, normalize_quality_passes
+from src.inference.rerank import QUALITY_PASSES_DEFAULT, evaluate_quality_metrics, normalize_quality_passes
 from src.models.notelm import load_notelm_checkpoint
+from src.utils.decoding.voice_state import (
+    VOICE_LEADING_DEFAULT,
+    VoiceLeadingMode,
+    normalize_voice_leading,
+    voice_leading_enabled,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CHECKPOINT_PATH = REPO_ROOT / "out" / "notelm_v1" / "notelm_step5000.pt"
@@ -35,6 +41,7 @@ class ComposeRuntimeConfig:
     gamma: float = 0.4
     eos_token: Optional[str] = None
     quality_passes: int = QUALITY_PASSES_DEFAULT
+    voice_leading: VoiceLeadingMode = VOICE_LEADING_DEFAULT
 
 
 def build_compose_service(config: ComposeRuntimeConfig) -> ComposeHandler:
@@ -69,6 +76,8 @@ def build_compose_service(config: ComposeRuntimeConfig) -> ComposeHandler:
             texture=_constraint_texture(constraints),
         )
         seed_tokens = build_compose_seed_tokens(controls)
+        voice_leading = _constraint_voice_leading(constraints, default=config.voice_leading)
+        quality_passes = _constraint_quality_passes(constraints, default=config.quality_passes)
 
         generation_config = GenerationConfig(
             max_length=_constraint_int(constraints, "max_length", "maxLength", default=config.max_length),
@@ -93,11 +102,14 @@ def build_compose_service(config: ComposeRuntimeConfig) -> ComposeHandler:
                 "useGrammarMask",
                 default=config.use_grammar_mask,
             ),
+            use_voice_leading_mask=voice_leading_enabled(voice_leading),
+            target_texture=controls.texture,
+            bar_voice_survival_penalty=(8.0 if voice_leading_enabled(voice_leading) else 0.0),
             alpha=_constraint_float(constraints, "alpha", default=config.alpha),
             gamma=_constraint_float(constraints, "gamma", default=config.gamma),
             eos_token=_constraint_text(constraints, "eos_token", "eosToken", default=config.eos_token),
         )
-        return compose_baseline(
+        result = compose_baseline(
             config.checkpoint_path,
             seed_tokens=seed_tokens,
             generation_config=generation_config,
@@ -105,8 +117,23 @@ def build_compose_service(config: ComposeRuntimeConfig) -> ComposeHandler:
             device=config.device,
             render_mode=request.render_mode,
             generator=generator,
-            quality_passes=_constraint_quality_passes(constraints, default=config.quality_passes),
+            quality_passes=quality_passes,
         )
+        object.__setattr__(
+            result,
+            "diagnostics",
+            {
+                "texture": controls.texture,
+                "qualityPasses": quality_passes,
+                "useGrammarMask": generation_config.use_grammar_mask,
+                "useVoiceLeadingMask": generation_config.use_voice_leading_mask,
+                "barVoiceSurvivalPenalty": generation_config.bar_voice_survival_penalty,
+                "voiceLeading": voice_leading,
+                "seed_tokens": [str(token) for token in seed_tokens],
+                "generated_metrics": evaluate_quality_metrics(result.generation.tokens),
+            },
+        )
+        return result
 
     return compose_service
 
@@ -144,6 +171,7 @@ def _runtime_config_from_env() -> ComposeRuntimeConfig:
         quality_passes=normalize_quality_passes(
             _env_int("BACH_GEN_QUALITY_PASSES", QUALITY_PASSES_DEFAULT)
         ),
+        voice_leading=normalize_voice_leading(os.environ.get("BACH_GEN_VOICE_LEADING")),
     )
 
 
@@ -186,6 +214,15 @@ def _constraint_texture(constraints: dict[str, Any]) -> int:
 def _constraint_quality_passes(constraints: dict[str, Any], *, default: int) -> int:
     value = _constraint_int(constraints, "quality_passes", "qualityPasses", default=default)
     return normalize_quality_passes(value)
+
+
+def _constraint_voice_leading(
+    constraints: dict[str, Any],
+    *,
+    default: VoiceLeadingMode,
+) -> VoiceLeadingMode:
+    value = _constraint_text(constraints, "voice_leading", "voiceLeading", default=default)
+    return normalize_voice_leading(value, default=default)
 
 
 def _constraint_float(constraints: dict[str, Any], *names: str, default: float) -> float:

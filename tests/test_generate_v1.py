@@ -119,3 +119,78 @@ def test_generate_v1_uses_scg_and_max_length(monkeypatch):
         (vocab["BAR"], vocab["POS_0"]),
         (vocab["POS_0"], vocab["POS_0"]),
     ]
+
+
+def test_generate_v1_applies_voice_leading_mask_at_melody_step(monkeypatch):
+    seed = ["BAR", "ABS_VOICE_3_84", "POS_0", "VOICE_3", "DUR_24"]
+    vocab = {
+        "BAR": 0,
+        "ABS_VOICE_3_84": 1,
+        "POS_0": 2,
+        "VOICE_3": 3,
+        "DUR_24": 4,
+        "MEL_INT12_0": 5,
+        "MEL_INT12_+1": 6,
+    }
+    seed_ids = tuple(vocab[token] for token in seed)
+    logits = torch.full((len(vocab),), -1e9, dtype=torch.float32)
+    logits[vocab["MEL_INT12_0"]] = 0.0
+    logits[vocab["MEL_INT12_+1"]] = 100.0
+    model = FakeAutoregressiveModel(
+        {seed_ids: logits},
+        vocab_size=len(vocab),
+        max_seq_len=16,
+    )
+    loaded = make_loaded_model(model, vocab)
+    monkeypatch.setattr(generate_module, "load_notelm_checkpoint", lambda *args, **kwargs: loaded)
+
+    result = generate_module.generate_v1(
+        "unused.pt",
+        seed_tokens=seed,
+        generation_config=generate_module.GenerationConfig(
+            max_length=len(seed) + 1,
+            top_p=1.0,
+            use_grammar_mask=True,
+        ),
+    )
+
+    assert result.tokens[-1] == "MEL_INT12_0"
+
+
+def test_generate_v1_penalizes_bar_when_current_bar_has_too_few_voices(monkeypatch):
+    seed = [
+        "BAR",
+        "ABS_VOICE_0_48",
+        "POS_0",
+        "VOICE_0",
+        "DUR_24",
+        "MEL_INT12_0",
+        "HARM_OCT_0",
+        "HARM_CLASS_0",
+    ]
+    vocab = {token: idx for idx, token in enumerate([*seed, "VOICE_1"])}
+    seed_ids = tuple(vocab[token] for token in seed)
+    logits = torch.full((len(vocab),), -1e9, dtype=torch.float32)
+    logits[vocab["BAR"]] = 10.0
+    logits[vocab["VOICE_1"]] = 0.0
+    model = FakeAutoregressiveModel(
+        {seed_ids: logits},
+        vocab_size=len(vocab),
+        max_seq_len=16,
+    )
+    loaded = make_loaded_model(model, vocab)
+    monkeypatch.setattr(generate_module, "load_notelm_checkpoint", lambda *args, **kwargs: loaded)
+
+    result = generate_module.generate_v1(
+        "unused.pt",
+        seed_tokens=seed,
+        generation_config=generate_module.GenerationConfig(
+            max_length=len(seed) + 1,
+            top_p=1.0,
+            use_grammar_mask=True,
+            target_texture=4,
+            bar_voice_survival_penalty=8.0,
+        ),
+    )
+
+    assert result.tokens[-1] == "VOICE_1"

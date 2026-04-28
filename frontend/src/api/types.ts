@@ -10,6 +10,7 @@ export interface ComposeConstraints {
   topP?: number;
   maxLength?: number;
   qualityPasses?: number;
+  voiceLeading?: 'fast' | 'off' | 'balanced' | 'best';
 }
 
 export interface ComposeRequest {
@@ -24,6 +25,7 @@ export interface ComposeResponse {
   document: ScoreDocumentBundle;
   midi?: string;
   instrumentMode: InstrumentMode;
+  diagnostics?: Record<string, unknown>;
 }
 
 export interface InpaintPreviewRequest {

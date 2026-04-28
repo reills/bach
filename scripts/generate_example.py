@@ -110,6 +110,7 @@ def _generate_with_checkpoint(args) -> list:
         temperature=args.temperature,
         top_p=args.top_p,
         use_grammar_mask=args.use_grammar_mask,
+        target_texture=args.texture,
         use_scg=args.use_scg,
     )
     result = compose_baseline(

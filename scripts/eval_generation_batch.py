@@ -147,6 +147,7 @@ def run_batch(args: argparse.Namespace) -> dict[str, Any]:
         no_repeat_ngram_size=args.no_repeat_ngram_size,
         use_scg=args.use_scg,
         use_grammar_mask=args.use_grammar_mask,
+        target_texture=args.texture,
         alpha=args.alpha,
         gamma=args.gamma,
         eos_token=args.eos_token,

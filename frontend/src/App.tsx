@@ -240,7 +240,12 @@ const App = () => {
     try {
       const response = await compose({
         prompt,
-        constraints: { texture: voiceCount, useGrammarMask: true },
+        constraints: {
+          texture: voiceCount,
+          useGrammarMask: true,
+          qualityPasses: 4,
+          voiceLeading: 'balanced',
+        },
         render_mode: instrumentMode,
       });
       resetLoadedScoreUi();
@@ -934,6 +939,37 @@ const App = () => {
             </div>
           )}
 
+        </section>
+
+        <section className="panel panel--viewer">
+          {showSheetMusic ? (
+            <SheetMusicViewer
+              scoreXml={renderXml}
+              highlightMeasureId={state.highlightMeasureId}
+              instrumentMode={activeDocument?.instrumentMode ?? state.instrumentMode}
+              viewTab={effectiveViewTab}
+              onViewTabChange={setViewTab}
+              onApiReady={setSheetPlayerApi}
+              onPlayerReady={() => setSheetPlayerReady(true)}
+              onPositionChanged={(current, total) => setPlaybackPos({ current, total })}
+            />
+          ) : (
+            <ScoreViewer
+              scoreXml={renderXml}
+              highlightMeasureId={state.highlightMeasureId}
+              instrumentMode={activeDocument?.instrumentMode ?? state.instrumentMode}
+              viewTab={effectiveViewTab}
+              onViewTabChange={setViewTab}
+              onMeasureClick={handleMeasureClick}
+              onNoteClick={handleNoteClick}
+              onApiReady={setAlphaTabApi}
+              onPlayerReady={() => setPlayerReady(true)}
+              onPositionChanged={(current, total) => setPlaybackPos({ current, total })}
+            />
+          )}
+        </section>
+
+        <aside className="panel panel--meta">
           {/* Playback & Export */}
           <div className="panel__section">
             <div className="panel__title">
@@ -993,37 +1029,7 @@ const App = () => {
               </div>
             </div>
           </div>
-        </section>
 
-        <section className="panel panel--viewer">
-          {showSheetMusic ? (
-            <SheetMusicViewer
-              scoreXml={renderXml}
-              highlightMeasureId={state.highlightMeasureId}
-              instrumentMode={activeDocument?.instrumentMode ?? state.instrumentMode}
-              viewTab={effectiveViewTab}
-              onViewTabChange={setViewTab}
-              onApiReady={setSheetPlayerApi}
-              onPlayerReady={() => setSheetPlayerReady(true)}
-              onPositionChanged={(current, total) => setPlaybackPos({ current, total })}
-            />
-          ) : (
-            <ScoreViewer
-              scoreXml={renderXml}
-              highlightMeasureId={state.highlightMeasureId}
-              instrumentMode={activeDocument?.instrumentMode ?? state.instrumentMode}
-              viewTab={effectiveViewTab}
-              onViewTabChange={setViewTab}
-              onMeasureClick={handleMeasureClick}
-              onNoteClick={handleNoteClick}
-              onApiReady={setAlphaTabApi}
-              onPlayerReady={() => setPlayerReady(true)}
-              onPositionChanged={(current, total) => setPlaybackPos({ current, total })}
-            />
-          )}
-        </section>
-
-        <aside className="panel panel--meta">
           {/* Workflow Stepper */}
           <div className="panel__section">
             <div className="panel__title">

@@ -291,6 +291,7 @@ def test_compose_launcher_binds_real_compose_service(monkeypatch):
                     "topP": 0.8,
                     "maxLength": 64,
                     "qualityPasses": 6,
+                    "voiceLeading": "fast",
                 },
             },
         )
@@ -324,10 +325,19 @@ def test_compose_launcher_binds_real_compose_service(monkeypatch):
     assert captured["generation_config"].temperature == 0.5
     assert captured["generation_config"].top_p == 0.8
     assert captured["generation_config"].use_grammar_mask is True
+    assert captured["generation_config"].use_voice_leading_mask is False
+    assert captured["generation_config"].target_texture == 4
+    assert captured["generation_config"].bar_voice_survival_penalty == 0.0
     assert captured["vocab_path"] == Path("/tmp/runtime-vocab.json")
     assert captured["device"] == "cpu"
     assert callable(captured["generator"])
     assert captured["quality_passes"] == 6
+    assert response.json()["diagnostics"]["texture"] == 4
+    assert response.json()["diagnostics"]["qualityPasses"] == 6
+    assert response.json()["diagnostics"]["useGrammarMask"] is True
+    assert response.json()["diagnostics"]["useVoiceLeadingMask"] is False
+    assert response.json()["diagnostics"]["barVoiceSurvivalPenalty"] == 0.0
+    assert response.json()["diagnostics"]["seed_tokens"] == captured["seed_tokens"]
 
 
 def test_compose_launcher_uses_local_defaults_when_env_is_unset(monkeypatch):
@@ -341,12 +351,14 @@ def test_compose_launcher_uses_local_defaults_when_env_is_unset(monkeypatch):
     monkeypatch.delenv("BACH_GEN_VOCAB", raising=False)
     monkeypatch.delenv("BACH_GEN_DEVICE", raising=False)
     monkeypatch.delenv("BACH_GEN_USE_GRAMMAR_MASK", raising=False)
+    monkeypatch.delenv("BACH_GEN_VOICE_LEADING", raising=False)
 
     config = _runtime_config_from_env()
 
     assert config.checkpoint_path == DEFAULT_CHECKPOINT_PATH
     assert config.vocab_path == DEFAULT_VOCAB_PATH
     assert config.use_grammar_mask is True
+    assert config.voice_leading == "balanced"
 
 
 def test_compose_launcher_defaults_seed_controls_when_request_has_no_constraints(monkeypatch):
@@ -402,6 +414,9 @@ def test_compose_launcher_defaults_seed_controls_when_request_has_no_constraints
     assert captured["seed_tokens"] == ["KEY_C", "MEAS_4"]
     assert captured["generation_config"].max_length == 512
     assert captured["generation_config"].use_grammar_mask is True
+    assert captured["generation_config"].use_voice_leading_mask is True
+    assert captured["generation_config"].target_texture == 1
+    assert captured["generation_config"].bar_voice_survival_penalty == 8.0
     assert captured["quality_passes"] == 4
 
 
