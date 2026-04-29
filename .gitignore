@@ -3,6 +3,7 @@
 /data/processed/
 /data/processed_rebuilt
 /data/processed_rebuilt_bad_piece_ids
+/data/overfit_20_chorales/
 /data/imslp_pdfs/
 /data/imslp_musicxml/
 *.omr

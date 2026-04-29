@@ -36,3 +36,27 @@ def test_midi_export_returns_parseable_midi_bytes():
 
     assert midi_file.ticksPerQuarterNote == score.header.tpq
     assert len(midi_file.tracks) >= 1
+
+
+def test_midi_export_polyphony_keeps_score_length_bounded():
+    score = CanonicalScore(
+        header=ScoreHeader(tpq=24, time_sig_map={0: "4/4"}, tempo_map={0: 96}),
+        measures=[Measure(id="measure-0", index=0, start_tick=0, length_ticks=96)],
+        parts=[
+            Part(
+                info=PartInfo(id="piano", instrument="piano", midi_program=0),
+                events=[
+                    Event(id="v0-a", start_tick=0, dur_tick=96, voice_id=0, pitch_midi=60),
+                    Event(id="v1-a", start_tick=0, dur_tick=96, voice_id=1, pitch_midi=64),
+                    Event(id="v0-b", start_tick=24, dur_tick=24, voice_id=0, pitch_midi=60),
+                    Event(id="v2-a", start_tick=48, dur_tick=48, voice_id=2, pitch_midi=67),
+                ],
+            )
+        ],
+    )
+
+    midi_file = MidiFile()
+    midi_file.readstr(canonical_score_to_midi(score))
+
+    track_lengths = [sum(event.time for event in track.events) for track in midi_file.tracks]
+    assert max(track_lengths) == 96

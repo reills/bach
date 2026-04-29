@@ -20,7 +20,7 @@ class Sampler:
         logits: (batch, vocab_size)
         input_ids: (batch, seq_len) used for repetition penalty
         """
-        logits = logits / self.temperature
+        logits = logits.clone()
 
         if self.repetition_penalty != 1.0 and input_ids is not None:
             # Simple repetition penalty: scale down logits of tokens already present
@@ -32,6 +32,11 @@ class Sampler:
         if self.no_repeat_ngram_size > 0 and input_ids is not None:
             # Implement no-repeat n-gram here if needed
             pass
+
+        if self.temperature <= 0:
+            return torch.argmax(logits, dim=-1, keepdim=True)
+
+        logits = logits / self.temperature
 
         if self.top_p < 1.0:
             logits = self._top_p_filter(logits, self.top_p)
