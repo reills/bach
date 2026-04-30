@@ -31,6 +31,8 @@ class GenerationConfig:
     alpha: float = 0.6
     gamma: float = 0.4
     eos_token: Optional[TokenLike] = None
+    use_chorale_v2_mask: bool = False
+    v2_max_sonority_repeats: int = 0
 
 
 @dataclass(frozen=True)
@@ -124,7 +126,11 @@ def _generate_from_loaded(
 
             decoded_so_far = None
             constraints = None
-            if generation_config.use_grammar_mask or generation_config.use_voice_leading_mask:
+            if (
+                generation_config.use_grammar_mask
+                or generation_config.use_voice_leading_mask
+                or generation_config.use_chorale_v2_mask
+            ):
                 decoded_so_far = [inv_vocab.get(int(t), str(int(t))) for t in generated[0].tolist()]
                 constraints = grammar_constraints(decoded_so_far)
 
@@ -162,6 +168,20 @@ def _generate_from_loaded(
                         "Voice-leading mask produced empty allowed set; skipping mask at step %d",
                         generated.size(1),
                     )
+
+            if generation_config.use_chorale_v2_mask and decoded_so_far is not None:
+                mask = _build_chorale_v2_mask(decoded_so_far, loaded.vocab).to(device)
+                if mask.any():
+                    logits[:, -1, :] = logits[:, -1, :].masked_fill(~mask, float("-inf"))
+
+                if generation_config.v2_max_sonority_repeats > 0:
+                    masked_logits = _apply_chorale_v2_repeat_mask(
+                        logits[:, -1, :],
+                        decoded_so_far,
+                        loaded.vocab,
+                        max_repeats=generation_config.v2_max_sonority_repeats,
+                    )
+                    logits[:, -1, :] = masked_logits
 
             if (
                 generation_config.bar_voice_survival_penalty > 0
@@ -222,6 +242,187 @@ def _required_bar_voice_count(target_texture: int) -> int:
     if isinstance(target_texture, bool):
         return 1
     return max(1, min(int(target_texture), 4) - 1)
+
+
+def _build_chorale_v2_mask(tokens: Sequence[str], vocab: dict[str, int]) -> torch.Tensor:
+    allowed = _chorale_v2_allowed_tokens(tokens, vocab)
+    mask = torch.zeros(len(vocab), dtype=torch.bool)
+    if not allowed:
+        return mask
+    for token_id in allowed:
+        mask[token_id] = True
+    return mask
+
+
+def _chorale_v2_allowed_tokens(tokens: Sequence[str], vocab: dict[str, int]) -> set[int]:
+    prefixes = _chorale_v2_allowed_prefixes(tokens)
+    if not prefixes:
+        return set()
+    partial = _chorale_v2_current_partial_sonority(tokens)
+    allowed: set[int] = set()
+    for token, token_id in vocab.items():
+        for prefix in prefixes:
+            if prefix.endswith("_"):
+                if token.startswith(prefix):
+                    if not _chorale_v2_pitch_fits_partial(token, prefix, partial):
+                        continue
+                    allowed.add(token_id)
+            elif token == prefix:
+                allowed.add(token_id)
+    return allowed
+
+
+def _chorale_v2_allowed_prefixes(tokens: Sequence[str]) -> tuple[str, ...]:
+    if not tokens:
+        return ()
+    if tokens[-1] == "BAR":
+        return ("STYLE_CHORALE",)
+
+    try:
+        bar_start = len(tokens) - 1 - list(reversed(tokens)).index("BAR")
+    except ValueError:
+        return ("BAR",)
+    current_bar = list(tokens[bar_start + 1:])
+
+    if not current_bar:
+        return ("STYLE_CHORALE",)
+    if len(current_bar) == 1 and current_bar[0] == "STYLE_CHORALE":
+        return ("KEY_",)
+    if len(current_bar) == 2 and current_bar[1].startswith("KEY_"):
+        return ("TIME_",)
+    if len(current_bar) == 3 and current_bar[2].startswith("TIME_"):
+        return ("TEXTURE_",)
+    if len(current_bar) == 4 and current_bar[3].startswith("TEXTURE_"):
+        return ("POS_",)
+
+    last = tokens[-1]
+    if last.startswith("DUR_"):
+        return ("POS_", "BAR")
+    if last.startswith("POS_"):
+        return ("BASS_",)
+    if last.startswith("BASS_"):
+        return ("TENOR_",)
+    if last.startswith("TENOR_"):
+        return ("ALTO_",)
+    if last.startswith("ALTO_"):
+        return ("SOP_",)
+    if last.startswith("SOP_"):
+        return ("DUR_",)
+    return ()
+
+
+def _apply_chorale_v2_repeat_mask(
+    logits: torch.Tensor,
+    tokens: Sequence[str],
+    vocab: dict[str, int],
+    *,
+    max_repeats: int,
+) -> torch.Tensor:
+    if max_repeats <= 0:
+        return logits
+
+    previous_sonorities = _chorale_v2_sonorities(tokens)
+    if not previous_sonorities:
+        return logits
+    run_len = _trailing_equal_run(previous_sonorities)
+    if run_len < max_repeats:
+        return logits
+
+    partial = _chorale_v2_current_partial_sonority(tokens)
+    if partial is None:
+        return logits
+    previous = previous_sonorities[-1]
+    if tuple(partial) != previous[: len(partial)]:
+        return logits
+    if len(partial) >= len(previous):
+        return logits
+
+    voice_prefix = ("BASS_", "TENOR_", "ALTO_", "SOP_")[len(partial)]
+    banned_token = f"{voice_prefix}{previous[len(partial)]}"
+    banned_id = vocab.get(banned_token)
+    if banned_id is None:
+        return logits
+
+    candidate = logits.clone()
+    candidate[:, banned_id] = float("-inf")
+    if torch.isfinite(candidate).any(dim=1).all():
+        return candidate
+    return logits
+
+
+def _chorale_v2_current_partial_sonority(tokens: Sequence[str]) -> tuple[int, ...] | None:
+    try:
+        pos_idx = max(idx for idx, token in enumerate(tokens) if token.startswith("POS_"))
+    except ValueError:
+        return None
+    if any(token == "BAR" for token in tokens[pos_idx + 1:]):
+        return None
+
+    expected = ("BASS_", "TENOR_", "ALTO_", "SOP_")
+    partial: list[int] = []
+    for token in tokens[pos_idx + 1:]:
+        if len(partial) >= len(expected):
+            return None
+        pitch = _chorale_v2_pitch(token, expected[len(partial)])
+        if pitch is None:
+            return None
+        partial.append(pitch)
+    return tuple(partial)
+
+
+def _chorale_v2_sonorities(tokens: Sequence[str]) -> list[tuple[int, int, int, int]]:
+    result: list[tuple[int, int, int, int]] = []
+    idx = 0
+    while idx + 5 < len(tokens):
+        if not tokens[idx].startswith("POS_"):
+            idx += 1
+            continue
+        pitches = (
+            _chorale_v2_pitch(tokens[idx + 1], "BASS_"),
+            _chorale_v2_pitch(tokens[idx + 2], "TENOR_"),
+            _chorale_v2_pitch(tokens[idx + 3], "ALTO_"),
+            _chorale_v2_pitch(tokens[idx + 4], "SOP_"),
+        )
+        if all(pitch is not None for pitch in pitches) and tokens[idx + 5].startswith("DUR_"):
+            result.append((int(pitches[0]), int(pitches[1]), int(pitches[2]), int(pitches[3])))
+            idx += 6
+            continue
+        idx += 1
+    return result
+
+
+def _chorale_v2_pitch(token: str, prefix: str) -> int | None:
+    if not token.startswith(prefix):
+        return None
+    try:
+        return int(token[len(prefix):])
+    except ValueError:
+        return None
+
+
+def _chorale_v2_pitch_fits_partial(token: str, prefix: str, partial: tuple[int, ...] | None) -> bool:
+    voice_prefixes = ("BASS_", "TENOR_", "ALTO_", "SOP_")
+    if prefix not in voice_prefixes:
+        return True
+    voice_idx = voice_prefixes.index(prefix)
+    if partial is None or len(partial) != voice_idx or not partial:
+        return True
+    pitch = _chorale_v2_pitch(token, prefix)
+    if pitch is None:
+        return False
+    return pitch >= partial[-1]
+
+
+def _trailing_equal_run(values: Sequence[object]) -> int:
+    if not values:
+        return 0
+    last = values[-1]
+    count = 0
+    for value in reversed(values):
+        if value != last:
+            break
+        count += 1
+    return count
 
 
 def generate_v1(

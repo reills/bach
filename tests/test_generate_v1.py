@@ -194,3 +194,90 @@ def test_generate_v1_penalizes_bar_when_current_bar_has_too_few_voices(monkeypat
     )
 
     assert result.tokens[-1] == "VOICE_1"
+
+
+def test_generate_v1_chorale_v2_mask_blocks_third_identical_sonority(monkeypatch):
+    seed = [
+        "BAR",
+        "STYLE_CHORALE",
+        "KEY_C",
+        "TIME_4_4",
+        "TEXTURE_4",
+        "POS_0",
+        "BASS_50",
+        "TENOR_62",
+        "ALTO_65",
+        "SOP_69",
+        "DUR_24",
+        "POS_24",
+        "BASS_50",
+        "TENOR_62",
+        "ALTO_65",
+        "SOP_69",
+        "DUR_24",
+        "POS_48",
+    ]
+    vocab_tokens = list(dict.fromkeys([*seed, "BASS_48"]))
+    vocab = {token: idx for idx, token in enumerate(vocab_tokens)}
+    seed_ids = tuple(vocab[token] for token in seed)
+    logits = torch.full((len(vocab),), -1e9, dtype=torch.float32)
+    logits[vocab["BASS_50"]] = 100.0
+    logits[vocab["BASS_48"]] = 0.0
+    model = FakeAutoregressiveModel(
+        {seed_ids: logits},
+        vocab_size=len(vocab),
+        max_seq_len=64,
+    )
+    loaded = make_loaded_model(model, vocab)
+    monkeypatch.setattr(generate_module, "load_notelm_checkpoint", lambda *args, **kwargs: loaded)
+
+    result = generate_module.generate_v1(
+        "unused.pt",
+        seed_tokens=seed,
+        generation_config=generate_module.GenerationConfig(
+            max_length=len(seed) + 1,
+            temperature=0.0,
+            top_p=1.0,
+            use_chorale_v2_mask=True,
+            v2_max_sonority_repeats=2,
+        ),
+    )
+
+    assert result.tokens[-1] == "BASS_48"
+
+
+def test_generate_v1_chorale_v2_mask_blocks_crossed_upper_voice(monkeypatch):
+    seed = [
+        "BAR",
+        "STYLE_CHORALE",
+        "KEY_C",
+        "TIME_4_4",
+        "TEXTURE_4",
+        "POS_0",
+        "BASS_60",
+    ]
+    vocab = {token: idx for idx, token in enumerate([*seed, "TENOR_55", "TENOR_64"])}
+    seed_ids = tuple(vocab[token] for token in seed)
+    logits = torch.full((len(vocab),), -1e9, dtype=torch.float32)
+    logits[vocab["TENOR_55"]] = 100.0
+    logits[vocab["TENOR_64"]] = 0.0
+    model = FakeAutoregressiveModel(
+        {seed_ids: logits},
+        vocab_size=len(vocab),
+        max_seq_len=32,
+    )
+    loaded = make_loaded_model(model, vocab)
+    monkeypatch.setattr(generate_module, "load_notelm_checkpoint", lambda *args, **kwargs: loaded)
+
+    result = generate_module.generate_v1(
+        "unused.pt",
+        seed_tokens=seed,
+        generation_config=generate_module.GenerationConfig(
+            max_length=len(seed) + 1,
+            temperature=0.0,
+            top_p=1.0,
+            use_chorale_v2_mask=True,
+        ),
+    )
+
+    assert result.tokens[-1] == "TENOR_64"

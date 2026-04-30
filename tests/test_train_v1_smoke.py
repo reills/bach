@@ -293,3 +293,33 @@ def test_piece_level_val_split_keeps_pieces_disjoint():
     assert train_indices
     assert val_indices
     assert train_pieces.isdisjoint(val_pieces)
+
+
+def test_loss_prefix_weights_build_tensor():
+    import torch
+    from scripts.train_v1 import _build_loss_weight_tensor
+
+    vocab = {
+        "<pad>": 0,
+        "BASS_48": 1,
+        "TENOR_60": 2,
+        "SOP_72": 3,
+        "DUR_24": 4,
+    }
+
+    weights = _build_loss_weight_tensor(
+        vocab,
+        ["BASS_=3", "SOP_=2.5"],
+        device=torch.device("cpu"),
+    )
+
+    assert weights.tolist() == [1.0, 3.0, 1.0, 2.5, 1.0]
+
+
+def test_loss_prefix_weight_rejects_bad_specs():
+    from scripts.train_v1 import _parse_prefix_weight
+
+    with pytest.raises(ValueError):
+        _parse_prefix_weight("BASS_")
+    with pytest.raises(ValueError):
+        _parse_prefix_weight("BASS_=0")

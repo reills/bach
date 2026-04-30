@@ -78,6 +78,43 @@ def _collect_harm_class_ids(vocab: Dict[str, int]) -> List[int]:
     return ids
 
 
+def _parse_prefix_weight(value: str) -> tuple[str, float]:
+    if "=" not in value:
+        raise ValueError(f"loss prefix weights must use PREFIX=WEIGHT format: {value}")
+    prefix, raw_weight = value.split("=", 1)
+    prefix = prefix.strip()
+    if not prefix:
+        raise ValueError(f"loss prefix weight is missing a prefix: {value}")
+    try:
+        weight = float(raw_weight)
+    except ValueError as exc:
+        raise ValueError(f"invalid loss weight in {value}") from exc
+    if weight <= 0:
+        raise ValueError(f"loss weights must be positive: {value}")
+    return prefix, weight
+
+
+def _build_loss_weight_tensor(
+    vocab: Dict[str, int],
+    specs: Iterable[str],
+    *,
+    device: torch.device,
+) -> Optional[torch.Tensor]:
+    parsed = [_parse_prefix_weight(spec) for spec in specs]
+    if not parsed:
+        return None
+    weights = torch.ones(len(vocab), dtype=torch.float32, device=device)
+    for prefix, weight in parsed:
+        matched = False
+        for token, token_id in vocab.items():
+            if token.startswith(prefix):
+                weights[token_id] = weight
+                matched = True
+        if not matched:
+            log.warning("Loss prefix %r matched no vocab tokens.", prefix)
+    return weights
+
+
 def _build_measure_tokens(prefix: str, max_measures: int) -> List[str]:
     return [f"{prefix}_{i}" for i in range(1, max_measures + 1)]
 
@@ -130,6 +167,7 @@ def _compute_val_loss(
     device: torch.device,
     pad_id: int,
     label_smoothing: float,
+    loss_weights: Optional[torch.Tensor] = None,
     mask_prefix: bool = False,
     max_batches: int = 0,
 ) -> float:
@@ -158,6 +196,7 @@ def _compute_val_loss(
                 labels.reshape(-1),
                 ignore_index=pad_id,
                 label_smoothing=label_smoothing,
+                weight=loss_weights,
             )
             total_loss += loss.item()
             n_batches += 1
@@ -237,6 +276,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--no-lr-decay", dest="lr_decay", action="store_false")
     parser.add_argument("--weight-decay", type=float, default=0.01)
     parser.add_argument("--label-smoothing", type=float, default=0.0)
+    parser.add_argument("--loss-token-prefix-weight", action="append", default=[],
+                        help="Upweight labels whose token starts with PREFIX, format PREFIX=WEIGHT. Repeatable.")
+    parser.add_argument("--voice-token-loss-weight", type=float, default=1.0,
+                        help="Convenience weight for BASS_/TENOR_/ALTO_/SOP_ label tokens.")
     parser.add_argument("--harm-class-dropout", type=float, default=0.0)
     parser.add_argument("--grad-clip", type=float, default=1.0)
     parser.add_argument("--log-every", type=int, default=50)
@@ -288,6 +331,13 @@ def main() -> None:
     )
 
     args = parse_args()
+    if args.voice_token_loss_weight <= 0:
+        raise SystemExit("--voice-token-loss-weight must be positive")
+    if args.voice_token_loss_weight != 1.0:
+        voice_weight = str(args.voice_token_loss_weight)
+        args.loss_token_prefix_weight.extend(
+            [f"BASS_={voice_weight}", f"TENOR_={voice_weight}", f"ALTO_={voice_weight}", f"SOP_={voice_weight}"]
+        )
 
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -343,6 +393,9 @@ def main() -> None:
     bar_token = "BAR"
     if bar_token not in vocab:
         raise SystemExit("Missing BAR token in vocab.")
+
+    device = _normalize_device(args.device)
+    _set_seed(args.seed)
 
     dataset = BarDataset(
         str(args.events),
@@ -449,9 +502,6 @@ def main() -> None:
         desc_embed_dim=DESC_EMBED_DIM if args.desc_embed else 0,
     )
 
-    device = _normalize_device(args.device)
-    _set_seed(args.seed)
-
     model = NoteLM(config).to(device)
     optimizer = torch.optim.AdamW(
         model.parameters(), lr=args.lr, weight_decay=args.weight_decay
@@ -470,6 +520,11 @@ def main() -> None:
         raise SystemExit("harm_class_dropout requires unk_token in vocab.")
 
     pad_id = vocab[args.pad_token]
+    loss_weight_tensor = _build_loss_weight_tensor(
+        vocab,
+        args.loss_token_prefix_weight,
+        device=device,
+    )
 
     (output_dir / "train_args.json").write_text(
         json.dumps(vars(args), indent=2), encoding="utf-8"
@@ -531,6 +586,7 @@ def main() -> None:
                 labels.reshape(-1),
                 ignore_index=pad_id,
                 label_smoothing=args.label_smoothing,
+                weight=loss_weight_tensor,
             )
 
             if args.lr_decay or args.warmup_steps > 0:
@@ -561,6 +617,7 @@ def main() -> None:
             if val_loader is not None and args.val_every > 0 and step > 0 and step % args.val_every == 0:
                 val_loss = _compute_val_loss(
                     model, val_loader, device, pad_id, args.label_smoothing,
+                    loss_weights=loss_weight_tensor,
                     mask_prefix=args.mask_prefix_loss,
                 )
                 log.info("step %d  val_loss %.4f", step, val_loss)

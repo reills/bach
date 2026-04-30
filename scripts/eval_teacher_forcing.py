@@ -6,7 +6,7 @@ import argparse
 import json
 import random
 import sys
-from collections import defaultdict
+from collections import Counter, defaultdict
 from pathlib import Path
 from statistics import mean
 from typing import Any, Sequence
@@ -62,6 +62,40 @@ def _format_category_stats(raw: dict[str, dict[str, int]]) -> dict[str, dict[str
             "top5_accuracy": _rate(values["top5"], values["count"]),
         }
         for category, values in sorted(raw.items())
+    }
+
+
+def _token_family(token: str) -> str:
+    if token.startswith("BASS_"):
+        return "BASS"
+    if token.startswith("TENOR_"):
+        return "TENOR"
+    if token.startswith("ALTO_"):
+        return "ALTO"
+    if token.startswith("SOP_"):
+        return "SOP"
+    if token.startswith("DUR_"):
+        return "DUR"
+    if token.startswith("POS_"):
+        return "POS"
+    if token == "BAR":
+        return "BAR"
+    if token.startswith(("STYLE_", "KEY_", "TIME_", "TEXTURE_", "MEAS_")):
+        return "META"
+    return token_category(token)
+
+
+def _format_prediction_counts(
+    raw: dict[str, Counter[str]],
+    *,
+    limit: int,
+) -> dict[str, list[dict[str, int | str]]]:
+    return {
+        family: [
+            {"token": token, "count": count}
+            for token, count in counter.most_common(limit)
+        ]
+        for family, counter in sorted(raw.items())
     }
 
 
@@ -122,6 +156,8 @@ def run_eval(args: argparse.Namespace) -> dict[str, Any]:
 
     total = _empty_counter()
     by_category: dict[str, dict[str, int]] = defaultdict(_empty_counter)
+    by_family: dict[str, dict[str, int]] = defaultdict(_empty_counter)
+    top1_predictions_by_label_family: dict[str, Counter[str]] = defaultdict(Counter)
     losses: list[float] = []
     sample_rows: list[dict[str, Any]] = []
     processed_batches = 0
@@ -174,18 +210,25 @@ def run_eval(args: argparse.Namespace) -> dict[str, Any]:
                     label_id = int(label_ids[row_idx, pos_idx])
                     pred_top1 = int(top1_cpu[row_idx, pos_idx])
                     pred_top5 = [int(value) for value in top5_cpu[row_idx, pos_idx].tolist()]
-                    category = token_category(inv_vocab.get(label_id, str(label_id)))
+                    label_token = inv_vocab.get(label_id, str(label_id))
+                    pred_token = inv_vocab.get(pred_top1, str(pred_top1))
+                    category = token_category(label_token)
+                    family = _token_family(label_token)
 
                     total["count"] += 1
                     by_category[category]["count"] += 1
+                    by_family[family]["count"] += 1
+                    top1_predictions_by_label_family[family][pred_token] += 1
                     row_count += 1
                     if pred_top1 == label_id:
                         total["top1"] += 1
                         by_category[category]["top1"] += 1
+                        by_family[family]["top1"] += 1
                         row_top1 += 1
                     if label_id in pred_top5:
                         total["top5"] += 1
                         by_category[category]["top5"] += 1
+                        by_family[family]["top5"] += 1
                         row_top5 += 1
 
                 sample_rows.append(
@@ -214,6 +257,7 @@ def run_eval(args: argparse.Namespace) -> dict[str, Any]:
             "mask_prefix_loss": args.mask_prefix_loss,
             "device": args.device,
             "seed": args.seed,
+            "prediction_count_limit": args.prediction_count_limit,
         },
         "sequence_count": len(sample_rows),
         "token_count": total["count"],
@@ -223,6 +267,11 @@ def run_eval(args: argparse.Namespace) -> dict[str, Any]:
             "top5_accuracy": _rate(total["top5"], total["count"]),
         },
         "by_category": _format_category_stats(by_category),
+        "by_family": _format_category_stats(by_family),
+        "top1_predictions_by_label_family": _format_prediction_counts(
+            top1_predictions_by_label_family,
+            limit=args.prediction_count_limit,
+        ),
         "sequences": sample_rows,
     }
     (args.out_dir / "teacher_forcing_summary.json").write_text(
@@ -260,6 +309,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--seed", type=int, default=1337)
     parser.add_argument("--max-batches", type=int, default=0)
+    parser.add_argument("--prediction-count-limit", type=int, default=12)
     parser.add_argument("--quiet", action="store_true")
     return parser
 
@@ -278,6 +328,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         for category, stats in summary["by_category"].items():
             print(
                 f"{category}: count={stats['count']} "
+                f"top1={stats['top1_accuracy']} top5={stats['top5_accuracy']}"
+            )
+        print("by_family:")
+        for family, stats in summary["by_family"].items():
+            print(
+                f"{family}: count={stats['count']} "
                 f"top1={stats['top1_accuracy']} top5={stats['top5_accuracy']}"
             )
     return 0

@@ -1,12 +1,25 @@
 # AGENTS.md - bach-gen
 
-Project goal: generate MusicXML/sheet-music scores in a Bach-like contrapuntal style.
+Project goal: generate clean MusicXML/sheet-music scores in a Bach-like instrumental contrapuntal style.
+
+Primary target is **not** Bach chorale harmonization. The desired output is 2-4 voice keyboard/instrumental counterpoint: inventions, sinfonias, fugue-like textures, suites, partitas, and related Baroque writing.
+
+Current strategic decision:
+
+- Keep the frontend/API/canonical-score/export infrastructure.
+- Treat flat-token NoteLM and chorale-v2 SATB-token experiments as legacy/prototype paths.
+- Do not keep adding decoder rules to hide model collapse.
+- The next model engine should be interval-aware symbolic instrumental counterpoint with compound musical events and type-specific prediction heads.
+- Audio-generation models may be useful later as critics/rerankers, but they are not the primary generator because the output must be clean notation.
 
 ## Environment
 
 - Preferred Python runtime: `conda run -n bach python`
 - For commands that should stream output, use:
   `CONDA_NO_PLUGINS=true conda run --no-capture-output -n bach python -u ...`
+- GPU/CUDA commands require explicit escalated permission from the user before running.
+- When using CUDA in Python scripts, initialize/resolve CUDA before reading parquet datasets with pandas/pyarrow. In this project, reading parquet first can make later `torch.cuda` initialization fail with `CUDA driver initialization failed` even when `nvidia-smi` sees the GPU. Prefer resolving the device and calling the seed/CUDA initialization before dataset construction/loading.
+- If CUDA fails unexpectedly, check with escalated `nvidia-smi` and a minimal PyTorch CUDA probe before falling back to CPU. Do not silently run full training on CPU.
 - Optional local venv fallback:
   `python -m venv .venv && source .venv/bin/activate`
 - Environment check:
@@ -52,6 +65,16 @@ npm run dev
 The Vite dev server proxies API calls to `http://localhost:8001`.
 
 ## Data And Training
+
+Legacy NoteLM/v1 pipeline exists and may still be useful for reference, tests, and infrastructure. It is not the preferred research direction for the next model engine.
+
+Preferred next model direction:
+
+- Build an instrumental dataset from MusicXML/MIDI keyboard works, starting with inventions/sinfonias and expanding to WTC, suites, partitas, fugues, and related Baroque/classical contrapuntal works.
+- Represent one timestep as a compound musical event/slice, not a flat text-token sequence.
+- Include relative melodic intervals per voice, vertical intervals between voices, local harmonic/scale-degree context, absolute register, duration, and NOTE/HOLD/REST state.
+- Use separate model heads/losses for voice state, melodic interval, duration, register/pitch, harmonic context, and next-position/advance.
+- Gate training with tiny-overfit and held-out objective metrics before listening.
 
 Clean rebuild/audit/train/generate pipeline:
 
@@ -122,10 +145,17 @@ CONDA_NO_PLUGINS=true conda run --no-capture-output -n bach python -u scripts/ev
 
 ## Current Quality Focus
 
-The dataset now audits cleanly. The main generation-quality work is:
+The immediate quality focus is model-engine redesign, not decoder patching.
 
-- Preserve 3-4 active voices during generation.
-- Reduce voice crossings and spacing violations.
-- Avoid parallel fifths/octaves.
-- Keep harmonic metadata repaired and valid.
+- Preserve independent 2-4 voice motion.
+- Avoid stuck soprano/bass and repeated sonority collapse.
+- Model relative melodic intervals and vertical harmonic intervals explicitly.
+- Maintain local harmonic continuity and cadence behavior.
+- Reduce voice crossings, spacing violations, and parallel fifths/octaves.
 - Use repeatable batch evaluation instead of judging one sample.
+
+Required objective gates for any new model path:
+
+- Tiny overfit on 1-5 instrumental pieces must reach near-perfect per-head accuracy and generate coherent continuations.
+- Held-out eval must report per-voice accuracy, stuck-voice rate, repeated-sonority rate, interval-distribution match, crossing/spacing rates, and parallel fifth/octave rates.
+- Do not proceed to long training runs if tiny overfit fails.

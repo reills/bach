@@ -1,6 +1,6 @@
 import torch
 import torch.nn.functional as F
-from typing import List, Optional, Tuple
+from typing import Optional
 
 class Sampler:
     def __init__(
@@ -30,8 +30,7 @@ class Sampler:
             logits.scatter_(1, input_ids, score)
 
         if self.no_repeat_ngram_size > 0 and input_ids is not None:
-            # Implement no-repeat n-gram here if needed
-            pass
+            logits = self._apply_no_repeat_ngram(logits, input_ids)
 
         if self.temperature <= 0:
             return torch.argmax(logits, dim=-1, keepdim=True)
@@ -58,3 +57,35 @@ class Sampler:
         indices_to_remove = sorted_indices_to_remove.scatter(1, sorted_indices, sorted_indices_to_remove)
         logits = logits.masked_fill(indices_to_remove, float("-inf"))
         return logits
+
+    def _apply_no_repeat_ngram(self, logits: torch.Tensor, input_ids: torch.Tensor) -> torch.Tensor:
+        ngram_size = self.no_repeat_ngram_size
+        if ngram_size <= 0 or input_ids.size(1) < ngram_size - 1:
+            return logits
+
+        result = logits.clone()
+        for batch_idx in range(input_ids.size(0)):
+            banned = self._banned_next_tokens(input_ids[batch_idx].tolist(), ngram_size)
+            if not banned:
+                continue
+            candidate = result[batch_idx].clone()
+            candidate[banned] = float("-inf")
+            if torch.isfinite(candidate).any():
+                result[batch_idx] = candidate
+        return result
+
+    @staticmethod
+    def _banned_next_tokens(sequence: list[int], ngram_size: int) -> list[int]:
+        if ngram_size == 1:
+            return sorted(set(sequence))
+        if len(sequence) < ngram_size - 1:
+            return []
+
+        current_prefix = tuple(sequence[-(ngram_size - 1):])
+        banned: set[int] = set()
+        stop = len(sequence) - ngram_size + 1
+        for idx in range(max(0, stop)):
+            ngram = sequence[idx: idx + ngram_size]
+            if tuple(ngram[:-1]) == current_prefix:
+                banned.add(ngram[-1])
+        return sorted(banned)
