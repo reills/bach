@@ -1,9 +1,13 @@
 """Instrumental v5 EMI-conditioned compound counterpoint representation."""
 
 from src.instrumental_v5.representation import (
+    CADENCE_TYPE_TO_ID,
     CONTOUR_BUCKET_NAMES,
+    HARMONIC_FUNCTION_TO_ID,
     PHRASE_ROLE_NAMES,
     RHYTHM_BUCKET_NAMES,
+    SPEAC_LABEL_NAMES,
+    SPEAC_LABEL_TO_ID,
     V5_EMI_FIELD_NAMES,
     V5_FEATURE_SPECS,
     V5_FIELD_NAMES,
@@ -14,9 +18,13 @@ from src.instrumental_v5.representation import (
 )
 
 __all__ = [
+    "CADENCE_TYPE_TO_ID",
     "CONTOUR_BUCKET_NAMES",
+    "HARMONIC_FUNCTION_TO_ID",
     "PHRASE_ROLE_NAMES",
     "RHYTHM_BUCKET_NAMES",
+    "SPEAC_LABEL_NAMES",
+    "SPEAC_LABEL_TO_ID",
     "V5_EMI_FIELD_NAMES",
     "V5_FEATURE_SPECS",
     "V5_FIELD_NAMES",

@@ -1,7 +1,7 @@
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Sequence, Union
+from typing import Any, List, Optional, Sequence, Union
 
 import torch
 
@@ -33,6 +33,7 @@ class GenerationConfig:
     eos_token: Optional[TokenLike] = None
     use_chorale_v2_mask: bool = False
     v2_max_sonority_repeats: int = 0
+    conditioning: Optional[dict[str, Any]] = None
 
 
 @dataclass(frozen=True)

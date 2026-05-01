@@ -9,9 +9,12 @@ from scripts.make_instrumental_v5_dataset import build_v5_outputs
 from src.instrumental_v3.representation import FIELD_NAMES as V3_FIELD_NAMES, InstrumentalV3Piece, SliceEvent
 from src.instrumental_v4.representation import build_v4_piece
 from src.instrumental_v5.representation import (
+    CADENCE_TYPE_TO_ID,
     CONTOUR_BUCKET_TO_ID,
+    HARMONIC_FUNCTION_TO_ID,
     PHRASE_ROLE_TO_ID,
     RHYTHM_BUCKET_TO_ID,
+    SPEAC_LABEL_TO_ID,
     V5_EMI_FIELD_NAMES,
     V5_FEATURE_SPECS,
     V5_FIELD_NAMES,
@@ -81,30 +84,44 @@ def test_v5_bucket_classifiers_are_bounded_and_abstract() -> None:
     assert classify_rhythm_bucket([2, 2]) == "EVEN_8THS"
     assert classify_rhythm_bucket([3, 1]) == "DOTTED"
 
-    assert max(CONTOUR_BUCKET_TO_ID.values()) < V5_FEATURE_SPECS["fragment_contour_bucket"]
-    assert max(RHYTHM_BUCKET_TO_ID.values()) < V5_FEATURE_SPECS["fragment_rhythm_bucket"]
+    assert max(CONTOUR_BUCKET_TO_ID.values()) < V5_FEATURE_SPECS["retrieved_contour_bucket"]
+    assert max(RHYTHM_BUCKET_TO_ID.values()) < V5_FEATURE_SPECS["retrieved_rhythm_bucket"]
 
 
-def test_build_v5_piece_adds_only_minimal_emi_fields() -> None:
+def test_build_v5_piece_adds_bounded_plan_and_retrieval_fields() -> None:
     piece = build_v5_piece(build_v4_piece(_toy_v3_piece("toy")), length_slices=4, hop_slices=2)
 
-    assert V5_FIELD_NAMES[-3:] == V5_EMI_FIELD_NAMES
+    assert V5_FIELD_NAMES[-7:] == V5_EMI_FIELD_NAMES
     assert len(piece.rows[0]) == len(V5_FIELD_NAMES)
-    assert len(V5_EMI_FIELD_NAMES) == 3
+    assert len(V5_EMI_FIELD_NAMES) == 7
     assert "fragment_id" not in V5_FIELD_NAMES
     assert piece.rows[0][V5_FIELD_NAMES.index("phrase_role")] < V5_FEATURE_SPECS["phrase_role"]
-    assert piece.rows[0][V5_FIELD_NAMES.index("fragment_contour_bucket")] < V5_FEATURE_SPECS["fragment_contour_bucket"]
-    assert piece.rows[0][V5_FIELD_NAMES.index("fragment_rhythm_bucket")] < V5_FEATURE_SPECS["fragment_rhythm_bucket"]
+    assert piece.rows[0][V5_FIELD_NAMES.index("speac_label")] < V5_FEATURE_SPECS["speac_label"]
+    assert piece.rows[0][V5_FIELD_NAMES.index("cadence_target")] < V5_FEATURE_SPECS["cadence_target"]
+    assert piece.rows[0][V5_FIELD_NAMES.index("harmonic_function")] < V5_FEATURE_SPECS["harmonic_function"]
+    assert piece.rows[0][V5_FIELD_NAMES.index("local_key_pc")] < V5_FEATURE_SPECS["local_key_pc"]
+    assert (
+        piece.rows[0][V5_FIELD_NAMES.index("retrieved_contour_bucket")]
+        < V5_FEATURE_SPECS["retrieved_contour_bucket"]
+    )
+    assert (
+        piece.rows[0][V5_FIELD_NAMES.index("retrieved_rhythm_bucket")]
+        < V5_FEATURE_SPECS["retrieved_rhythm_bucket"]
+    )
 
 
-def test_build_v5_piece_uses_unknown_defaults_when_no_fragment_covers_rows() -> None:
+def test_build_v5_piece_keeps_plan_fields_when_no_fragment_covers_rows() -> None:
     piece = build_v5_piece(build_v4_piece(_toy_v3_piece("toy")), length_slices=64, hop_slices=8)
 
-    assert {row[V5_FIELD_NAMES.index("phrase_role")] for row in piece.rows} == {PHRASE_ROLE_TO_ID["UNKNOWN"]}
-    assert {row[V5_FIELD_NAMES.index("fragment_contour_bucket")] for row in piece.rows} == {
+    assert piece.rows[0][V5_FIELD_NAMES.index("phrase_role")] == PHRASE_ROLE_TO_ID["SUBJECT_ENTRY"]
+    assert piece.rows[0][V5_FIELD_NAMES.index("speac_label")] == SPEAC_LABEL_TO_ID["S"]
+    assert piece.rows[0][V5_FIELD_NAMES.index("cadence_target")] == CADENCE_TYPE_TO_ID["NONE"]
+    assert piece.rows[0][V5_FIELD_NAMES.index("harmonic_function")] == HARMONIC_FUNCTION_TO_ID["TONIC"]
+    assert piece.rows[0][V5_FIELD_NAMES.index("local_key_pc")] == 0
+    assert {row[V5_FIELD_NAMES.index("retrieved_contour_bucket")] for row in piece.rows} == {
         CONTOUR_BUCKET_TO_ID["UNKNOWN"]
     }
-    assert {row[V5_FIELD_NAMES.index("fragment_rhythm_bucket")] for row in piece.rows} == {
+    assert {row[V5_FIELD_NAMES.index("retrieved_rhythm_bucket")] for row in piece.rows} == {
         RHYTHM_BUCKET_TO_ID["UNKNOWN"]
     }
 
@@ -131,8 +148,11 @@ def test_v5_builder_writes_parquet_vocab_metadata_and_split_fragment_files(tmp_p
 
     vocab = json.loads((tmp_path / "vocab.json").read_text(encoding="utf-8"))
     assert vocab["phrase_role"]["UNKNOWN"] == 0
-    assert vocab["fragment_contour_bucket"]["UNKNOWN"] == 0
-    assert vocab["fragment_rhythm_bucket"]["UNKNOWN"] == 0
+    assert vocab["speac_label"]["UNKNOWN"] == 0
+    assert vocab["cadence_target"]["UNKNOWN"] == 0
+    assert vocab["harmonic_function"]["UNKNOWN"] == 0
+    assert vocab["retrieved_contour_bucket"]["UNKNOWN"] == 0
+    assert vocab["retrieved_rhythm_bucket"]["UNKNOWN"] == 0
     assert "fragment_id" not in json.dumps(vocab)
     assert "toy_a_v0" not in json.dumps(vocab)
 

@@ -9,9 +9,12 @@ import torch
 from torch.utils.data import Dataset
 
 from src.instrumental_v5.representation import (
+    CADENCE_TYPE_TO_ID,
     CONTOUR_BUCKET_TO_ID,
+    HARMONIC_FUNCTION_TO_ID,
     PHRASE_ROLE_TO_ID,
     RHYTHM_BUCKET_TO_ID,
+    SPEAC_LABEL_TO_ID,
     V5_FEATURE_SPECS,
     V5_FIELD_NAMES,
 )
@@ -66,8 +69,12 @@ def build_v5_vocab() -> dict[str, Any]:
         "field_names": V5_FIELD_NAMES,
         "feature_specs": V5_FEATURE_SPECS,
         "phrase_role": PHRASE_ROLE_TO_ID,
-        "fragment_contour_bucket": CONTOUR_BUCKET_TO_ID,
-        "fragment_rhythm_bucket": RHYTHM_BUCKET_TO_ID,
+        "speac_label": SPEAC_LABEL_TO_ID,
+        "cadence_target": CADENCE_TYPE_TO_ID,
+        "harmonic_function": HARMONIC_FUNCTION_TO_ID,
+        "local_key_pc": {str(value): value for value in range(13)},
+        "retrieved_contour_bucket": CONTOUR_BUCKET_TO_ID,
+        "retrieved_rhythm_bucket": RHYTHM_BUCKET_TO_ID,
     }
 
 

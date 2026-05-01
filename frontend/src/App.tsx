@@ -172,9 +172,18 @@ const initialState: ScoreState = {
 type StatusTone = 'idle' | 'busy' | 'success' | 'error';
 type DataSource = 'api' | 'local';
 type VoiceCount = 1 | 2 | 3 | 4;
+type CompositionEngine = 'hybrid' | 'emi' | 'transformer';
 
 const defaultSource: DataSource =
   import.meta.env.VITE_USE_LOCAL_DATA === 'true' ? 'local' : 'api';
+
+const formatDiagnosticValue = (value: unknown): string => {
+  if (Array.isArray(value)) return value.map(String).join(' -> ');
+  if (value === null || value === undefined) return 'n/a';
+  if (typeof value === 'boolean') return value ? 'yes' : 'no';
+  if (typeof value === 'number') return Number.isInteger(value) ? String(value) : value.toFixed(3);
+  return String(value);
+};
 
 const App = () => {
   const [state, setState] = useState<ScoreState>(initialState);
@@ -191,6 +200,8 @@ const App = () => {
   );
   const [instrumentMode, setInstrumentMode] = useState<InstrumentMode>('guitar');
   const [voiceCount, setVoiceCount] = useState<VoiceCount>(4);
+  const [compositionEngine, setCompositionEngine] =
+    useState<CompositionEngine>('hybrid');
   const [viewTab, setViewTab] = useState<ScoreViewTab>('score');
   const [mode, setMode] = useState<'window' | 'repair'>('window');
   const [constraints, setConstraints] = useState({
@@ -200,6 +211,7 @@ const App = () => {
   });
   const [statusTone, setStatusTone] = useState<StatusTone>('idle');
   const [statusMessage, setStatusMessage] = useState('Ready.');
+  const [lastDiagnostics, setLastDiagnostics] = useState<Record<string, unknown> | null>(null);
   const [busy, setBusy] = useState(false);
   const [fingeringPicker, setFingeringPicker] = useState<{
     eventId: string;
@@ -241,6 +253,7 @@ const App = () => {
       const response = await compose({
         prompt,
         constraints: {
+          engine: compositionEngine,
           texture: voiceCount,
           useGrammarMask: true,
           qualityPasses: 4,
@@ -266,6 +279,7 @@ const App = () => {
         changedMeasureIds: null,
         lastEventId: null,
       }));
+      setLastDiagnostics(response.diagnostics ?? null);
       setStatus('success', 'Score loaded. Click a measure to inpaint.');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Compose failed.';
@@ -669,6 +683,14 @@ const App = () => {
     () => `status-pill status-pill--${statusTone}`,
     [statusTone],
   );
+  const hybridDiagnostics =
+    lastDiagnostics?.hybrid && typeof lastDiagnostics.hybrid === 'object'
+      ? (lastDiagnostics.hybrid as Record<string, unknown>)
+      : null;
+  const noveltyDiagnostics =
+    lastDiagnostics?.novelty && typeof lastDiagnostics.novelty === 'object'
+      ? (lastDiagnostics.novelty as Record<string, unknown>)
+      : null;
 
   const workflowStep = useMemo(() => {
     if (!state.scoreId) return 0;
@@ -733,6 +755,19 @@ const App = () => {
                       <option value="piano">Piano</option>
                     </select>
                   </label>
+                  <label className="field">
+                    <span>Engine</span>
+                    <select
+                      value={compositionEngine}
+                      onChange={(event) =>
+                        setCompositionEngine(event.target.value as CompositionEngine)
+                      }
+                    >
+                      <option value="hybrid">Hybrid</option>
+                      <option value="emi">EMI symbolic</option>
+                      <option value="transformer">Transformer</option>
+                    </select>
+                  </label>
                   <div className="field">
                     <span>Voices</span>
                     <div className="segmented-control" role="group" aria-label="Voices">
@@ -775,6 +810,40 @@ const App = () => {
                     <span className="info-label">Snippets</span>
                     <span className="info-value">{localManifest.snippets.length}</span>
                   </div>
+                </div>
+              ) : null}
+              {dataSource === 'api' && lastDiagnostics ? (
+                <div className="info-grid">
+                  <div className="info-item">
+                    <span className="info-label">Engine</span>
+                    <span className="info-value">{formatDiagnosticValue(lastDiagnostics.engine)}</span>
+                  </div>
+                  <div className="info-item">
+                    <span className="info-label">Retrieved</span>
+                    <span className="info-value">
+                      {formatDiagnosticValue(hybridDiagnostics?.retrievedFragmentCount)}
+                    </span>
+                  </div>
+                  <div className="info-item">
+                    <span className="info-label">Role plan</span>
+                    <span className="info-value">
+                      {formatDiagnosticValue(hybridDiagnostics?.rolePlan)}
+                    </span>
+                  </div>
+                  <div className="info-item">
+                    <span className="info-label">Novelty</span>
+                    <span className="info-value">
+                      {formatDiagnosticValue(noveltyDiagnostics?.high_copy_risk ? 'risk' : 'pass')}
+                    </span>
+                  </div>
+                  {lastDiagnostics.hybridFallbackReason ? (
+                    <div className="info-item">
+                      <span className="info-label">Fallback</span>
+                      <span className="info-value">
+                        {formatDiagnosticValue(lastDiagnostics.hybridFallbackReason)}
+                      </span>
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
               <div className="button-row">

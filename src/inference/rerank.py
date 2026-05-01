@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Callable, Sequence
@@ -31,6 +32,10 @@ QUALITY_SCORE_WEIGHTS = {
     "repeated_interval_rate": 20,
     "counterpoint_monophonic_position_rate": 100,
     "counterpoint_avg_active_voices": -5,
+    "source_ngram_overlap_rate": 300,
+    "exact_measure_match_count": 60,
+    "max_contiguous_source_match": 2,
+    "fragment_chain_reuse": 80,
 }
 
 GeneratorFn = Callable[..., GenerationResult]
@@ -149,6 +154,71 @@ def evaluate_quality_metrics(tokens: Sequence[str]) -> dict[str, int | float | N
     }
 
 
+def evaluate_novelty_metrics(
+    tokens: Sequence[str],
+    source_token_sequences: Sequence[Sequence[str]],
+    *,
+    ngram: int = 16,
+) -> dict[str, int | float | None]:
+    if ngram <= 0:
+        raise ValueError("ngram must be positive")
+    if not source_token_sequences:
+        return {
+            "source_ngram": ngram,
+            "source_ngram_overlap_rate": 0.0,
+            "exact_measure_match_count": 0,
+            "max_contiguous_source_match": 0,
+            "fragment_chain_reuse": 0.0,
+            "high_copy_risk": 0,
+        }
+
+    normalized_tokens = _transposition_normalized_tokens(tokens)
+    normalized_sources = [_transposition_normalized_tokens(source) for source in source_token_sequences]
+    generated_ngrams = _ngrams(normalized_tokens, ngram)
+    source_ngrams = {
+        ngram_tuple
+        for source in normalized_sources
+        for ngram_tuple in _ngrams(source, ngram)
+    }
+    overlap = sum(1 for ngram_tuple in generated_ngrams if ngram_tuple in source_ngrams)
+    exact_measure_matches = _exact_measure_match_count(tokens, source_token_sequences)
+    max_contiguous = _max_contiguous_match(normalized_tokens, normalized_sources)
+    fragment_chain_reuse = _fragment_chain_reuse(tokens, source_token_sequences)
+    overlap_rate = overlap / max(1, len(generated_ngrams))
+    high_copy_risk = is_high_copy_risk(
+        {
+            "source_ngram_overlap_rate": overlap_rate,
+            "exact_measure_match_count": exact_measure_matches,
+            "max_contiguous_source_match": max_contiguous,
+            "fragment_chain_reuse": fragment_chain_reuse,
+        }
+    )
+    return {
+        "source_ngram": ngram,
+        "source_ngram_overlap_rate": round(overlap_rate, 4),
+        "exact_measure_match_count": exact_measure_matches,
+        "max_contiguous_source_match": max_contiguous,
+        "fragment_chain_reuse": round(fragment_chain_reuse, 4),
+        "high_copy_risk": 1 if high_copy_risk else 0,
+    }
+
+
+def is_high_copy_risk(
+    novelty_metrics: dict[str, Any],
+    *,
+    max_ngram_overlap_rate: float = 0.2,
+    max_exact_measure_matches: int = 0,
+    max_contiguous_source_match: int = 32,
+    max_fragment_chain_reuse: float = 0.0,
+) -> bool:
+    return (
+        _numeric_metric(novelty_metrics.get("source_ngram_overlap_rate")) > max_ngram_overlap_rate
+        or _numeric_metric(novelty_metrics.get("exact_measure_match_count")) > max_exact_measure_matches
+        or _numeric_metric(novelty_metrics.get("max_contiguous_source_match")) > max_contiguous_source_match
+        or _numeric_metric(novelty_metrics.get("fragment_chain_reuse")) > max_fragment_chain_reuse
+    )
+
+
 def score_quality_metrics(metrics: dict[str, Any]) -> float:
     score = 0.0
     for metric, weight in QUALITY_SCORE_WEIGHTS.items():
@@ -158,6 +228,78 @@ def score_quality_metrics(metrics: dict[str, Any]) -> float:
     if metrics.get("pct_bars_3plus_voices") is not None:
         score += 50 * max(0.0, 0.8 - (_numeric_metric(metrics.get("pct_bars_3plus_voices")) / 100.0))
     return round(score, 6)
+
+
+def _ngrams(tokens: Sequence[str], ngram: int) -> list[tuple[str, ...]]:
+    if len(tokens) < ngram:
+        return []
+    return [tuple(tokens[idx : idx + ngram]) for idx in range(0, len(tokens) - ngram + 1)]
+
+
+def _transposition_normalized_tokens(tokens: Sequence[str]) -> list[str]:
+    anchor = _first_abs_pitch(tokens)
+    if anchor is None:
+        return [str(token) for token in tokens]
+    normalized = []
+    for token in tokens:
+        match = re.fullmatch(r"ABS_VOICE_(\d+)_(\d+)", token)
+        if match:
+            normalized.append(f"ABS_VOICE_{match.group(1)}_REL_{int(match.group(2)) - anchor}")
+            continue
+        normalized.append(str(token))
+    return normalized
+
+
+def _first_abs_pitch(tokens: Sequence[str]) -> int | None:
+    for token in tokens:
+        match = re.fullmatch(r"ABS_VOICE_\d+_(\d+)", token)
+        if match:
+            return int(match.group(1))
+    return None
+
+
+def _exact_measure_match_count(
+    tokens: Sequence[str],
+    source_token_sequences: Sequence[Sequence[str]],
+) -> int:
+    generated_bars = {tuple(bar) for bar in _split_bars(tokens) if bar}
+    source_bars = {
+        tuple(bar)
+        for source in source_token_sequences
+        for bar in _split_bars(source)
+        if bar
+    }
+    return sum(1 for bar in generated_bars if bar in source_bars)
+
+
+def _max_contiguous_match(tokens: Sequence[str], sources: Sequence[Sequence[str]]) -> int:
+    best = 0
+    for source in sources:
+        current = [0] * (len(source) + 1)
+        for token in tokens:
+            previous = 0
+            for source_idx, source_token in enumerate(source, start=1):
+                saved = current[source_idx]
+                if token == source_token:
+                    current[source_idx] = previous + 1
+                    best = max(best, current[source_idx])
+                else:
+                    current[source_idx] = 0
+                previous = saved
+    return best
+
+
+def _fragment_chain_reuse(tokens: Sequence[str], source_token_sequences: Sequence[Sequence[str]]) -> float:
+    generated = [token for token in tokens if token.startswith("COPY_HASH_")]
+    if not generated:
+        return 0.0
+    source_hashes = {
+        token
+        for source in source_token_sequences
+        for token in source
+        if token.startswith("COPY_HASH_")
+    }
+    return sum(1 for token in generated if token in source_hashes) / len(generated)
 
 
 def _harm_mismatch_count(tokens: Sequence[str]) -> int | None:

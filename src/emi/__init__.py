@@ -1,5 +1,11 @@
-"""EMI-inspired symbolic fragment analysis and retrieval helpers."""
+"""EMI-inspired symbolic fragment analysis, retrieval, and composition helpers."""
 
+from src.emi.composer import (
+    EMI_ENGINE_VERSION,
+    EmiComposerConfig,
+    EmiComposition,
+    compose_emi,
+)
 from src.emi.fragments import (
     Fragment,
     FragmentMatch,
@@ -11,11 +17,18 @@ from src.emi.fragments import (
     score_fragment,
     summarize_fragments,
 )
+from src.emi.planner import PhrasePlanStep, build_phrase_plan
 
 __all__ = [
+    "EMI_ENGINE_VERSION",
+    "EmiComposerConfig",
+    "EmiComposition",
     "Fragment",
     "FragmentMatch",
     "FragmentQuery",
+    "PhrasePlanStep",
+    "build_phrase_plan",
+    "compose_emi",
     "extract_fragments",
     "fragment_from_jsonl",
     "fragment_to_jsonl",

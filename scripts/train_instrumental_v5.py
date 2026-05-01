@@ -195,8 +195,11 @@ def _field_weights() -> dict[str, float]:
         "v1_mel": 1.5,
         "vertical_interval": 1.5,
         "phrase_role": 1.25,
-        "fragment_contour_bucket": 1.25,
-        "fragment_rhythm_bucket": 1.25,
+        "speac_label": 1.15,
+        "cadence_target": 1.15,
+        "harmonic_function": 1.15,
+        "retrieved_contour_bucket": 1.25,
+        "retrieved_rhythm_bucket": 1.25,
     }
 
 
@@ -207,8 +210,10 @@ def _focus_metrics(metrics: dict[str, float]) -> dict[str, float]:
         "v0_pitch_acc",
         "v1_pitch_acc",
         "phrase_role_acc",
-        "fragment_contour_bucket_acc",
-        "fragment_rhythm_bucket_acc",
+        "speac_label_acc",
+        "cadence_target_acc",
+        "retrieved_contour_bucket_acc",
+        "retrieved_rhythm_bucket_acc",
     ]
     return {key: round(float(metrics.get(key, 0.0)), 4) for key in keys}
 

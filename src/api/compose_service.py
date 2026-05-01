@@ -336,6 +336,42 @@ def compose_baseline(
     )
 
 
+def compose_canonical_score(
+    score: CanonicalScore,
+    *,
+    generation: GenerationResult,
+    render_mode: Literal["guitar", "piano"] = "guitar",
+    max_fret: int = DEFAULT_MAX_FRET,
+    diagnostics: dict[str, object] | None = None,
+) -> ComposeServiceResult:
+    """Render/export a symbolic engine result through the compose service format."""
+
+    resolved_render_mode = render_mode
+    if render_mode == "guitar":
+        try:
+            score = _normalize_to_guitar_range(score)
+            score = _tab_score(score, max_fret=max_fret)
+        except ValueError as exc:
+            if _should_fallback_to_piano_score(exc):
+                score = _to_piano_score(score)
+                resolved_render_mode = "piano"
+            else:
+                raise
+    else:
+        score = _to_piano_score(score)
+
+    exported = export_score(score)
+    midi = canonical_score_to_midi(score)
+    return ComposeServiceResult(
+        generation=generation,
+        score=score,
+        document=exported,
+        midi=midi,
+        render_mode=resolved_render_mode,
+        diagnostics=diagnostics,
+    )
+
+
 def _repair_generation_harmonic_metadata(
     generation: GenerationResult,
     *,

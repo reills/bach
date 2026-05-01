@@ -145,3 +145,5 @@ def test_masked_v5_loss_ignores_padded_tail(tmp_path: Path) -> None:
 
     assert loss.item() > 0
     assert "phrase_role_acc" in metrics
+    assert "speac_label_acc" in metrics
+    assert "retrieved_contour_bucket_acc" in metrics

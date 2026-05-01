@@ -67,6 +67,18 @@ def test_extract_fragments_records_interval_rhythm_signature() -> None:
     assert first.melodic_intervals == [2]
     assert first.rhythm_steps == [2, 2]
     assert first.vertical_intervals == [12, 12, 12, 12]
+    assert first.speac_label == "A"
+    assert first.cadence_type == "NONE"
+    assert first.contour_bucket == "ASCENDING_STEPWISE"
+    assert first.rhythm_bucket == "EVEN_8THS"
+    assert first.local_key_pc == 0
+    assert first.harmonic_function == "DOMINANT"
+    assert first.entry_degree == first.start_degree
+    assert first.exit_degree == first.end_degree
+    assert first.min_pitch == 48
+    assert first.max_pitch == 50
+    assert first.copy_hash
+    assert first.transposition_hash
     assert first.fingerprint
 
 
@@ -87,6 +99,10 @@ def test_rank_fragments_prefers_compatible_query() -> None:
         mode=0,
         previous_end_pitch=69,
         previous_end_degree=5,
+        speac_label="C",
+        cadence_type="AUTHENTIC",
+        local_key_pc=0,
+        harmonic_function="CADENTIAL",
         avoid_piece_id="other",
     )
 

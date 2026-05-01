@@ -3,7 +3,9 @@ from pathlib import Path
 
 from src.inference.generate_v1 import GenerationConfig, GenerationResult
 from src.inference.rerank import (
+    evaluate_novelty_metrics,
     evaluate_quality_metrics,
+    is_high_copy_risk,
     repair_generation_harmonic_metadata,
     rerank_generations,
     score_quality_metrics,
@@ -167,3 +169,31 @@ def test_repair_generation_harmonic_metadata_remaps_ids_from_vocab():
 
     assert repaired.tokens == repaired_tokens
     assert repaired.ids == [vocab[token] for token in repaired_tokens]
+
+
+def test_novelty_metrics_detect_transposition_normalized_source_overlap():
+    source = [
+        "BAR",
+        "ABS_VOICE_0_60",
+        "POS_0",
+        "VOICE_0",
+        "DUR_24",
+        "MEL_INT12_0",
+        "COPY_HASH_a",
+    ]
+    generated = [
+        "BAR",
+        "ABS_VOICE_0_65",
+        "POS_0",
+        "VOICE_0",
+        "DUR_24",
+        "MEL_INT12_0",
+        "COPY_HASH_a",
+    ]
+
+    metrics = evaluate_novelty_metrics(generated, [source], ngram=4)
+
+    assert metrics["source_ngram_overlap_rate"] > 0
+    assert metrics["fragment_chain_reuse"] == 1.0
+    assert metrics["high_copy_risk"] == 1
+    assert is_high_copy_risk(metrics)

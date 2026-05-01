@@ -6,6 +6,8 @@ from collections import Counter
 from dataclasses import asdict, dataclass
 from typing import Iterable, Protocol
 
+from src.emi.buckets import classify_contour_bucket, classify_rhythm_bucket
+from src.emi.planner import cadence_type_for_role, harmonic_function_for_role, phrase_role_to_speac
 from src.instrumental_v3.representation import (
     FIELD_NAMES,
     STATE_NOTE,
@@ -61,6 +63,18 @@ class Fragment:
     state_pattern: list[int]
     contour_hash: str
     fingerprint: str
+    speac_label: str = "UNKNOWN"
+    cadence_type: str = "UNKNOWN"
+    contour_bucket: str = "UNKNOWN"
+    rhythm_bucket: str = "UNKNOWN"
+    local_key_pc: int = 12
+    harmonic_function: str = "UNKNOWN"
+    entry_degree: int = 0
+    exit_degree: int = 0
+    min_pitch: int | None = None
+    max_pitch: int | None = None
+    copy_hash: str = ""
+    transposition_hash: str = ""
 
     def to_dict(self) -> dict[str, object]:
         return asdict(self)
@@ -91,6 +105,18 @@ class Fragment:
             state_pattern=[int(v) for v in data["state_pattern"]],  # type: ignore[index]
             contour_hash=str(data["contour_hash"]),
             fingerprint=str(data["fingerprint"]),
+            speac_label=str(data.get("speac_label", "UNKNOWN")),
+            cadence_type=str(data.get("cadence_type", "UNKNOWN")),
+            contour_bucket=str(data.get("contour_bucket", "UNKNOWN")),
+            rhythm_bucket=str(data.get("rhythm_bucket", "UNKNOWN")),
+            local_key_pc=int(data.get("local_key_pc", data.get("key_pc", 12))),
+            harmonic_function=str(data.get("harmonic_function", "UNKNOWN")),
+            entry_degree=int(data.get("entry_degree", data.get("start_degree", 0))),
+            exit_degree=int(data.get("exit_degree", data.get("end_degree", 0))),
+            min_pitch=_optional_int(data.get("min_pitch")),
+            max_pitch=_optional_int(data.get("max_pitch")),
+            copy_hash=str(data.get("copy_hash", "")),
+            transposition_hash=str(data.get("transposition_hash", "")),
         )
 
 
@@ -107,6 +133,13 @@ class FragmentQuery:
     target_beats: float | None = None
     avoid_piece_id: str | None = None
     contour_hash: str | None = None
+    speac_label: str | None = None
+    cadence_type: str | None = None
+    contour_bucket: str | None = None
+    rhythm_bucket: str | None = None
+    local_key_pc: int | None = None
+    harmonic_function: str | None = None
+    avoid_copy_hashes: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -155,7 +188,30 @@ def extract_fragments(
             start_bar = window[0][_col("bar")]
             start_pos = window[0][_col("pos")]
             phrase_role = infer_phrase_role(rows, start, length_slices, voice, piece.steps_per_bar)
+            speac_label = phrase_role_to_speac(phrase_role)
+            cadence_type = cadence_type_for_role(phrase_role)
+            harmonic_function = harmonic_function_for_role(phrase_role)
+            contour_bucket = classify_contour_bucket(melodic_intervals)
+            rhythm_bucket = classify_rhythm_bucket(rhythm_steps, state_pattern)
             contour_hash = hash_signature({"mel": melodic_intervals, "rhythm": rhythm_steps})
+            copy_hash = hash_signature(
+                {
+                    "mel": melodic_intervals,
+                    "rhythm": rhythm_steps,
+                    "degrees": [notes[0][3], notes[-1][3]],
+                    "verticals": verticals,
+                    "states": state_pattern,
+                }
+            )
+            transposition_hash = hash_signature(
+                {
+                    "mel": melodic_intervals,
+                    "rhythm": rhythm_steps,
+                    "degree_span": notes[-1][3] - notes[0][3],
+                    "states": state_pattern,
+                    "cadence": cadence_type,
+                }
+            )
             fingerprint = hash_signature(
                 {
                     "piece": piece.piece_id,
@@ -192,6 +248,18 @@ def extract_fragments(
                     state_pattern=state_pattern,
                     contour_hash=contour_hash,
                     fingerprint=fingerprint,
+                    speac_label=speac_label,
+                    cadence_type=cadence_type,
+                    contour_bucket=contour_bucket,
+                    rhythm_bucket=rhythm_bucket,
+                    local_key_pc=piece.key_pc,
+                    harmonic_function=harmonic_function,
+                    entry_degree=notes[0][3],
+                    exit_degree=notes[-1][3],
+                    min_pitch=min(note[2] for note in notes),
+                    max_pitch=max(note[2] for note in notes),
+                    copy_hash=copy_hash,
+                    transposition_hash=transposition_hash,
                 )
             )
     return fragments
@@ -243,8 +311,16 @@ def score_fragment(query: FragmentQuery, fragment: Fragment) -> FragmentMatch:
         add("phrase_role", 1.5 if fragment.phrase_role == query.phrase_role else _role_transition_score(query.phrase_role, fragment.phrase_role))
     if query.key_pc is not None:
         add("key_pc", 0.75 if fragment.key_pc == query.key_pc else -0.25)
+    if query.local_key_pc is not None:
+        add("local_key_pc", 0.6 if fragment.local_key_pc == query.local_key_pc else -0.2)
     if query.mode is not None:
         add("mode", 0.5 if fragment.mode == query.mode else -0.25)
+    if query.speac_label is not None:
+        add("speac", 0.6 if fragment.speac_label == query.speac_label else -0.2)
+    if query.cadence_type is not None:
+        add("cadence", 0.7 if fragment.cadence_type == query.cadence_type else -0.2)
+    if query.harmonic_function is not None:
+        add("harmonic_function", 0.5 if fragment.harmonic_function == query.harmonic_function else -0.15)
     if query.start_degree is not None:
         add("start_degree", _distance_score(query.start_degree, fragment.start_degree, exact=0.8, near=0.25, penalty=-0.4))
     if query.previous_end_degree is not None:
@@ -258,8 +334,14 @@ def score_fragment(query: FragmentQuery, fragment: Fragment) -> FragmentMatch:
         add("beats", max(-0.5, 0.5 - abs(fragment.beats - query.target_beats) * 0.25))
     if query.contour_hash is not None:
         add("contour", 0.8 if fragment.contour_hash == query.contour_hash else 0.0)
+    if query.contour_bucket is not None:
+        add("contour_bucket", 0.45 if fragment.contour_bucket == query.contour_bucket else 0.0)
+    if query.rhythm_bucket is not None:
+        add("rhythm_bucket", 0.45 if fragment.rhythm_bucket == query.rhythm_bucket else 0.0)
     if query.avoid_piece_id is not None and fragment.piece_id == query.avoid_piece_id:
         add("novelty_piece", -1.5)
+    if fragment.copy_hash and fragment.copy_hash in query.avoid_copy_hashes:
+        add("novelty_copy_hash", -3.0)
 
     score = sum(reasons.values())
     return FragmentMatch(fragment=fragment, score=score, reasons=reasons)
@@ -270,13 +352,20 @@ def summarize_fragments(fragments: Iterable[Fragment]) -> dict[str, object]:
     role_counts = Counter(fragment.phrase_role for fragment in items)
     piece_counts = Counter(fragment.piece_id for fragment in items)
     contour_counts = Counter(fragment.contour_hash for fragment in items)
+    cadence_counts = Counter(fragment.cadence_type for fragment in items)
+    harmonic_counts = Counter(fragment.harmonic_function for fragment in items)
+    copy_counts = Counter(fragment.copy_hash for fragment in items if fragment.copy_hash)
     return {
         "fragment_count": len(items),
         "piece_count": len(piece_counts),
         "role_counts": dict(sorted(role_counts.items())),
+        "cadence_counts": dict(sorted(cadence_counts.items())),
+        "harmonic_function_counts": dict(sorted(harmonic_counts.items())),
         "top_pieces": dict(piece_counts.most_common(10)),
         "unique_contours": len(contour_counts),
         "reused_contours": sum(1 for count in contour_counts.values() if count > 1),
+        "unique_copy_hashes": len(copy_counts),
+        "reused_copy_hashes": sum(1 for count in copy_counts.values() if count > 1),
     }
 
 

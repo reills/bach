@@ -1,6 +1,7 @@
 import type { InstrumentMode, ScoreDocumentBundle } from '../state/types';
 
 export interface ComposeConstraints {
+  engine?: 'transformer' | 'emi' | 'hybrid';
   useGrammarMask?: boolean;
   useScg?: boolean;
   texture?: number;
@@ -11,6 +12,9 @@ export interface ComposeConstraints {
   maxLength?: number;
   qualityPasses?: number;
   voiceLeading?: 'fast' | 'off' | 'balanced' | 'best';
+  hybridAllowEmiFallback?: boolean;
+  noveltyNgram?: number;
+  sourceTokenSequences?: string[][];
 }
 
 export interface ComposeRequest {

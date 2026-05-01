@@ -141,12 +141,16 @@ Implementation notes:
 
 ## Phase 2: Retrieval-Conditioned Representation
 
-Add a v5 representation rather than mutating v4 in place. The first v5 fields
-are intentionally minimal:
+Add a v5 representation rather than mutating v4 in place. The v5 EMI fields are
+bounded symbolic plan/retrieval fields:
 
 - `phrase_role`
-- `fragment_contour_bucket`
-- `fragment_rhythm_bucket`
+- `speac_label`
+- `cadence_target`
+- `harmonic_function`
+- `local_key_pc`
+- `retrieved_contour_bucket`
+- `retrieved_rhythm_bucket`
 
 Do not put raw fragment IDs, source piece names, or exact measure origins in the
 main LM fields. Raw IDs belong in `emi_fragments.jsonl` for retrieval,
@@ -165,6 +169,47 @@ Generation should become plan-first:
 
 The current `rank_fragments()` API is intentionally small so it can be used by a
 future generator without importing training code.
+
+## API Engine Switch
+
+The compose API can now run the legacy transformer path, the EMI-style symbolic
+baseline path, or the retrieval-conditioned hybrid path:
+
+```json
+{
+  "render_mode": "piano",
+  "constraints": {
+    "engine": "hybrid",
+    "key": "D minor",
+    "measures": 8,
+    "texture": 4
+  }
+}
+```
+
+Runtime defaults:
+
+- `BACH_GEN_ENGINE=transformer|emi|hybrid`
+- `BACH_GEN_EMI_FRAGMENTS=data/emi_fragments/example.fragments.jsonl`
+- `BACH_GEN_HYBRID_EMI_DEBUG_FALLBACK=false`
+
+Current semantics:
+
+- `transformer` keeps the existing NoteLM/token path.
+- `emi` bypasses checkpoints and composes a notation-first canonical score using
+  protected subject/countersubject cells, SPEAC-like role sequencing, optional
+  fragment retrieval, and contrapuntal cleanup. This is a diagnostic/baseline
+  engine, not the preferred composer.
+- `hybrid` builds a phrase/SPEAC/cadence plan, retrieves compatible fragment
+  signatures, attaches bounded conditioning fields to the transformer generation
+  config, generates/reranks candidates, reports validity and novelty metrics, and
+  rejects excessive source overlap. It does not fall back to EMI unless
+  `BACH_GEN_HYBRID_EMI_DEBUG_FALLBACK=true` or `hybridAllowEmiFallback=true` is
+  set explicitly for debugging.
+
+This is not exact historical EMI. It is the practical integration layer that lets
+EMI-style symbolic structure coexist with transformer work while the v5
+retrieval-conditioned model matures.
 
 ## Required Gates
 
