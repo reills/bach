@@ -15,6 +15,13 @@ sys.path.insert(0, str(ROOT))
 
 from src.api.render.midi import canonical_score_to_midi
 from src.api.render.musicxml import canonical_score_to_musicxml
+from src.inference.controls import ComposeControls
+from src.inference.hybrid import (
+    HybridContext,
+    apply_conditioning_to_v5_row,
+    apply_conditioning_to_v5_rows,
+    build_hybrid_context,
+)
 from src.instrumental_v3.metrics import evaluate_slices, source_overlap_report
 from src.instrumental_v3.representation import (
     FEATURE_SPECS as V3_FEATURE_SPECS,
@@ -28,9 +35,14 @@ from src.instrumental_v3.representation import (
     slice_rows_to_piece,
 )
 from src.instrumental_v4.model import CompoundConfig
-from src.instrumental_v4.representation import PLAN_FIELD_NAMES
+from src.instrumental_v4.representation import PLAN_FIELD_NAMES, V4_FIELD_NAMES
 from src.instrumental_v5.model import build_generator
-from src.instrumental_v5.representation import V5_FEATURE_SPECS, V5_FIELD_NAMES
+from src.instrumental_v5.representation import (
+    V5_COUNTERPOINT_FIELD_NAMES,
+    V5_FEATURE_SPECS,
+    V5_FIELD_NAMES,
+    counterpoint_features_for_transition,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -45,8 +57,23 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--temperature", type=float, default=0.8)
     parser.add_argument("--top-p", type=float, default=0.95)
     parser.add_argument("--top-k", type=int, default=0)
+    parser.add_argument("--candidates", type=int, default=4, help="Generate N candidates and keep the best objective score.")
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--seed", type=int, default=2604)
+    parser.add_argument(
+        "--hybrid-conditioning",
+        action="store_true",
+        help="Force planned/retrieved EMI conditioning fields during v5 generation.",
+    )
+    parser.add_argument(
+        "--fragment-path",
+        default=None,
+        help="EMI fragment memory JSONL. Defaults to <data-dir>/train_emi_fragments.jsonl.",
+    )
+    parser.add_argument("--key", default=None, help="Planning key for hybrid conditioning. Defaults to the prompt key.")
+    parser.add_argument("--measures", type=int, default=0, help="Planning length in measures. Defaults from prompt+generation rows.")
+    parser.add_argument("--texture", type=int, default=2, help="Planning texture/voice count.")
+    parser.add_argument("--retrieval-limit", type=int, default=1, help="Fragments to consider per plan step.")
     return parser.parse_args()
 
 
@@ -79,12 +106,20 @@ def main() -> None:
     prompt = template_df[V5_FIELD_NAMES].to_numpy(dtype="int64").tolist()[: args.prompt_rows]
     if len(prompt) < 2:
         raise SystemExit("prompt must contain at least two rows")
+    hybrid_context = _hybrid_context_from_args(
+        args,
+        template=template,
+        data_dir=Path(args.data_dir),
+        total_rows=len(prompt) + args.max_new_tokens,
+    )
+    if hybrid_context is not None:
+        prompt = apply_conditioning_to_v5_rows(prompt, hybrid_context, steps_per_bar=template.steps_per_bar)
 
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     reports = []
     for sample_idx in range(args.samples):
-        rows = _generate_rows(
+        rows, rerank_diagnostics = _generate_best_rows(
             model,
             prompt_rows=[row[:] for row in prompt],
             template=template,
@@ -94,6 +129,9 @@ def main() -> None:
             temperature=args.temperature,
             top_p=args.top_p,
             top_k=args.top_k,
+            hybrid_context=hybrid_context,
+            candidate_count=args.candidates,
+            source_pieces=source_pieces,
         )
         piece_id = f"instrumental_v5_sample{sample_idx:02d}"
         report = _write_exports(
@@ -105,6 +143,8 @@ def main() -> None:
             prompt_rows=len(prompt),
             generated_rows=args.max_new_tokens,
             source_pieces=source_pieces,
+            hybrid_diagnostics=hybrid_context.diagnostics() if hybrid_context is not None else None,
+            rerank_diagnostics=rerank_diagnostics,
         )
         reports.append(report)
     print(json.dumps({"samples": reports}, indent=2, sort_keys=True))
@@ -121,6 +161,7 @@ def _generate_rows(
     temperature: float,
     top_p: float,
     top_k: int,
+    hybrid_context: HybridContext | None = None,
 ) -> list[list[int]]:
     rows = [row[:] for row in prompt_rows]
     total = len(rows) + max_new_rows
@@ -134,8 +175,167 @@ def _generate_rows(
             value = _sample(logits[name][0, -1], temperature=temperature, top_p=top_p, top_k=top_k)
             next_row.append(max(0, min(V5_FEATURE_SPECS[name] - 1, value)))
         _repair_generated_row(next_row, rows, template)
+        if hybrid_context is not None:
+            next_row = apply_conditioning_to_v5_row(
+                next_row,
+                hybrid_context,
+                row_index=len(rows),
+                steps_per_bar=template.steps_per_bar,
+            )
         rows.append(next_row)
     return rows
+
+
+def _generate_best_rows(
+    model: torch.nn.Module,
+    *,
+    prompt_rows: list[list[int]],
+    template: InstrumentalV3Piece,
+    max_new_rows: int,
+    device: torch.device,
+    max_context: int,
+    temperature: float,
+    top_p: float,
+    top_k: int,
+    hybrid_context: HybridContext | None = None,
+    candidate_count: int = 1,
+    source_pieces: list[InstrumentalV3Piece] | None = None,
+) -> tuple[list[list[int]], dict[str, object]]:
+    candidate_count = max(1, int(candidate_count))
+    source_pieces = source_pieces or []
+    candidates: list[tuple[float, list[list[int]], dict[str, object]]] = []
+    batched_rows = _generate_rows_batch(
+        model,
+        prompt_rows=prompt_rows,
+        template=template,
+        max_new_rows=max_new_rows,
+        device=device,
+        max_context=max_context,
+        temperature=temperature,
+        top_p=top_p,
+        top_k=top_k,
+        hybrid_context=hybrid_context,
+        candidate_count=candidate_count,
+    )
+    for candidate_idx, rows in enumerate(batched_rows):
+        score, diagnostics = _score_candidate_rows(
+            rows,
+            template=template,
+            prompt_row_count=len(prompt_rows),
+            source_pieces=source_pieces,
+        )
+        diagnostics["candidate_index"] = candidate_idx
+        candidates.append((score, rows, diagnostics))
+
+    candidates.sort(key=lambda item: item[0], reverse=True)
+    best_score, best_rows, best_diagnostics = candidates[0]
+    return best_rows, {
+        "candidate_count": candidate_count,
+        "selected_candidate_index": best_diagnostics["candidate_index"],
+        "selected_score": best_score,
+        "candidates": [diagnostics for _, _, diagnostics in candidates],
+    }
+
+
+def _generate_rows_batch(
+    model: torch.nn.Module,
+    *,
+    prompt_rows: list[list[int]],
+    template: InstrumentalV3Piece,
+    max_new_rows: int,
+    device: torch.device,
+    max_context: int,
+    temperature: float,
+    top_p: float,
+    top_k: int,
+    hybrid_context: HybridContext | None = None,
+    candidate_count: int = 1,
+) -> list[list[list[int]]]:
+    candidate_count = max(1, int(candidate_count))
+    rows_by_candidate = [[row[:] for row in prompt_rows] for _ in range(candidate_count)]
+    total = len(prompt_rows) + max_new_rows
+    while len(rows_by_candidate[0]) < total:
+        context_rows = [rows[-max_context:] for rows in rows_by_candidate]
+        x = torch.tensor(context_rows, dtype=torch.long, device=device)
+        with torch.inference_mode():
+            logits = model(x)
+        sampled_by_field = {
+            name: _sample_many(logits[name][:, -1, :], temperature=temperature, top_p=top_p, top_k=top_k)
+            for name in V5_FIELD_NAMES
+        }
+        row_index = len(rows_by_candidate[0])
+        for candidate_idx, rows in enumerate(rows_by_candidate):
+            next_row = [
+                max(0, min(V5_FEATURE_SPECS[name] - 1, int(sampled_by_field[name][candidate_idx].item())))
+                for name in V5_FIELD_NAMES
+            ]
+            _repair_generated_row(next_row, rows, template)
+            if hybrid_context is not None:
+                next_row = apply_conditioning_to_v5_row(
+                    next_row,
+                    hybrid_context,
+                    row_index=row_index,
+                    steps_per_bar=template.steps_per_bar,
+                )
+            rows.append(next_row)
+    return rows_by_candidate
+
+
+def _score_candidate_rows(
+    rows: list[list[int]],
+    *,
+    template: InstrumentalV3Piece,
+    prompt_row_count: int,
+    source_pieces: list[InstrumentalV3Piece],
+) -> tuple[float, dict[str, object]]:
+    continuation = rows[prompt_row_count:] or rows
+    v3_rows = [row[: len(V3_FIELD_NAMES)] for row in continuation]
+    piece = slice_rows_to_piece(
+        v3_rows,
+        template=template,
+        piece_id="candidate",
+        source_path="candidate",
+    )
+    report = evaluate_slices(piece.slices).to_dict()
+    novelty = source_overlap_report(piece.slices, [source.slices for source in source_pieces], ngram=16)
+    v0_note_rate = float(report["v0_note_rate"])
+    v1_note_rate = float(report["v1_note_rate"])
+    stuck_rate = max(float(report["v0_stuck_rate"]), float(report["v1_stuck_rate"]))
+    same_pitch_rate = max(float(report["v0_same_pitch_run_rate"]), float(report["v1_same_pitch_run_rate"]))
+    activity_floor_penalty = max(0.0, 0.20 - v0_note_rate) + max(0.0, 0.20 - v1_note_rate)
+    activity_ceiling_penalty = max(0.0, v0_note_rate - 0.90) + max(0.0, v1_note_rate - 0.90)
+    balance_penalty = abs(v0_note_rate - v1_note_rate)
+    overlap_rate = float(novelty.get("source_ngram_overlap_rate", 0.0))
+    contiguous = float(novelty.get("max_contiguous_source_match", 0.0))
+
+    score = 100.0
+    score -= 260.0 * float(report["invalid_pitch_state_rate"])
+    score -= 220.0 * float(report["voice_crossing_rate"])
+    score -= 200.0 * float(report["parallel_fifth_octave_rate"])
+    score -= 120.0 * float(report["empty_slice_rate"])
+    score -= 100.0 * float(report["repeated_sonority_rate"])
+    score -= 90.0 * stuck_rate
+    score -= 80.0 * same_pitch_rate
+    score -= 70.0 * activity_floor_penalty
+    score -= 55.0 * activity_ceiling_penalty
+    score -= 35.0 * balance_penalty
+    score -= 120.0 * overlap_rate
+    score -= 1.5 * max(0.0, contiguous - 8.0)
+
+    diagnostics = {
+        "score": round(score, 4),
+        "invalid_pitch_state_rate": float(report["invalid_pitch_state_rate"]),
+        "voice_crossing_rate": float(report["voice_crossing_rate"]),
+        "parallel_fifth_octave_rate": float(report["parallel_fifth_octave_rate"]),
+        "empty_slice_rate": float(report["empty_slice_rate"]),
+        "repeated_sonority_rate": float(report["repeated_sonority_rate"]),
+        "stuck_voice_rate": stuck_rate,
+        "same_pitch_run_rate": same_pitch_rate,
+        "voice_note_balance": balance_penalty,
+        "source_overlap_rate": overlap_rate,
+        "max_contiguous_source_match": int(contiguous),
+    }
+    return score, diagnostics
 
 
 def _repair_generated_row(row: list[int], rows: list[list[int]], template: InstrumentalV3Piece) -> None:
@@ -162,7 +362,7 @@ def _repair_generated_row(row: list[int], rows: list[list[int]], template: Instr
         degree_i = V5_FIELD_NAMES.index(f"v{voice}_degree")
         state = row[state_i]
         prev_state = prev[state_i]
-        prev_pitch = prev[pitch_i]
+        prev_pitch = _clip_midi_pitch(prev[pitch_i]) if prev[pitch_i] > 0 else 0
         if state == STATE_HOLD and not (prev_state in {STATE_NOTE, STATE_HOLD} and prev_pitch > 0):
             state = STATE_NOTE
             row[state_i] = state
@@ -180,6 +380,7 @@ def _repair_generated_row(row: list[int], rows: list[list[int]], template: Instr
             continue
         if row[pitch_i] <= 0:
             row[pitch_i] = prev_pitch if prev_pitch > 0 else (48 if voice == 0 else 60)
+        row[pitch_i] = _clip_midi_pitch(row[pitch_i])
         row[state_i] = STATE_NOTE
         row[dur_i] = max(1, row[dur_i])
         row[tie_i] = 0
@@ -187,6 +388,7 @@ def _repair_generated_row(row: list[int], rows: list[list[int]], template: Instr
         active.append(row[pitch_i])
 
     _derive_vertical(row, active)
+    _derive_counterpoint_transition(row, prev)
     # Plan fields are conditioning summaries. Keeping sampled values is fine, but clamp defensively.
     for name in PLAN_FIELD_NAMES:
         idx = V5_FIELD_NAMES.index(name)
@@ -214,6 +416,30 @@ def _sample(logits: torch.Tensor, *, temperature: float, top_p: float, top_k: in
     return int(torch.multinomial(probs, num_samples=1).item())
 
 
+def _sample_many(logits: torch.Tensor, *, temperature: float, top_p: float, top_k: int) -> torch.Tensor:
+    if logits.dim() != 2:
+        raise ValueError("expected batched logits with shape (batch, vocab)")
+    if temperature <= 0:
+        return torch.argmax(logits, dim=-1)
+    logits = logits / max(0.05, temperature)
+    if top_k > 0 and top_k < logits.size(-1):
+        values, indices = torch.topk(logits, k=top_k, dim=-1)
+        probs = torch.softmax(values, dim=-1)
+        selected = torch.multinomial(probs, num_samples=1).squeeze(-1)
+        return indices.gather(1, selected.unsqueeze(-1)).squeeze(-1)
+    probs = torch.softmax(logits, dim=-1)
+    if 0 < top_p < 1:
+        sorted_probs, sorted_indices = torch.sort(probs, descending=True, dim=-1)
+        cdf = torch.cumsum(sorted_probs, dim=-1)
+        keep = cdf <= top_p
+        keep[:, 0] = True
+        filtered = sorted_probs.masked_fill(~keep, 0.0)
+        filtered = filtered / filtered.sum(dim=-1, keepdim=True).clamp_min(1e-12)
+        selected = torch.multinomial(filtered, num_samples=1).squeeze(-1)
+        return sorted_indices.gather(1, selected.unsqueeze(-1)).squeeze(-1)
+    return torch.multinomial(probs, num_samples=1).squeeze(-1)
+
+
 def _write_exports(
     out_dir: Path,
     *,
@@ -224,6 +450,8 @@ def _write_exports(
     prompt_rows: int,
     generated_rows: int,
     source_pieces: list[InstrumentalV3Piece],
+    hybrid_diagnostics: dict[str, object] | None = None,
+    rerank_diagnostics: dict[str, object] | None = None,
 ) -> dict[str, object]:
     v3_rows = [row[: len(V3_FIELD_NAMES)] for row in rows]
     piece = slice_rows_to_piece(v3_rows, template=template, piece_id=piece_id, source_path=checkpoint)
@@ -238,6 +466,10 @@ def _write_exports(
     xml_path.write_text(canonical_score_to_musicxml(score), encoding="utf-8")
     midi_path.write_bytes(canonical_score_to_midi(score))
     metrics = {**report.to_dict(), "source_overlap": novelty}
+    if hybrid_diagnostics is not None:
+        metrics["hybrid"] = hybrid_diagnostics
+    if rerank_diagnostics is not None:
+        metrics["candidate_rerank"] = rerank_diagnostics
     metrics_path.write_text(json.dumps(metrics, indent=2, sort_keys=True), encoding="utf-8")
     rows_path.write_text(
         json.dumps(
@@ -247,6 +479,8 @@ def _write_exports(
                 "prompt_rows": prompt_rows,
                 "generated_rows": generated_rows,
                 "field_names": V5_FIELD_NAMES,
+                "hybrid": hybrid_diagnostics,
+                "candidate_rerank": rerank_diagnostics,
                 "rows": rows,
             },
             indent=2,
@@ -261,7 +495,44 @@ def _write_exports(
         "rows": str(rows_path),
         "counterpoint": report.to_dict(),
         "source_overlap": novelty,
+        "hybrid": hybrid_diagnostics,
+        "candidate_rerank": rerank_diagnostics,
     }
+
+
+def _hybrid_context_from_args(
+    args: argparse.Namespace,
+    *,
+    template: InstrumentalV3Piece,
+    data_dir: Path,
+    total_rows: int,
+) -> HybridContext | None:
+    if not getattr(args, "hybrid_conditioning", False):
+        return None
+    fragment_path = _resolve_fragment_path(getattr(args, "fragment_path", None), data_dir=data_dir)
+    measures = int(getattr(args, "measures", 0) or _rows_to_measures(total_rows, template.steps_per_bar))
+    key = getattr(args, "key", None) or template.key or "C"
+    return build_hybrid_context(
+        ComposeControls(
+            key=key,
+            measures=measures,
+            texture=int(getattr(args, "texture", 2) or 2),
+        ),
+        fragment_path=fragment_path,
+        retrieval_limit=int(getattr(args, "retrieval_limit", 1) or 1),
+    )
+
+
+def _resolve_fragment_path(fragment_path: str | None, *, data_dir: Path) -> Path:
+    if fragment_path:
+        return Path(fragment_path)
+    return data_dir / "train_emi_fragments.jsonl"
+
+
+def _rows_to_measures(row_count: int, steps_per_bar: int) -> int:
+    if steps_per_bar <= 0:
+        return 1
+    return max(1, (max(1, row_count) + steps_per_bar - 1) // steps_per_bar)
 
 
 def _template_piece(df: pd.DataFrame) -> InstrumentalV3Piece:
@@ -298,6 +569,13 @@ def _derive_vertical(row: list[int], active: list[int | None]) -> None:
     row[ci] = 1 if pc in {0, 7} else 2 if pc in {3, 4, 8, 9} else 3
 
 
+def _derive_counterpoint_transition(row: list[int], previous_row: list[int] | None) -> None:
+    previous_v4 = None if previous_row is None else previous_row[: len(V4_FIELD_NAMES)]
+    features = counterpoint_features_for_transition(previous_v4, row[: len(V4_FIELD_NAMES)])
+    for idx, name in enumerate(V5_COUNTERPOINT_FIELD_NAMES):
+        row[V5_FIELD_NAMES.index(name)] = features[idx]
+
+
 def _scale_degree_id(pitch: int, key_pc: int, mode: int) -> int:
     if key_pc >= 12 or pitch <= 0:
         return 0
@@ -305,6 +583,10 @@ def _scale_degree_id(pitch: int, key_pc: int, mode: int) -> int:
     major = {0: 1, 2: 2, 4: 3, 5: 4, 7: 5, 9: 6, 11: 7}
     minor = {0: 1, 2: 2, 3: 3, 5: 4, 7: 5, 8: 6, 10: 7, 11: 7}
     return (minor if mode == 1 else major).get(rel, 8 + rel % 5)
+
+
+def _clip_midi_pitch(pitch: int) -> int:
+    return max(1, min(127, int(pitch)))
 
 
 if __name__ == "__main__":

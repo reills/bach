@@ -67,12 +67,13 @@ def test_extract_fragments_records_interval_rhythm_signature() -> None:
     assert first.melodic_intervals == [2]
     assert first.rhythm_steps == [2, 2]
     assert first.vertical_intervals == [12, 12, 12, 12]
-    assert first.speac_label == "A"
+    assert first.speac_label == "C"
+    assert first.cmmc_function == "C1"
     assert first.cadence_type == "NONE"
     assert first.contour_bucket == "ASCENDING_STEPWISE"
     assert first.rhythm_bucket == "EVEN_8THS"
-    assert first.local_key_pc == 0
-    assert first.harmonic_function == "DOMINANT"
+    assert first.local_key_pc == 7
+    assert first.harmonic_function == "TONIC"
     assert first.entry_degree == first.start_degree
     assert first.exit_degree == first.end_degree
     assert first.min_pitch == 48
@@ -94,20 +95,21 @@ def test_rank_fragments_prefers_compatible_query() -> None:
     fragments = extract_fragments(_toy_piece(), length_slices=4, hop_slices=4, min_notes=2)
     query = FragmentQuery(
         voice=1,
-        phrase_role="CADENCE",
+        phrase_role="CLOSING",
         key_pc=0,
         mode=0,
         previous_end_pitch=69,
         previous_end_degree=5,
-        speac_label="C",
-        cadence_type="AUTHENTIC",
+        speac_label="A",
+        cmmc_function="A1",
+        cadence_type="NONE",
         local_key_pc=0,
-        harmonic_function="CADENTIAL",
+        harmonic_function="DOMINANT",
         avoid_piece_id="other",
     )
 
     matches = rank_fragments(query, fragments, limit=3)
 
     assert matches[0].fragment.voice == 1
-    assert matches[0].fragment.phrase_role == "CADENCE"
+    assert matches[0].fragment.phrase_role == "CLOSING"
     assert matches[0].score > matches[-1].score

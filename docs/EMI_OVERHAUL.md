@@ -33,6 +33,9 @@ typed columns:
 - `train_emi_fragments.jsonl`: retrieval source for training/generation.
 - `val_emi_fragments.jsonl`: held-out diagnostic fragments only.
 - `metadata.json`: split and build provenance.
+  - Includes `conditioning_coverage` so builds report non-default rates for
+    `phrase_role`, `speac_label`, `cadence_target`, `harmonic_function`,
+    `local_key_pc`, and retrieval buckets.
 
 Later training can add pre-tokenized tensor/binary shards derived from Parquet.
 Those shards are training caches, not the canonical dataset.
@@ -169,6 +172,16 @@ Generation should become plan-first:
 
 The current `rank_fragments()` API is intentionally small so it can be used by a
 future generator without importing training code.
+
+Validation checks now cover:
+
+- `hybrid` transformer failures do not call EMI unless debug fallback is
+  explicitly enabled.
+- `hybridAllowEmiFallback=true` is labeled
+  `transformer_exception_debug_only` in diagnostics.
+- Hybrid context can be written into actual v5 rows via bounded field IDs.
+- v5 dataset metadata reports conditioning coverage so sparse/default labels are
+  visible before training.
 
 ## API Engine Switch
 

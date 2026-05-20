@@ -6,7 +6,17 @@
 /data/overfit_20_chorales/
 /data/imslp_pdfs/
 /data/imslp_musicxml/
+/data/instrumental_v5/*/emi_fragments.jsonl
+/data/instrumental_v5/*/events.parquet
+/data/instrumental_v5/*/metadata.json
+/data/instrumental_v5/*/vocab.json
+/data/instrumental_v5/*/train_emi_fragments.jsonl
+/data/instrumental_v5/*/val_emi_fragments.jsonl
+/data/instrumental_v5/*/tokenized/
 *.omr
+
+# local research/reference data
+/docs/cope-data/
 
 # legacy local data files at repo root
 tobis_xml

@@ -4,6 +4,12 @@ from dataclasses import asdict, dataclass
 from typing import Literal, Sequence
 
 from src.emi.buckets import CADENCE_TYPE_NAMES, HARMONIC_FUNCTION_NAMES, SPEAC_LABEL_NAMES
+from src.emi.cmmc import (
+    cadence_type_for_cmmc_function,
+    cmmc_function_for_role,
+    harmonic_function_for_cmmc_function,
+    speac_label_for_cmmc_function,
+)
 from src.inference.controls import normalize_compose_key, normalize_texture
 
 PhraseRole = Literal[
@@ -59,6 +65,7 @@ class PhrasePlanStep:
     index: int
     phrase_role: PhraseRole
     speac_label: SPEACLabel
+    cmmc_function: str
     cadence_target: str
     local_key_pc: int
     mode: int
@@ -83,19 +90,24 @@ def build_phrase_plan(
     resolved_key_pc, resolved_mode = _key_context(key=key, key_pc=key_pc, mode=mode)
     resolved_texture = normalize_texture(texture)
     roles = _role_plan(measures)
-    return [
-        PhrasePlanStep(
-            index=index,
-            phrase_role=role,
-            speac_label=phrase_role_to_speac(role),
-            cadence_target=cadence_type_for_role(role),
-            local_key_pc=_local_key_for_role(resolved_key_pc, role=role, index=index),
-            mode=resolved_mode,
-            harmonic_function=harmonic_function_for_role(role),
-            texture=resolved_texture,
+    plan: list[PhrasePlanStep] = []
+    for index, role in enumerate(roles):
+        cmmc_function = cmmc_function_for_role(role)
+        cadence_target = cadence_type_for_role(role)
+        plan.append(
+            PhrasePlanStep(
+                index=index,
+                phrase_role=role,
+                speac_label=phrase_role_to_speac(role),
+                cmmc_function=cmmc_function,
+                cadence_target=cadence_target,
+                local_key_pc=_local_key_for_role(resolved_key_pc, role=role, index=index),
+                mode=resolved_mode,
+                harmonic_function=harmonic_function_for_role(role),
+                texture=resolved_texture,
+            )
         )
-        for index, role in enumerate(roles)
-    ]
+    return plan
 
 
 def plan_step_for_row(row_index: int, *, steps_per_bar: int, plan: Sequence[PhrasePlanStep]) -> PhrasePlanStep:
@@ -108,40 +120,31 @@ def plan_step_for_row(row_index: int, *, steps_per_bar: int, plan: Sequence[Phra
 
 
 def phrase_role_to_speac(role: str) -> SPEACLabel:
-    return {
-        "OPENING": "S",
-        "SUBJECT_ENTRY": "S",
-        "ANSWER_ENTRY": "A",
-        "COUNTERSUBJECT": "E",
-        "EPISODE": "E",
-        "SEQUENCE": "P",
-        "CADENTIAL_PREPARATION": "P",
-        "CADENTIAL_PREP": "P",
-        "CADENCE": "C",
-        "CLOSING": "C",
-    }.get(role, "E")  # type: ignore[return-value]
+    return speac_label_for_cmmc_function(cmmc_function_for_role(role))  # type: ignore[return-value]
 
 
 def cadence_type_for_role(role: str) -> str:
-    if role == "CADENCE":
-        return "AUTHENTIC"
     if role in {"CADENTIAL_PREPARATION", "CADENTIAL_PREP"}:
         return "HALF"
+    if role in {"CADENCE", "CLOSING"}:
+        return cadence_type_for_cmmc_function(cmmc_function_for_role(role))
     return "NONE"
 
 
 def harmonic_function_for_role(role: str) -> str:
     if role in {"OPENING", "SUBJECT_ENTRY", "CLOSING"}:
         return "TONIC"
-    if role in {"ANSWER_ENTRY", "CADENCE"}:
-        return "DOMINANT" if role == "ANSWER_ENTRY" else "CADENTIAL"
+    if role == "ANSWER_ENTRY":
+        return "DOMINANT"
+    if role == "CADENCE":
+        return "CADENTIAL"
     if role in {"CADENTIAL_PREPARATION", "CADENTIAL_PREP"}:
         return "PREDOMINANT"
     if role == "SEQUENCE":
         return "SEQUENTIAL"
     if role in {"COUNTERSUBJECT", "EPISODE"}:
         return "OTHER"
-    return "UNKNOWN"
+    return harmonic_function_for_cmmc_function(cmmc_function_for_role(role), cadence_type=cadence_type_for_role(role))
 
 
 def phrase_role_id(role: str | None) -> int:

@@ -40,6 +40,11 @@ class ComposeRuntimeConfig:
     vocab_path: Optional[Path] = None
     engine: EngineMode = "hybrid"
     emi_fragment_path: Optional[Path] = None
+    v5_checkpoint_path: Optional[Path] = None
+    v5_data_dir: Optional[Path] = None
+    v5_prompt_rows: int = 64
+    v5_piece_index: int = 0
+    v5_candidates: int = 4
     hybrid_allow_emi_debug_fallback: bool = False
     device: str = "cpu"
     max_length: int = 512
@@ -114,6 +119,15 @@ def build_compose_service(config: ComposeRuntimeConfig) -> ComposeHandler:
                 config=config,
                 constraints=constraints,
                 requested_engine=engine,
+            )
+
+        if engine == "hybrid" and config.v5_checkpoint_path is not None and config.v5_data_dir is not None:
+            return _compose_v5_hybrid_result(
+                request,
+                controls=controls,
+                config=config,
+                constraints=constraints,
+                hybrid_context=hybrid_context,
             )
 
         generation_config = GenerationConfig(
@@ -249,6 +263,11 @@ def _runtime_config_from_env() -> ComposeRuntimeConfig:
         vocab_path=vocab_path,
         engine=normalize_engine(os.environ.get("BACH_GEN_ENGINE"), default="hybrid"),
         emi_fragment_path=fragment_path,
+        v5_checkpoint_path=_env_optional_path("BACH_GEN_V5_CHECKPOINT"),
+        v5_data_dir=_env_optional_path("BACH_GEN_V5_DATA_DIR"),
+        v5_prompt_rows=_env_int("BACH_GEN_V5_PROMPT_ROWS", 64),
+        v5_piece_index=_env_int("BACH_GEN_V5_PIECE_INDEX", 0),
+        v5_candidates=_env_int("BACH_GEN_V5_CANDIDATES", 4),
         hybrid_allow_emi_debug_fallback=_env_bool("BACH_GEN_HYBRID_EMI_DEBUG_FALLBACK", False),
         device=device,
         max_length=_env_int("BACH_GEN_MAX_LENGTH", 512),
@@ -311,6 +330,126 @@ def _compose_emi_result(
                 f"KEY_{composition.diagnostics['key']}",
                 f"MEAS_{composition.diagnostics['measures']}",
                 f"TEXTURE_{composition.diagnostics['texture']}",
+            ],
+            stopped_on_eos=True,
+        ),
+        render_mode=request.render_mode,
+        diagnostics=diagnostics,
+    )
+
+
+def _compose_v5_hybrid_result(
+    request: ComposeRequest,
+    *,
+    controls: ComposeControls,
+    config: ComposeRuntimeConfig,
+    constraints: dict[str, Any],
+    hybrid_context: Any,
+) -> ComposeServiceResult:
+    if config.v5_checkpoint_path is None or config.v5_data_dir is None:
+        raise ValueError("v5 hybrid requires BACH_GEN_V5_CHECKPOINT and BACH_GEN_V5_DATA_DIR")
+
+    import pandas as pd
+
+    from scripts.generate_instrumental_v5 import _generate_best_rows, _template_piece
+    from scripts.make_v5_listening_batch import _reset_positions
+    from src.instrumental_v3.metrics import evaluate_slices, source_overlap_report
+    from src.instrumental_v3.representation import (
+        FIELD_NAMES as V3_FIELD_NAMES,
+        piece_to_canonical_score,
+        slice_rows_to_piece,
+    )
+    from src.instrumental_v4.model import CompoundConfig
+    from src.instrumental_v5.model import build_generator
+    from src.instrumental_v5.representation import V5_FIELD_NAMES
+
+    device = torch.device(config.device)
+    if device.type == "cuda":
+        if not torch.cuda.is_available():
+            raise ValueError("CUDA requested but torch.cuda.is_available() is false")
+        torch.cuda.init()
+
+    ckpt = torch.load(config.v5_checkpoint_path, map_location=device)
+    if list(ckpt.get("field_names", [])) != V5_FIELD_NAMES:
+        raise ValueError("v5 checkpoint field_names do not match current v5 representation")
+    model_config = CompoundConfig(**ckpt["config"])
+    model = build_generator(model_config).to(device)
+    model.load_state_dict(ckpt["model_state"])
+    model.eval()
+
+    events = pd.read_parquet(config.v5_data_dir / "events.parquet")
+    grouped = [group.sort_values("row_index").copy() for _, group in events.groupby("piece_id", sort=False)]
+    if not grouped:
+        raise ValueError("v5 events.parquet has no pieces")
+    template_df = grouped[min(max(0, config.v5_piece_index), len(grouped) - 1)]
+    template = _template_piece(template_df)
+    prompt_rows = template_df[V5_FIELD_NAMES].to_numpy(dtype="int64").tolist()[: config.v5_prompt_rows]
+    if len(prompt_rows) < 2:
+        raise ValueError("v5 prompt must contain at least two rows")
+
+    if hybrid_context is not None:
+        from src.inference.hybrid import apply_conditioning_to_v5_rows
+
+        prompt_rows = apply_conditioning_to_v5_rows(
+            prompt_rows,
+            hybrid_context,
+            steps_per_bar=template.steps_per_bar,
+        )
+
+    measure_count = controls.measures or 4
+    max_new_rows = max(1, measure_count * template.steps_per_bar)
+    source_pieces = [_template_piece(group) for group in grouped]
+    rows, rerank_diagnostics = _generate_best_rows(
+        model,
+        prompt_rows=[row[:] for row in prompt_rows],
+        template=template,
+        max_new_rows=max_new_rows,
+        device=device,
+        max_context=model_config.max_seq_len,
+        temperature=_constraint_float(constraints, "temperature", default=config.temperature),
+        top_p=_constraint_float(constraints, "top_p", "topP", default=config.top_p),
+        top_k=_constraint_int(constraints, "top_k", "topK", default=0) or 0,
+        hybrid_context=hybrid_context,
+        candidate_count=_constraint_int(constraints, "candidates", "candidateCount", default=config.v5_candidates) or 1,
+        source_pieces=source_pieces,
+    )
+    generated_only = _reset_positions(rows[len(prompt_rows) :], template=template)
+    v3_rows = [row[: len(V3_FIELD_NAMES)] for row in generated_only]
+    piece = slice_rows_to_piece(
+        v3_rows,
+        template=template,
+        piece_id="instrumental_v5_hybrid_compose",
+        source_path=str(config.v5_checkpoint_path),
+    )
+    score = piece_to_canonical_score(piece)
+    quality = evaluate_slices(piece.slices).to_dict()
+    novelty = source_overlap_report(piece.slices, [source.slices for source in source_pieces], ngram=16)
+    diagnostics: dict[str, object] = {
+        "engine": "hybrid",
+        "requestedEngine": "hybrid",
+        "proposalEngine": "instrumental_v5_transformer",
+        "v5": {
+            "checkpoint": str(config.v5_checkpoint_path),
+            "dataDir": str(config.v5_data_dir),
+            "promptRows": len(prompt_rows),
+            "generatedRows": len(generated_only),
+            "pieceIndex": config.v5_piece_index,
+            "fieldCount": len(V5_FIELD_NAMES),
+            "candidates": rerank_diagnostics["candidate_count"],
+        },
+        "candidate_rerank": rerank_diagnostics,
+        "hybrid": hybrid_context.diagnostics() if hybrid_context is not None else None,
+        "generated_metrics": quality,
+        "novelty": novelty,
+    }
+    return compose_canonical_score(
+        score,
+        generation=GenerationResult(
+            ids=[],
+            tokens=[
+                "V5_INSTRUMENTAL",
+                "HYBRID_RETRIEVAL_CONDITIONED",
+                f"ROWS_{len(generated_only)}",
             ],
             stopped_on_eos=True,
         ),
@@ -525,6 +664,13 @@ def _env_bool(name: str, default: bool) -> bool:
     if normalized in {"0", "false", "no", "off"}:
         return False
     raise ValueError(f"{name} must be a boolean string")
+
+
+def _env_optional_path(name: str) -> Optional[Path]:
+    value = os.environ.get(name)
+    if not value:
+        return None
+    return Path(value).expanduser()
 
 
 def _default_device() -> str:

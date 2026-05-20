@@ -5,6 +5,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Sequence
 
+from src.emi.cmmc import cmmc_function_id
 from src.emi.fragments import Fragment, FragmentMatch, FragmentQuery, fragment_from_jsonl, rank_fragments
 from src.emi.planner import (
     PhrasePlanStep,
@@ -19,6 +20,7 @@ from src.instrumental_v5.representation import (
     CONTOUR_BUCKET_TO_ID,
     RHYTHM_BUCKET_TO_ID,
     V5_EMI_FIELD_NAMES,
+    V5_FIELD_NAMES,
     contour_bucket_id,
     rhythm_bucket_id,
 )
@@ -52,6 +54,7 @@ class HybridContext:
             "retrievedFragmentCount": len(self.retrieved_matches),
             "rolePlan": [step.phrase_role for step in self.plan],
             "speacLabels": [step.speac_label for step in self.plan],
+            "cmmcFunctions": [step.cmmc_function for step in self.plan],
             "cadenceTargets": [step.cadence_target for step in self.plan],
             "harmonicFunctions": [step.harmonic_function for step in self.plan],
             "conditioningFields": list(V5_EMI_FIELD_NAMES),
@@ -115,6 +118,7 @@ def retrieve_plan_fragments(
             FragmentQuery(
                 phrase_role=step.phrase_role,
                 speac_label=step.speac_label,
+                cmmc_function=step.cmmc_function,
                 cadence_type=step.cadence_target,
                 local_key_pc=step.local_key_pc,
                 mode=step.mode,
@@ -139,6 +143,41 @@ def conditioning_has_raw_fragment_ids(conditioning: dict[str, object]) -> bool:
     return "fragment_id" in serialized or "fragmentId" in serialized or "_v0_s" in serialized or "_v1_s" in serialized
 
 
+def apply_conditioning_to_v5_rows(
+    rows: Sequence[Sequence[int]],
+    context: HybridContext,
+    *,
+    steps_per_bar: int,
+) -> list[list[int]]:
+    return [
+        apply_conditioning_to_v5_row(row, context, row_index=row_index, steps_per_bar=steps_per_bar)
+        for row_index, row in enumerate(rows)
+    ]
+
+
+def apply_conditioning_to_v5_row(
+    row: Sequence[int],
+    context: HybridContext,
+    *,
+    row_index: int,
+    steps_per_bar: int,
+) -> list[int]:
+    if steps_per_bar <= 0:
+        raise ValueError("steps_per_bar must be positive")
+    conditioned = list(row)
+    if len(conditioned) != len(V5_FIELD_NAMES):
+        raise ValueError(f"expected v5 row width {len(V5_FIELD_NAMES)}, got {len(conditioned)}")
+    if not context.conditioning_rows:
+        return conditioned
+    field_indices = {field: V5_FIELD_NAMES.index(field) for field in V5_EMI_FIELD_NAMES}
+    plan_index = min(max(0, row_index) // steps_per_bar, len(context.conditioning_rows) - 1)
+    conditioning_row = context.conditioning_rows[plan_index]
+    for field, value in conditioning_row.items():
+        if field in field_indices:
+            conditioned[field_indices[field]] = int(value)
+    return conditioned
+
+
 def _conditioning_rows(
     plan: Sequence[PhrasePlanStep],
     matches: Sequence[FragmentMatch],
@@ -151,6 +190,7 @@ def _conditioning_rows(
             {
                 "phrase_role": phrase_role_id(step.phrase_role),
                 "speac_label": speac_label_id(step.speac_label),
+                "cmmc_function": cmmc_function_id(step.cmmc_function),
                 "cadence_target": cadence_type_id(step.cadence_target),
                 "harmonic_function": harmonic_function_id(step.harmonic_function),
                 "local_key_pc": max(0, min(12, int(step.local_key_pc))),

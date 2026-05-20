@@ -6,6 +6,7 @@ import csv
 import json
 import random
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -15,7 +16,9 @@ import torch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from scripts.generate_instrumental_v5 import _generate_rows, _template_piece
+from scripts.generate_instrumental_v5 import _generate_best_rows, _template_piece
+from scripts.generate_instrumental_v5 import _hybrid_context_from_args
+from src.inference.hybrid import apply_conditioning_to_v5_rows
 from src.api.render.midi import canonical_score_to_midi
 from src.api.render.musicxml import canonical_score_to_musicxml
 from src.instrumental_v3.metrics import evaluate_slices
@@ -27,8 +30,13 @@ from src.instrumental_v3.representation import (
     slice_rows_to_piece,
 )
 from src.instrumental_v4.model import CompoundConfig
+from src.instrumental_v4.representation import V4_FIELD_NAMES
 from src.instrumental_v5.model import build_generator
-from src.instrumental_v5.representation import V5_FIELD_NAMES
+from src.instrumental_v5.representation import (
+    V5_COUNTERPOINT_FIELD_NAMES,
+    V5_FIELD_NAMES,
+    counterpoint_features_for_transition,
+)
 
 
 RATING_COLUMNS = [
@@ -56,8 +64,23 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--temperature", type=float, default=0.8)
     parser.add_argument("--top-p", type=float, default=0.95)
     parser.add_argument("--top-k", type=int, default=0)
+    parser.add_argument("--candidates", type=int, default=4, help="Generate N candidates per sample and keep the best objective score.")
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument(
+        "--hybrid-conditioning",
+        action="store_true",
+        help="Force planned/retrieved EMI conditioning fields during v5 generation.",
+    )
+    parser.add_argument(
+        "--fragment-path",
+        default=None,
+        help="EMI fragment memory JSONL. Defaults to <data-dir>/train_emi_fragments.jsonl.",
+    )
+    parser.add_argument("--key", default=None, help="Planning key for hybrid conditioning. Defaults to the prompt key.")
+    parser.add_argument("--measures", type=int, default=0, help="Planning length in measures. Defaults from prompt+generation rows.")
+    parser.add_argument("--texture", type=int, default=2, help="Planning texture/voice count.")
+    parser.add_argument("--retrieval-limit", type=int, default=1, help="Fragments to consider per plan step.")
     return parser.parse_args()
 
 
@@ -83,12 +106,22 @@ def main() -> None:
         raise SystemExit("events.parquet has no pieces")
     template_df = grouped[min(args.piece_index, len(grouped) - 1)]
     template = _template_piece(template_df)
+    source_pieces = [_template_piece(group) for group in grouped]
     prompt = template_df[V5_FIELD_NAMES].to_numpy(dtype="int64").tolist()[: args.prompt_rows]
     if len(prompt) < 2:
         raise SystemExit("prompt must contain at least two rows")
+    hybrid_context = _hybrid_context_from_args(
+        args,
+        template=template,
+        data_dir=Path(args.data_dir),
+        total_rows=len(prompt) + args.max_new_tokens,
+    )
+    if hybrid_context is not None:
+        prompt = apply_conditioning_to_v5_rows(prompt, hybrid_context, steps_per_bar=template.steps_per_bar)
     prompt_paths, prompt_metrics = _write_prompt(out_dir / "prompt", prompt_rows=prompt, template=template)
 
     manifest_samples = []
+    batch_start = time.monotonic()
     for sample_idx in range(1, args.samples + 1):
         sample_id = f"sample_{sample_idx:03d}"
         sample_seed = args.seed + sample_idx - 1
@@ -98,7 +131,13 @@ def main() -> None:
             torch.cuda.manual_seed_all(sample_seed)
         sample_dir = out_dir / sample_id
         sample_dir.mkdir(parents=True, exist_ok=True)
-        rows = _generate_rows(
+        sample_start = time.monotonic()
+        print(
+            f"[{sample_idx}/{args.samples}] generating {sample_id}: "
+            f"{args.candidates} candidates x {args.max_new_tokens} rows",
+            flush=True,
+        )
+        rows, rerank_diagnostics = _generate_best_rows(
             model,
             prompt_rows=[row[:] for row in prompt],
             template=template,
@@ -108,6 +147,9 @@ def main() -> None:
             temperature=args.temperature,
             top_p=args.top_p,
             top_k=args.top_k,
+            hybrid_context=hybrid_context,
+            candidate_count=args.candidates,
+            source_pieces=source_pieces,
         )
         generated_only_rows = _reset_positions(rows[len(prompt) :], template=template)
         paths, metrics = _write_sample(
@@ -119,6 +161,8 @@ def main() -> None:
             prompt_rows=len(prompt),
             generated_rows=args.max_new_tokens,
             seed=sample_seed,
+            hybrid_diagnostics=hybrid_context.diagnostics() if hybrid_context is not None else None,
+            rerank_diagnostics=rerank_diagnostics,
         )
         manifest_samples.append(
             {
@@ -127,6 +171,13 @@ def main() -> None:
                 "paths": {key: str(path.relative_to(out_dir)) for key, path in paths.items()},
                 "metrics": metrics,
             }
+        )
+        elapsed = time.monotonic() - sample_start
+        best_score = float(rerank_diagnostics.get("selected_score", 0.0))
+        print(
+            f"[{sample_idx}/{args.samples}] wrote {sample_id} in {elapsed:.1f}s "
+            f"(selected_score={best_score:.2f})",
+            flush=True,
         )
 
     manifest = {
@@ -147,15 +198,19 @@ def main() -> None:
             "temperature": args.temperature,
             "top_p": args.top_p,
             "top_k": args.top_k,
+            "candidates": args.candidates,
             "seed": args.seed,
         },
+        "hybrid": hybrid_context.diagnostics() if hybrid_context is not None else None,
     }
     _write_manifest(out_dir / "manifest.json", manifest)
     _write_ratings_template(out_dir / "ratings_template.csv", [sample["sample_id"] for sample in manifest_samples])
     _write_notes(out_dir / "notes.md", args=args, sample_ids=[sample["sample_id"] for sample in manifest_samples])
+    total_elapsed = time.monotonic() - batch_start
     print(f"Listening batch created at:\n{out_dir}/")
+    print(f"Total generation time: {total_elapsed:.1f}s")
     print("The prompt is exported once in prompt/. Each sample contains only generated continuation audio.")
-    print("Listen to the two samples and fill in ratings_template.csv or notes.md before the next modeling change.")
+    print("Listen to the samples and fill in ratings_template.csv or notes.md before the next modeling change.")
 
 
 def _load_model(checkpoint_path: Path, *, device: torch.device) -> tuple[torch.nn.Module, int]:
@@ -179,12 +234,20 @@ def _write_sample(
     prompt_rows: int,
     generated_rows: int,
     seed: int,
+    hybrid_diagnostics: dict[str, object] | None = None,
+    rerank_diagnostics: dict[str, object] | None = None,
 ) -> tuple[dict[str, Path], dict[str, float | int]]:
     v3_rows = [row[: len(V3_FIELD_NAMES)] for row in rows]
     piece = slice_rows_to_piece(v3_rows, template=template, piece_id=sample_id, source_path=checkpoint)
     score = piece_to_canonical_score(piece)
     report = evaluate_slices(piece.slices)
     metrics = _sanity_metrics(report.to_dict(), template=template)
+    if hybrid_diagnostics is not None:
+        metrics["hybrid_fragment_count"] = int(hybrid_diagnostics.get("fragmentMemoryCount", 0))
+        metrics["hybrid_retrieved_count"] = int(hybrid_diagnostics.get("retrievedFragmentCount", 0))
+    if rerank_diagnostics is not None:
+        metrics["candidate_count"] = int(rerank_diagnostics.get("candidate_count", 1))
+        metrics["selected_candidate_score"] = float(rerank_diagnostics.get("selected_score", 0.0))
 
     musicxml_path = sample_dir / f"{sample_id}.musicxml"
     midi_path = sample_dir / f"{sample_id}.mid"
@@ -201,6 +264,8 @@ def _write_sample(
                 "prompt_rows": prompt_rows,
                 "generated_rows": generated_rows,
                 "field_names": V5_FIELD_NAMES,
+                "hybrid": hybrid_diagnostics,
+                "candidate_rerank": rerank_diagnostics,
                 "rows": rows,
             },
             indent=2,
@@ -250,6 +315,15 @@ def _reset_positions(rows: list[list[int]], *, template: InstrumentalV3Piece) ->
         new_row[V5_FIELD_NAMES.index("phrase_pos")] = phrase_pos
         new_row[V5_FIELD_NAMES.index("cadence_zone")] = 1 if phrase_pos in {6, 7} else 0
         out.append(new_row)
+    previous: list[int] | None = None
+    for row in out:
+        features = counterpoint_features_for_transition(
+            None if previous is None else previous[: len(V4_FIELD_NAMES)],
+            row[: len(V4_FIELD_NAMES)],
+        )
+        for feature_idx, name in enumerate(V5_COUNTERPOINT_FIELD_NAMES):
+            row[V5_FIELD_NAMES.index(name)] = features[feature_idx]
+        previous = row
     return out
 
 
@@ -303,6 +377,9 @@ def _write_notes(path: Path, *, args: argparse.Namespace, sample_ids: list[str])
         f"seed = {args.seed}",
         f"samples = {args.samples}",
         f"max_new_tokens = {args.max_new_tokens}",
+        f"candidates = {getattr(args, 'candidates', 1)}",
+        f"hybrid_conditioning = {getattr(args, 'hybrid_conditioning', False)}",
+        f"fragment_path = {getattr(args, 'fragment_path', None) or '<data-dir>/train_emi_fragments.jsonl'}",
         "",
         "## What to listen for",
         "",

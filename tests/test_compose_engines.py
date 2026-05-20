@@ -5,9 +5,11 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import httpx
+import pytest
 from fastapi.testclient import TestClient
 
 from src.api.canonical import CanonicalScore, Event, Measure, Part, PartInfo, ScoreHeader
+from src.api.routes.scores import ComposeRequest
 from src.api.compose_service import ComposeServiceResult, export_score
 from src.api.render import canonical_score_to_midi
 from src.emi.fragments import Fragment, fragment_to_jsonl
@@ -191,3 +193,116 @@ def test_hybrid_engine_calls_transformer_with_retrieval_conditioning(monkeypatch
     assert diagnostics["proposalEngine"] == "transformer"
     assert diagnostics["hybrid"]["retrievedFragmentCount"] > 0
     assert "hybridFallbackReason" not in diagnostics
+
+
+def test_hybrid_engine_can_route_to_v5_runtime_when_configured(monkeypatch, tmp_path: Path) -> None:
+    from src.api.compose_launcher import ComposeRuntimeConfig, build_compose_service
+
+    score = _score()
+    exported = export_score(score)
+    captured = {}
+
+    def fail_load_notelm_checkpoint(*args, **kwargs):
+        raise AssertionError("v5 hybrid should not load the legacy NoteLM checkpoint")
+
+    def fake_compose_v5_hybrid_result(request, *, controls, config, constraints, hybrid_context):
+        captured["controls"] = controls
+        captured["config"] = config
+        captured["constraints"] = constraints
+        captured["hybrid_context"] = hybrid_context
+        return ComposeServiceResult(
+            generation=GenerationResult(ids=[], tokens=["V5_INSTRUMENTAL"], stopped_on_eos=True),
+            score=score,
+            score_xml=exported.score_xml,
+            midi=canonical_score_to_midi(score),
+            measure_map=exported.measure_map,
+            event_hit_map=exported.event_hit_map,
+            render_mode=request.render_mode,
+            diagnostics={
+                "engine": "hybrid",
+                "requestedEngine": "hybrid",
+                "proposalEngine": "instrumental_v5_transformer",
+            },
+        )
+
+    monkeypatch.setattr("src.api.compose_launcher.load_notelm_checkpoint", fail_load_notelm_checkpoint)
+    monkeypatch.setattr("src.api.compose_launcher._compose_v5_hybrid_result", fake_compose_v5_hybrid_result)
+
+    service = build_compose_service(
+        ComposeRuntimeConfig(
+            checkpoint_path=Path("/tmp/notelm.pt"),
+            vocab_path=Path("/tmp/vocab.json"),
+            engine="hybrid",
+            v5_checkpoint_path=tmp_path / "v5.pt",
+            v5_data_dir=tmp_path / "v5_data",
+        )
+    )
+    result = service(
+        ComposeRequest(
+            render_mode="piano",
+            constraints={"key": "C", "measures": 2, "texture": 2},
+        )
+    )
+
+    assert result.diagnostics is not None
+    assert result.diagnostics["proposalEngine"] == "instrumental_v5_transformer"
+    assert captured["config"].v5_checkpoint_path == tmp_path / "v5.pt"
+    assert captured["hybrid_context"] is not None
+
+
+def test_hybrid_does_not_call_emi_when_transformer_fails_without_debug_flag(monkeypatch) -> None:
+    from src.api.compose_launcher import ComposeRuntimeConfig, build_compose_service
+
+    def fail_load_notelm_checkpoint(*args, **kwargs):
+        raise RuntimeError("checkpoint unavailable")
+
+    def fail_compose_emi(*args, **kwargs):
+        raise AssertionError("hybrid must not silently call EMI")
+
+    monkeypatch.setattr("src.api.compose_launcher.load_notelm_checkpoint", fail_load_notelm_checkpoint)
+    monkeypatch.setattr("src.api.compose_launcher.compose_emi", fail_compose_emi)
+
+    service = build_compose_service(
+        ComposeRuntimeConfig(
+            checkpoint_path=Path("/tmp/missing-notelm.pt"),
+            vocab_path=Path("/tmp/missing-vocab.json"),
+            engine="hybrid",
+        )
+    )
+
+    with pytest.raises(RuntimeError, match="checkpoint unavailable"):
+        service(
+            ComposeRequest(
+                render_mode="piano",
+                constraints={"key": "C", "measures": 2, "texture": 2},
+            )
+        )
+
+
+def test_hybrid_debug_fallback_to_emi_is_explicit_and_labeled(monkeypatch) -> None:
+    from src.api.compose_launcher import ComposeRuntimeConfig, build_compose_service
+
+    def fail_load_notelm_checkpoint(*args, **kwargs):
+        raise RuntimeError("checkpoint unavailable")
+
+    monkeypatch.setattr("src.api.compose_launcher.load_notelm_checkpoint", fail_load_notelm_checkpoint)
+
+    service = build_compose_service(
+        ComposeRuntimeConfig(
+            checkpoint_path=Path("/tmp/missing-notelm.pt"),
+            vocab_path=Path("/tmp/missing-vocab.json"),
+            engine="hybrid",
+            hybrid_allow_emi_debug_fallback=True,
+        )
+    )
+    result = service(
+        ComposeRequest(
+            render_mode="piano",
+            constraints={"key": "C", "measures": 2, "texture": 2},
+        )
+    )
+
+    assert result.diagnostics is not None
+    assert result.diagnostics["engine"] == "emi"
+    assert result.diagnostics["requestedEngine"] == "hybrid"
+    assert result.diagnostics["hybridFallbackReason"] == "transformer_exception_debug_only"

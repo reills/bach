@@ -7,7 +7,7 @@ from dataclasses import asdict, dataclass
 from typing import Iterable, Protocol
 
 from src.emi.buckets import classify_contour_bucket, classify_rhythm_bucket
-from src.emi.planner import cadence_type_for_role, harmonic_function_for_role, phrase_role_to_speac
+from src.emi.cmmc import BEAT, analyze_rows
 from src.instrumental_v3.representation import (
     FIELD_NAMES,
     STATE_NOTE,
@@ -64,6 +64,7 @@ class Fragment:
     contour_hash: str
     fingerprint: str
     speac_label: str = "UNKNOWN"
+    cmmc_function: str = "UNKNOWN"
     cadence_type: str = "UNKNOWN"
     contour_bucket: str = "UNKNOWN"
     rhythm_bucket: str = "UNKNOWN"
@@ -106,6 +107,7 @@ class Fragment:
             contour_hash=str(data["contour_hash"]),
             fingerprint=str(data["fingerprint"]),
             speac_label=str(data.get("speac_label", "UNKNOWN")),
+            cmmc_function=str(data.get("cmmc_function", "UNKNOWN")),
             cadence_type=str(data.get("cadence_type", "UNKNOWN")),
             contour_bucket=str(data.get("contour_bucket", "UNKNOWN")),
             rhythm_bucket=str(data.get("rhythm_bucket", "UNKNOWN")),
@@ -134,6 +136,7 @@ class FragmentQuery:
     avoid_piece_id: str | None = None
     contour_hash: str | None = None
     speac_label: str | None = None
+    cmmc_function: str | None = None
     cadence_type: str | None = None
     contour_bucket: str | None = None
     rhythm_bucket: str | None = None
@@ -174,6 +177,13 @@ def extract_fragments(
     if hop <= 0:
         raise ValueError("hop_slices must be positive")
 
+    cmmc = analyze_rows(
+        rows,
+        steps_per_bar=piece.steps_per_bar,
+        grid_ticks=BEAT,
+        key_pc=piece.key_pc,
+        mode=piece.mode,
+    )
     fragments: list[Fragment] = []
     for voice in (0, 1):
         for start in range(0, max(0, len(rows) - length_slices + 1), hop):
@@ -187,10 +197,7 @@ def extract_fragments(
             verticals = [_decode_vertical(row) for row in window if _decode_vertical(row) > 0]
             start_bar = window[0][_col("bar")]
             start_pos = window[0][_col("pos")]
-            phrase_role = infer_phrase_role(rows, start, length_slices, voice, piece.steps_per_bar)
-            speac_label = phrase_role_to_speac(phrase_role)
-            cadence_type = cadence_type_for_role(phrase_role)
-            harmonic_function = harmonic_function_for_role(phrase_role)
+            cmmc_fragment = cmmc.fragment_analysis(start, length_slices, voice)
             contour_bucket = classify_contour_bucket(melodic_intervals)
             rhythm_bucket = classify_rhythm_bucket(rhythm_steps, state_pattern)
             contour_hash = hash_signature({"mel": melodic_intervals, "rhythm": rhythm_steps})
@@ -209,7 +216,8 @@ def extract_fragments(
                     "rhythm": rhythm_steps,
                     "degree_span": notes[-1][3] - notes[0][3],
                     "states": state_pattern,
-                    "cadence": cadence_type,
+                    "cadence": cmmc_fragment.cadence_type,
+                    "cmmc": cmmc_fragment.cmmc_function,
                 }
             )
             fingerprint = hash_signature(
@@ -220,7 +228,8 @@ def extract_fragments(
                     "mel": melodic_intervals,
                     "rhythm": rhythm_steps,
                     "states": state_pattern,
-                    "role": phrase_role,
+                    "role": cmmc_fragment.phrase_role,
+                    "cmmc": cmmc_fragment.cmmc_function,
                 }
             )
             fragments.append(
@@ -234,7 +243,7 @@ def extract_fragments(
                     start_bar=start_bar,
                     start_pos=start_pos,
                     beats=length_slices * piece.grid_ticks / 24.0,
-                    phrase_role=phrase_role,
+                    phrase_role=cmmc_fragment.phrase_role,
                     key=piece.key,
                     key_pc=piece.key_pc,
                     mode=piece.mode,
@@ -248,12 +257,13 @@ def extract_fragments(
                     state_pattern=state_pattern,
                     contour_hash=contour_hash,
                     fingerprint=fingerprint,
-                    speac_label=speac_label,
-                    cadence_type=cadence_type,
+                    speac_label=cmmc_fragment.speac_label,
+                    cmmc_function=cmmc_fragment.cmmc_function,
+                    cadence_type=cmmc_fragment.cadence_type,
                     contour_bucket=contour_bucket,
                     rhythm_bucket=rhythm_bucket,
-                    local_key_pc=piece.key_pc,
-                    harmonic_function=harmonic_function,
+                    local_key_pc=cmmc_fragment.local_key_pc,
+                    harmonic_function=cmmc_fragment.harmonic_function,
                     entry_degree=notes[0][3],
                     exit_degree=notes[-1][3],
                     min_pitch=min(note[2] for note in notes),
@@ -266,30 +276,9 @@ def extract_fragments(
 
 
 def infer_phrase_role(rows: list[list[int]], start: int, length_slices: int, voice: int, steps_per_bar: int) -> str:
-    if not rows:
-        return "EPISODE"
-    start_bar = rows[start][_col("bar")]
-    end = min(len(rows), start + length_slices)
-    window = rows[start:end]
-    phrase_positions = [row[_col("phrase_pos")] for row in window]
-    cadence_rate = sum(row[_col("cadence_zone")] for row in window) / max(1, len(window))
-
-    if start_bar == 0 and _first_note_index(rows, voice) in range(start, end):
-        return "SUBJECT_ENTRY" if voice == 1 else "ANSWER_ENTRY"
-    if start_bar <= 1:
-        return "OPENING"
-    if cadence_rate >= 0.75:
-        final_degrees = [_voice_degree(row, voice) for row in window if _voice_state(row, voice) == STATE_NOTE]
-        if final_degrees and final_degrees[-1] in {1, 5}:
-            return "CADENCE"
-        return "CADENTIAL_PREPARATION"
-    if start_bar >= max(0, rows[-1][_col("bar")] - 1):
-        return "CLOSING"
-    if _looks_sequential(rows, start, length_slices, voice, steps_per_bar):
-        return "SEQUENCE"
-    if phrase_positions and phrase_positions[0] in {2, 3, 4, 5}:
-        return "EPISODE"
-    return "EPISODE"
+    return analyze_rows(rows, steps_per_bar=steps_per_bar, grid_ticks=BEAT).fragment_analysis(
+        start, length_slices, voice
+    ).phrase_role
 
 
 def rank_fragments(query: FragmentQuery, fragments: Iterable[Fragment], *, limit: int = 16) -> list[FragmentMatch]:
@@ -317,6 +306,8 @@ def score_fragment(query: FragmentQuery, fragment: Fragment) -> FragmentMatch:
         add("mode", 0.5 if fragment.mode == query.mode else -0.25)
     if query.speac_label is not None:
         add("speac", 0.6 if fragment.speac_label == query.speac_label else -0.2)
+    if query.cmmc_function is not None:
+        add("cmmc_function", 0.7 if fragment.cmmc_function == query.cmmc_function else -0.25)
     if query.cadence_type is not None:
         add("cadence", 0.7 if fragment.cadence_type == query.cadence_type else -0.2)
     if query.harmonic_function is not None:
@@ -354,11 +345,13 @@ def summarize_fragments(fragments: Iterable[Fragment]) -> dict[str, object]:
     contour_counts = Counter(fragment.contour_hash for fragment in items)
     cadence_counts = Counter(fragment.cadence_type for fragment in items)
     harmonic_counts = Counter(fragment.harmonic_function for fragment in items)
+    cmmc_counts = Counter(fragment.cmmc_function for fragment in items)
     copy_counts = Counter(fragment.copy_hash for fragment in items if fragment.copy_hash)
     return {
         "fragment_count": len(items),
         "piece_count": len(piece_counts),
         "role_counts": dict(sorted(role_counts.items())),
+        "cmmc_function_counts": dict(sorted(cmmc_counts.items())),
         "cadence_counts": dict(sorted(cadence_counts.items())),
         "harmonic_function_counts": dict(sorted(harmonic_counts.items())),
         "top_pieces": dict(piece_counts.most_common(10)),
@@ -394,37 +387,6 @@ def _note_events(rows: list[list[int]], voice: int) -> list[tuple[int, int, int,
         degree = _voice_degree(row, voice)
         events.append((idx, dur, pitch, degree))
     return events
-
-
-def _looks_sequential(rows: list[list[int]], start: int, length_slices: int, voice: int, steps_per_bar: int) -> bool:
-    if length_slices < 4 or steps_per_bar <= 0:
-        return False
-    prev_start = start - length_slices
-    if prev_start < 0:
-        return False
-    current = _interval_rhythm_signature(rows[start : start + length_slices], voice)
-    previous = _interval_rhythm_signature(rows[prev_start:start], voice)
-    if not current or not previous:
-        return False
-    current_intervals, current_rhythm = current
-    previous_intervals, previous_rhythm = previous
-    return current_rhythm == previous_rhythm and current_intervals == previous_intervals
-
-
-def _interval_rhythm_signature(rows: list[list[int]], voice: int) -> tuple[list[int], list[int]] | None:
-    notes = _note_events(rows, voice)
-    if len(notes) < 2:
-        return None
-    intervals = [notes[idx][2] - notes[idx - 1][2] for idx in range(1, len(notes))]
-    rhythm = [dur for _, dur, _, _ in notes]
-    return intervals, rhythm
-
-
-def _first_note_index(rows: list[list[int]], voice: int) -> int | None:
-    for idx, row in enumerate(rows):
-        if _voice_state(row, voice) == STATE_NOTE and _voice_pitch(row, voice) > 0:
-            return idx
-    return None
 
 
 def _role_transition_score(requested: str, actual: str) -> float:

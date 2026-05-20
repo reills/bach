@@ -8,14 +8,17 @@ import pandas as pd
 from scripts.make_instrumental_v5_dataset import build_v5_outputs
 from src.instrumental_v3.representation import FIELD_NAMES as V3_FIELD_NAMES, InstrumentalV3Piece, SliceEvent
 from src.instrumental_v4.representation import build_v4_piece
+from src.instrumental_v5.data import summarize_conditioning_coverage
 from src.instrumental_v5.representation import (
     CADENCE_TYPE_TO_ID,
     CONTOUR_BUCKET_TO_ID,
+    CP_MOTION_TYPE_TO_ID,
     HARMONIC_FUNCTION_TO_ID,
     PHRASE_ROLE_TO_ID,
     RHYTHM_BUCKET_TO_ID,
     SPEAC_LABEL_TO_ID,
     V5_EMI_FIELD_NAMES,
+    V5_COUNTERPOINT_FIELD_NAMES,
     V5_FEATURE_SPECS,
     V5_FIELD_NAMES,
     build_v5_piece,
@@ -91,12 +94,16 @@ def test_v5_bucket_classifiers_are_bounded_and_abstract() -> None:
 def test_build_v5_piece_adds_bounded_plan_and_retrieval_fields() -> None:
     piece = build_v5_piece(build_v4_piece(_toy_v3_piece("toy")), length_slices=4, hop_slices=2)
 
-    assert V5_FIELD_NAMES[-7:] == V5_EMI_FIELD_NAMES
+    assert V5_FIELD_NAMES[-8:] == V5_EMI_FIELD_NAMES
+    assert set(V5_COUNTERPOINT_FIELD_NAMES).issubset(V5_FIELD_NAMES)
     assert len(piece.rows[0]) == len(V5_FIELD_NAMES)
-    assert len(V5_EMI_FIELD_NAMES) == 7
+    assert len(V5_EMI_FIELD_NAMES) == 8
     assert "fragment_id" not in V5_FIELD_NAMES
     assert piece.rows[0][V5_FIELD_NAMES.index("phrase_role")] < V5_FEATURE_SPECS["phrase_role"]
     assert piece.rows[0][V5_FIELD_NAMES.index("speac_label")] < V5_FEATURE_SPECS["speac_label"]
+    assert piece.rows[0][V5_FIELD_NAMES.index("cmmc_function")] < V5_FEATURE_SPECS["cmmc_function"]
+    assert piece.rows[0][V5_FIELD_NAMES.index("cp_motion_type")] < V5_FEATURE_SPECS["cp_motion_type"]
+    assert piece.rows[0][V5_FIELD_NAMES.index("cp_curr_interval_class")] < V5_FEATURE_SPECS["cp_curr_interval_class"]
     assert piece.rows[0][V5_FIELD_NAMES.index("cadence_target")] < V5_FEATURE_SPECS["cadence_target"]
     assert piece.rows[0][V5_FIELD_NAMES.index("harmonic_function")] < V5_FEATURE_SPECS["harmonic_function"]
     assert piece.rows[0][V5_FIELD_NAMES.index("local_key_pc")] < V5_FEATURE_SPECS["local_key_pc"]
@@ -108,6 +115,8 @@ def test_build_v5_piece_adds_bounded_plan_and_retrieval_fields() -> None:
         piece.rows[0][V5_FIELD_NAMES.index("retrieved_rhythm_bucket")]
         < V5_FEATURE_SPECS["retrieved_rhythm_bucket"]
     )
+    assert piece.rows[2][V5_FIELD_NAMES.index("cp_motion_type")] == CP_MOTION_TYPE_TO_ID["PARALLEL"]
+    assert piece.rows[2][V5_FIELD_NAMES.index("cp_parallel_perfect")] == 1
 
 
 def test_build_v5_piece_keeps_plan_fields_when_no_fragment_covers_rows() -> None:
@@ -115,9 +124,11 @@ def test_build_v5_piece_keeps_plan_fields_when_no_fragment_covers_rows() -> None
 
     assert piece.rows[0][V5_FIELD_NAMES.index("phrase_role")] == PHRASE_ROLE_TO_ID["SUBJECT_ENTRY"]
     assert piece.rows[0][V5_FIELD_NAMES.index("speac_label")] == SPEAC_LABEL_TO_ID["S"]
+    assert piece.rows[0][V5_FIELD_NAMES.index("cmmc_function")] > 0
     assert piece.rows[0][V5_FIELD_NAMES.index("cadence_target")] == CADENCE_TYPE_TO_ID["NONE"]
     assert piece.rows[0][V5_FIELD_NAMES.index("harmonic_function")] == HARMONIC_FUNCTION_TO_ID["TONIC"]
     assert piece.rows[0][V5_FIELD_NAMES.index("local_key_pc")] == 0
+    assert piece.rows[0][V5_FIELD_NAMES.index("cp_motion_type")] == CP_MOTION_TYPE_TO_ID["UNKNOWN"]
     assert {row[V5_FIELD_NAMES.index("retrieved_contour_bucket")] for row in piece.rows} == {
         CONTOUR_BUCKET_TO_ID["UNKNOWN"]
     }
@@ -141,6 +152,7 @@ def test_v5_builder_writes_parquet_vocab_metadata_and_split_fragment_files(tmp_p
 
     events = pd.read_parquet(tmp_path / "events.parquet")
     assert set(V5_EMI_FIELD_NAMES).issubset(events.columns)
+    assert set(V5_COUNTERPOINT_FIELD_NAMES).issubset(events.columns)
     for field in V5_FIELD_NAMES:
         assert pd.api.types.is_integer_dtype(events[field])
         assert int(events[field].min()) >= 0
@@ -149,6 +161,8 @@ def test_v5_builder_writes_parquet_vocab_metadata_and_split_fragment_files(tmp_p
     vocab = json.loads((tmp_path / "vocab.json").read_text(encoding="utf-8"))
     assert vocab["phrase_role"]["UNKNOWN"] == 0
     assert vocab["speac_label"]["UNKNOWN"] == 0
+    assert vocab["cmmc_function"]["UNKNOWN"] == 0
+    assert vocab["cp_motion_type"]["UNKNOWN"] == 0
     assert vocab["cadence_target"]["UNKNOWN"] == 0
     assert vocab["harmonic_function"]["UNKNOWN"] == 0
     assert vocab["retrieved_contour_bucket"]["UNKNOWN"] == 0
@@ -157,6 +171,7 @@ def test_v5_builder_writes_parquet_vocab_metadata_and_split_fragment_files(tmp_p
     assert "toy_a_v0" not in json.dumps(vocab)
 
     metadata = json.loads((tmp_path / "metadata.json").read_text(encoding="utf-8"))
+    assert metadata["conditioning_coverage"]["phrase_role"]["non_default_rate"] > 0
     train_piece_ids = set(metadata["train_piece_ids"])
     val_piece_ids = set(metadata["val_piece_ids"])
     assert train_piece_ids
@@ -173,3 +188,27 @@ def test_v5_builder_writes_parquet_vocab_metadata_and_split_fragment_files(tmp_p
     assert train_fragment_piece_ids.isdisjoint(val_piece_ids)
 
     assert Path(summary["events_path"]).name == "events.parquet"
+
+
+def test_conditioning_coverage_reports_non_default_label_rates(tmp_path: Path) -> None:
+    pieces = [build_v4_piece(_toy_v3_piece("toy_a")), build_v4_piece(_toy_v3_piece("toy_b"))]
+    build_v5_outputs(
+        pieces,
+        output_dir=tmp_path,
+        source_dataset="toy_v4.json",
+        length_slices=4,
+        hop_slices=2,
+        val_split=0.5,
+        seed=7,
+    )
+    events = pd.read_parquet(tmp_path / "events.parquet")
+
+    coverage = summarize_conditioning_coverage(events)
+
+    assert coverage["phrase_role"]["non_default_rate"] > 0
+    assert coverage["speac_label"]["non_default_rate"] > 0
+    assert coverage["harmonic_function"]["non_default_rate"] > 0
+    assert coverage["local_key_pc"]["non_default_rate"] > 0
+    assert coverage["retrieved_contour_bucket"]["non_default_rate"] > 0
+    assert coverage["retrieved_rhythm_bucket"]["non_default_rate"] > 0
+    assert coverage["cadence_target"]["default_id"] == CADENCE_TYPE_TO_ID["NONE"]

@@ -11,6 +11,11 @@ from scripts.make_v5_listening_batch import (
     _write_notes,
     _write_ratings_template,
 )
+from scripts.generate_instrumental_v5 import _repair_generated_row
+from scripts.generate_instrumental_v5 import _score_candidate_rows
+from src.instrumental_v3.representation import InstrumentalV3Piece
+from src.instrumental_v3.representation import STATE_NOTE
+from src.instrumental_v5.representation import V5_FIELD_NAMES
 
 
 class _Args:
@@ -25,6 +30,8 @@ class _Args:
 
 class _Template:
     steps_per_bar = 16
+    key_pc = 0
+    mode = 0
 
 
 def test_listening_batch_writes_rating_template_and_notes(tmp_path: Path) -> None:
@@ -77,7 +84,7 @@ def test_listening_batch_sanity_metrics_are_slim() -> None:
 def test_reset_positions_removes_prompt_offset() -> None:
     rows = []
     for idx in range(3):
-        row = [0] * 35
+        row = [0] * len(V5_FIELD_NAMES)
         row[0] = 20
         row[1] = 10 + idx
         rows.append(row)
@@ -86,3 +93,69 @@ def test_reset_positions_removes_prompt_offset() -> None:
 
     assert [row[0] for row in reset] == [0, 0, 0]
     assert [row[1] for row in reset] == [0, 1, 2]
+
+
+def test_repair_generated_v5_row_clamps_sampled_pitch_to_valid_midi() -> None:
+    previous = [0] * len(V5_FIELD_NAMES)
+    row = [0] * len(V5_FIELD_NAMES)
+    for voice in (0, 1):
+        previous[V5_FIELD_NAMES.index(f"v{voice}_state")] = STATE_NOTE
+        previous[V5_FIELD_NAMES.index(f"v{voice}_pitch")] = 60 + voice * 12
+        row[V5_FIELD_NAMES.index(f"v{voice}_state")] = STATE_NOTE
+        row[V5_FIELD_NAMES.index(f"v{voice}_pitch")] = 128
+
+    _repair_generated_row(row, [previous], _Template())
+
+    assert row[V5_FIELD_NAMES.index("v0_pitch")] == 127
+    assert row[V5_FIELD_NAMES.index("v1_pitch")] == 127
+
+
+def test_candidate_score_prefers_valid_non_crossed_two_voice_motion() -> None:
+    template = InstrumentalV3Piece(
+        piece_id="toy",
+        source_path="toy.musicxml",
+        tpq=24,
+        grid_ticks=6,
+        time_signature="4/4",
+        key="C",
+        key_pc=0,
+        mode=0,
+        bar_len_ticks=96,
+        steps_per_bar=16,
+        slices=[],
+    )
+    good_rows = [_candidate_row(60 + idx, 84 - idx) for idx in range(8)]
+    crossed_rows = [_candidate_row(72 + idx, 60 - idx) for idx in range(8)]
+
+    good_score, good_diagnostics = _score_candidate_rows(
+        good_rows,
+        template=template,
+        prompt_row_count=0,
+        source_pieces=[],
+    )
+    crossed_score, crossed_diagnostics = _score_candidate_rows(
+        crossed_rows,
+        template=template,
+        prompt_row_count=0,
+        source_pieces=[],
+    )
+
+    assert good_score > crossed_score
+    assert good_diagnostics["voice_crossing_rate"] == 0.0
+    assert crossed_diagnostics["voice_crossing_rate"] == 1.0
+
+
+def _candidate_row(v0_pitch: int, v1_pitch: int) -> list[int]:
+    row = [0] * len(V5_FIELD_NAMES)
+    row[V5_FIELD_NAMES.index("key_pc")] = 0
+    row[V5_FIELD_NAMES.index("mode")] = 0
+    row[V5_FIELD_NAMES.index("voice_count")] = 2
+    for voice, pitch in [(0, v0_pitch), (1, v1_pitch)]:
+        row[V5_FIELD_NAMES.index(f"v{voice}_state")] = STATE_NOTE
+        row[V5_FIELD_NAMES.index(f"v{voice}_pitch")] = pitch
+        row[V5_FIELD_NAMES.index(f"v{voice}_mel")] = 25
+        row[V5_FIELD_NAMES.index(f"v{voice}_dur")] = 1
+    interval = abs(v1_pitch - v0_pitch) + 1
+    row[V5_FIELD_NAMES.index("vertical_interval")] = interval
+    row[V5_FIELD_NAMES.index("spacing")] = interval
+    return row

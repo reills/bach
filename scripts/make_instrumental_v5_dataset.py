@@ -15,7 +15,7 @@ sys.path.insert(0, str(ROOT))
 
 from src.instrumental_v4.data import load_v4_dataset
 from src.instrumental_v4.representation import V4Piece
-from src.instrumental_v5.data import save_events, save_vocab
+from src.instrumental_v5.data import save_events, save_vocab, summarize_conditioning_coverage
 from src.instrumental_v5.representation import (
     V5_EMI_FIELD_NAMES,
     V5_FEATURE_SPECS,
@@ -109,6 +109,7 @@ def build_v5_outputs(
         "field_names": V5_FIELD_NAMES,
         "emi_field_names": V5_EMI_FIELD_NAMES,
         "feature_specs": V5_FEATURE_SPECS,
+        "conditioning_coverage": summarize_conditioning_coverage(events),
         "train_piece_ids": train_piece_ids,
         "val_piece_ids": val_piece_ids,
         "events_path": str(events_path),
