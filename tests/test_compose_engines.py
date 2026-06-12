@@ -250,6 +250,67 @@ def test_hybrid_engine_can_route_to_v5_runtime_when_configured(monkeypatch, tmp_
     assert captured["hybrid_context"] is not None
 
 
+def test_instrumental_v6_engine_uses_cached_runtime(monkeypatch, tmp_path: Path) -> None:
+    from src.api.compose_launcher import ComposeRuntimeConfig, build_compose_service
+
+    score = _score()
+    exported = export_score(score)
+    load_calls = 0
+    captured = {}
+    runtime = SimpleNamespace(checkpoint_step=7000)
+
+    def fake_load_v6_runtime(config):
+        nonlocal load_calls
+        load_calls += 1
+        captured["config"] = config
+        return runtime
+
+    def fake_compose_v6_result(request, *, controls, config, constraints, runtime):
+        captured["controls"] = controls
+        captured["constraints"] = constraints
+        captured["runtime"] = runtime
+        return ComposeServiceResult(
+            generation=GenerationResult(ids=[], tokens=["INSTRUMENTAL_V6"], stopped_on_eos=True),
+            score=score,
+            score_xml=exported.score_xml,
+            midi=canonical_score_to_midi(score),
+            measure_map=exported.measure_map,
+            event_hit_map=exported.event_hit_map,
+            render_mode=request.render_mode,
+            diagnostics={
+                "engine": "instrumental_v6",
+                "proposalEngine": "voice_aware_v2",
+            },
+        )
+
+    monkeypatch.setattr("src.api.compose_launcher._load_v6_runtime", fake_load_v6_runtime)
+    monkeypatch.setattr("src.api.compose_launcher._compose_v6_result", fake_compose_v6_result)
+
+    service = build_compose_service(
+        ComposeRuntimeConfig(
+            checkpoint_path=Path("/tmp/notelm.pt"),
+            engine="instrumental_v6",
+            v6_checkpoint_path=tmp_path / "checkpoint_best.pt",
+            v6_data_dir=tmp_path / "v6_data",
+            device="cuda",
+        )
+    )
+    request = ComposeRequest(
+        render_mode="piano",
+        constraints={"measures": 2, "texture": 4},
+    )
+    first = service(request)
+    second = service(request)
+
+    assert first.diagnostics is not None
+    assert second.diagnostics is not None
+    assert first.diagnostics["engine"] == "instrumental_v6"
+    assert load_calls == 1
+    assert captured["runtime"] is runtime
+    assert captured["controls"].texture == 4
+    assert captured["config"].v6_checkpoint_path == tmp_path / "checkpoint_best.pt"
+
+
 def test_hybrid_does_not_call_emi_when_transformer_fails_without_debug_flag(monkeypatch) -> None:
     from src.api.compose_launcher import ComposeRuntimeConfig, build_compose_service
 

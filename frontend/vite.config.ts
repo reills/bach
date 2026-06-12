@@ -13,6 +13,8 @@ export default defineConfig({
       '/discard_draft': 'http://localhost:8001',
       '/alt_positions': 'http://localhost:8001',
       '/apply_fingering': 'http://localhost:8001',
+      '/append_measures': 'http://localhost:8001',
+      '/generate_measures': 'http://localhost:8001',
       '/health': 'http://localhost:8001',
     },
   },

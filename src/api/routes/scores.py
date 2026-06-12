@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import random
 from typing import Any, Callable, Literal
 
 from fastapi import APIRouter, HTTPException, status
@@ -12,11 +13,13 @@ from src.api.canonical import (
     EventNotFoundError,
     FingeringSelection,
     GuitarFingering,
+    Measure,
     MeasureNotFoundError,
     Part,
     apply_fingering_selections,
     get_event_by_id,
     get_measure_by_id,
+    splice_generated_measures,
 )
 from src.api.compose_service import ComposeServiceResult, export_score
 from src.api.services import preview_window_inpaint
@@ -36,7 +39,7 @@ class ComposeRequest(BaseModel):
     prompt: str | None = None
     constraints: dict[str, Any] | None = None
     name: str | None = None
-    render_mode: Literal["guitar", "piano"] = "guitar"
+    render_mode: Literal["guitar", "piano"] = "piano"
 
 
 class ComposeResponse(BaseModel):
@@ -156,6 +159,40 @@ class ApplyFingeringResponse(BaseModel):
     document: dict[str, Any]
     scoreXML: str | None = None
     revision: int
+
+
+class AppendMeasuresRequest(BaseModel):
+    scoreId: str
+    revision: int
+    count: int = 1
+
+
+class AppendMeasuresResponse(BaseModel):
+    document: dict[str, Any]
+    scoreXML: str | None = None
+    revision: int
+    addedMeasureIds: list[str]
+
+
+class GenerateMeasuresRequest(BaseModel):
+    scoreId: str
+    revision: int
+    operation: Literal["prepend", "insert_before", "insert_after", "append", "replace"]
+    count: int = 1
+    measureId: str | None = None
+    prompt: str | None = None
+    constraints: dict[str, Any] | None = None
+    render_mode: Literal["guitar", "piano"] | None = None
+
+
+class GenerateMeasuresResponse(BaseModel):
+    document: dict[str, Any]
+    scoreXML: str | None = None
+    revision: int
+    insertedMeasureIds: list[str]
+    replacedMeasureIds: list[str]
+    changedMeasureIds: list[str]
+    diagnostics: dict[str, Any] | None = None
 
 
 def create_router(
@@ -359,6 +396,124 @@ def create_router(
             revision=committed.revision,
         )
 
+    async def _generate_and_commit_measures(
+        request: GenerateMeasuresRequest,
+    ) -> GenerateMeasuresResponse:
+        if compose_service is None:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="compose service is not configured",
+            )
+        if request.count <= 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="count must be positive",
+            )
+        if request.count > 32:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="count must be at most 32",
+            )
+
+        try:
+            draft = score_repository.create_draft(
+                request.scoreId,
+                base_revision=request.revision,
+            )
+        except ScoreNotFoundError as exc:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        except StaleRevisionError as exc:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+        try:
+            insert_index, replace_count = _resolve_measure_generation_window(
+                draft.score,
+                request,
+            )
+            context = _measure_context_summary(
+                draft.score,
+                insert_index=insert_index,
+                replace_count=replace_count,
+            )
+            generation_request = ComposeRequest(
+                prompt=request.prompt,
+                constraints=_measure_generation_constraints(
+                    request.constraints,
+                    score=draft.score,
+                    count=request.count,
+                    context=context,
+                ),
+                render_mode=request.render_mode or _score_render_mode(draft.score),
+            )
+            generated = compose_service(generation_request)
+            splice = splice_generated_measures(
+                draft.score,
+                generated.score,
+                insert_index=insert_index,
+                replace_count=replace_count,
+                count=request.count,
+            )
+            updated_score = splice.score
+            saved_draft = score_repository.save_draft(draft.draft_id, updated_score)
+            committed = score_repository.commit_draft(saved_draft.draft_id)
+        except MeasureNotFoundError as exc:
+            score_repository.discard_draft(draft.draft_id)
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        except ValueError as exc:
+            score_repository.discard_draft(draft.draft_id)
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        except StaleRevisionError as exc:
+            score_repository.discard_draft(draft.draft_id)
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+        except Exception:
+            score_repository.discard_draft(draft.draft_id)
+            raise
+
+        exported = export_score(committed.score)
+        changed_measure_ids = [*splice.replaced_measure_ids, *splice.inserted_measure_ids]
+        diagnostics: dict[str, Any] = {
+            "operation": request.operation,
+            "insertIndex": insert_index,
+            "replaceCount": replace_count,
+            "requestedCount": request.count,
+            "insertedMeasureIds": splice.inserted_measure_ids,
+            "replacedMeasureIds": splice.replaced_measure_ids,
+            "changedMeasureIds": changed_measure_ids,
+            "contextFitTransposition": splice.transposition,
+            "context": context,
+            "generation": generated.diagnostics,
+        }
+        return GenerateMeasuresResponse(
+            document=_bundle_to_response_dict(exported),
+            scoreXML=exported.score_xml,
+            revision=committed.revision,
+            insertedMeasureIds=splice.inserted_measure_ids,
+            replacedMeasureIds=splice.replaced_measure_ids,
+            changedMeasureIds=changed_measure_ids,
+            diagnostics=diagnostics,
+        )
+
+    @router.post("/generate_measures", response_model=GenerateMeasuresResponse)
+    async def generate_measures(request: GenerateMeasuresRequest) -> GenerateMeasuresResponse:
+        return await _generate_and_commit_measures(request)
+
+    @router.post("/append_measures", response_model=AppendMeasuresResponse)
+    async def append_measures(request: AppendMeasuresRequest) -> AppendMeasuresResponse:
+        response = await _generate_and_commit_measures(
+            GenerateMeasuresRequest(
+                scoreId=request.scoreId,
+                revision=request.revision,
+                operation="append",
+                count=request.count,
+            )
+        )
+        return AppendMeasuresResponse(
+            document=response.document,
+            scoreXML=response.scoreXML,
+            revision=response.revision,
+            addedMeasureIds=response.insertedMeasureIds,
+        )
+
     return router
 
 
@@ -407,6 +562,108 @@ def _build_fingering_selections(
             )
         )
     return canonical_selections
+
+
+def _resolve_measure_generation_window(
+    score: CanonicalScore,
+    request: GenerateMeasuresRequest,
+) -> tuple[int, int]:
+    if request.operation == "append":
+        return len(score.measures), 0
+    if request.operation == "prepend":
+        return 0, 0
+
+    if request.measureId is None:
+        raise ValueError(f"measureId is required for {request.operation}")
+
+    measure = get_measure_by_id(score, request.measureId)
+    if request.operation == "insert_before":
+        return measure.index, 0
+    if request.operation == "insert_after":
+        return measure.index + 1, 0
+    if request.operation == "replace":
+        if measure.index + request.count > len(score.measures):
+            raise ValueError("replace count extends beyond the score")
+        return measure.index, request.count
+
+    raise ValueError(f"unsupported measure operation: {request.operation}")
+
+
+def _measure_generation_constraints(
+    constraints: dict[str, Any] | None,
+    *,
+    score: CanonicalScore,
+    count: int,
+    context: dict[str, Any],
+) -> dict[str, Any]:
+    merged = dict(constraints or {})
+    voice_count = _score_voice_count(score)
+    merged["measures"] = count
+    merged["texture"] = voice_count
+    merged["voices"] = voice_count
+    seed = merged.get("seed", merged.get("randomSeed"))
+    if seed is None:
+        seed = random.SystemRandom().randint(1, 2_147_483_646)
+    merged.setdefault("seed", seed)
+    merged.setdefault("randomSeed", seed)
+    merged["measureContext"] = context
+    return merged
+
+
+def _score_voice_count(score: CanonicalScore) -> int:
+    voice_ids = {
+        event.voice_id
+        for part in score.parts
+        for event in part.events
+    }
+    return max(1, max(voice_ids) + 1 if voice_ids else 1)
+
+
+def _score_render_mode(score: CanonicalScore) -> Literal["guitar", "piano"]:
+    instrument = score.parts[0].info.instrument if score.parts else ""
+    return "piano" if instrument == "piano" else "guitar"
+
+
+def _measure_context_summary(
+    score: CanonicalScore,
+    *,
+    insert_index: int,
+    replace_count: int,
+    radius: int = 2,
+) -> dict[str, Any]:
+    after_index = insert_index + replace_count
+    before = [
+        _measure_summary(score, measure)
+        for measure in score.measures[max(0, insert_index - radius) : insert_index]
+    ]
+    after = [
+        _measure_summary(score, measure)
+        for measure in score.measures[after_index : min(len(score.measures), after_index + radius)]
+    ]
+    return {
+        "insertIndex": insert_index,
+        "replaceCount": replace_count,
+        "before": before,
+        "after": after,
+    }
+
+
+def _measure_summary(score: CanonicalScore, measure: Measure) -> dict[str, Any]:
+    voices: dict[str, list[int]] = {}
+    for part in score.parts:
+        for event in part.events:
+            if not measure.start_tick <= event.start_tick < measure.end_tick:
+                continue
+            if event.pitch_midi is None:
+                continue
+            voices.setdefault(str(event.voice_id), []).append(event.pitch_midi)
+    return {
+        "id": measure.id,
+        "index": measure.index,
+        "startTick": measure.start_tick,
+        "lengthTicks": measure.length_ticks,
+        "voices": voices,
+    }
 
 
 def _to_request_hit_key(hit_key: EventHitKeyRequest) -> str:

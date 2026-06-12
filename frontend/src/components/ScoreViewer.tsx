@@ -1,4 +1,4 @@
-import { useEffect, useRef, type MutableRefObject } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type MutableRefObject } from 'react';
 import * as alphaTab from '@coderline/alphatab';
 import type { HitKey, InstrumentMode, ScoreViewTab } from '../state/types';
 import { VerovioPlayer } from '../playback/VerovioPlayer';
@@ -57,6 +57,7 @@ export const createScoreViewerPlaybackController = ({
 interface ScoreViewerProps {
   scoreXml: string | null;
   highlightMeasureId: string | null;
+  selectedBarIndex?: number | null;
   instrumentMode: InstrumentMode | null;
   viewTab: ScoreViewTab;
   onViewTabChange?: (viewTab: ScoreViewTab) => void;
@@ -90,11 +91,11 @@ const loadScoreXml = (api: any, scoreXml: string) => {
 };
 
 const resolveHitKey = (args: any): HitKey | null => {
-  const note = args?.note;
-  const beat = note?.beat;
+  const note = args?.note ?? args;
+  const beat = note?.beat ?? args?.beatBounds?.beat ?? args?.beat;
   const voice = beat?.voice;
   const bar = voice?.bar;
-  const barIndex = bar?.index;
+  const barIndex = resolveBarIndex(args) ?? bar?.index;
   if (typeof barIndex !== 'number') {
     return null;
   }
@@ -106,9 +107,45 @@ const resolveHitKey = (args: any): HitKey | null => {
   };
 };
 
+const resolveBarIndex = (value: any): number | null => {
+  const candidates = [
+    value?.barBounds?.masterBarBounds?.index,
+    value?.beatBounds?.barBounds?.masterBarBounds?.index,
+    value?.masterBarBounds?.index,
+    value?.beat?.voice?.bar?.index,
+    value?.note?.beat?.voice?.bar?.index,
+    value?.voice?.bar?.index,
+    value?.bar?.index,
+  ];
+  for (const candidate of candidates) {
+    if (typeof candidate === 'number') {
+      return candidate;
+    }
+  }
+  return null;
+};
+
+const getBoundsLookup = (api: any) =>
+  api?.boundsLookup ?? api?.renderer?.boundsLookup ?? null;
+
+interface MeasureSelectionBox {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+const selectionBoxStyle = (box: MeasureSelectionBox): CSSProperties => ({
+  left: `${box.left}px`,
+  top: `${box.top}px`,
+  width: `${box.width}px`,
+  height: `${box.height}px`,
+});
+
 const ScoreViewer = ({
   scoreXml,
   highlightMeasureId,
+  selectedBarIndex = null,
   instrumentMode,
   viewTab,
   onViewTabChange,
@@ -130,6 +167,8 @@ const ScoreViewer = ({
   const onPositionChangedRef = useRef<ScoreViewerProps['onPositionChanged']>();
   const instrumentModeRef = useRef(instrumentMode);
   const viewTabRef = useRef(viewTab);
+  const selectedBarIndexRef = useRef<number | null>(selectedBarIndex);
+  const [selectionBox, setSelectionBox] = useState<MeasureSelectionBox | null>(null);
 
   useEffect(() => { onMeasureClickRef.current = onMeasureClick; }, [onMeasureClick]);
   useEffect(() => { onNoteClickRef.current = onNoteClick; }, [onNoteClick]);
@@ -138,6 +177,66 @@ const ScoreViewer = ({
   useEffect(() => { onPositionChangedRef.current = onPositionChanged; }, [onPositionChanged]);
   useEffect(() => { instrumentModeRef.current = instrumentMode; }, [instrumentMode]);
   useEffect(() => { viewTabRef.current = viewTab; }, [viewTab]);
+  useEffect(() => { selectedBarIndexRef.current = selectedBarIndex; }, [selectedBarIndex]);
+
+  const updateSelectedMeasureOverlay = () => {
+    const barIndex = selectedBarIndexRef.current;
+    const container = containerRef.current;
+    const lookup = getBoundsLookup(apiRef.current);
+    if (barIndex === null || !container || !lookup) {
+      setSelectionBox(null);
+      return;
+    }
+
+    const masterBar =
+      lookup.findMasterBarByIndex?.(barIndex) ??
+      lookup._masterBarLookup?.get?.(barIndex) ??
+      null;
+    const bounds = masterBar?.realBounds ?? masterBar?.visualBounds ?? null;
+    if (!bounds) {
+      setSelectionBox(null);
+      return;
+    }
+
+    setSelectionBox({
+      left: bounds.x - container.scrollLeft,
+      top: bounds.y - container.scrollTop,
+      width: bounds.w,
+      height: bounds.h,
+    });
+  };
+
+  const resolveBarIndexFromPointer = (event: MouseEvent): number | null => {
+    const container = containerRef.current;
+    const lookup = getBoundsLookup(apiRef.current);
+    if (!container || !lookup) {
+      return null;
+    }
+
+    const rect = container.getBoundingClientRect();
+    const x = event.clientX - rect.left + container.scrollLeft;
+    const y = event.clientY - rect.top + container.scrollTop;
+    const beatBounds = lookup.getBeatAtPos?.(x, y) ?? null;
+    const beatBarIndex = resolveBarIndex(beatBounds);
+    if (beatBarIndex !== null) {
+      return beatBarIndex;
+    }
+
+    const systems = Array.isArray(lookup.staffSystems) ? lookup.staffSystems : [];
+    for (const system of systems) {
+      const bounds = system?.realBounds;
+      if (!bounds || y < bounds.y || y > bounds.y + bounds.h) {
+        continue;
+      }
+      const bar = system.findBarAtPos?.(x) ?? null;
+      const barIndex = resolveBarIndex(bar);
+      if (barIndex !== null) {
+        return barIndex;
+      }
+    }
+
+    return null;
+  };
 
   const bindExternalPlayer = () => {
     const api = apiRef.current;
@@ -241,19 +340,40 @@ const ScoreViewer = ({
         }
         onMeasureClickRef.current?.(hit.barIndex);
         onNoteClickRef.current?.(hit);
+        window.requestAnimationFrame(updateSelectedMeasureOverlay);
       });
     }
 
-    if (api?.barMouseDown?.on) {
-      api.barMouseDown.on((args: any) => {
-        const barIndex = args?.bar?.index;
-        if (typeof barIndex === 'number') {
+    if (api?.beatMouseDown?.on) {
+      api.beatMouseDown.on((args: any) => {
+        const barIndex = resolveBarIndex(args);
+        if (barIndex !== null) {
           onMeasureClickRef.current?.(barIndex);
+          window.requestAnimationFrame(updateSelectedMeasureOverlay);
         }
       });
     }
 
+    const handleCanvasClick = (event: MouseEvent) => {
+      const barIndex = resolveBarIndexFromPointer(event);
+      if (barIndex !== null) {
+        onMeasureClickRef.current?.(barIndex);
+        window.requestAnimationFrame(updateSelectedMeasureOverlay);
+      }
+    };
+    const handleCanvasScroll = () => updateSelectedMeasureOverlay();
+    containerRef.current.addEventListener('click', handleCanvasClick);
+    containerRef.current.addEventListener('scroll', handleCanvasScroll);
+
+    if (api?.postRenderFinished?.on) {
+      api.postRenderFinished.on(() => {
+        window.requestAnimationFrame(updateSelectedMeasureOverlay);
+      });
+    }
+
     return () => {
+      containerRef.current?.removeEventListener('click', handleCanvasClick);
+      containerRef.current?.removeEventListener('scroll', handleCanvasScroll);
       onApiReadyRef.current?.(null);
       midiPlayerRef.current?.dispose();
       midiPlayerRef.current = null;
@@ -309,11 +429,17 @@ const ScoreViewer = ({
     };
 
     void loadPlaybackMidi();
+    window.requestAnimationFrame(updateSelectedMeasureOverlay);
 
     return () => {
       cancelled = true;
     };
   }, [scoreXml]);
+
+  useEffect(() => {
+    updateSelectedMeasureOverlay();
+  }, [selectedBarIndex, scoreXml, viewTab]);
+
   const label = getScoreViewerLabel(instrumentMode, viewTab);
   const showSwitcher = shouldShowTabSwitcher(instrumentMode);
 
@@ -356,6 +482,12 @@ const ScoreViewer = ({
             Draft: {highlightMeasureId}
           </span>
         ) : null}
+        {selectedBarIndex !== null ? (
+          <span className="score-viewer__badge score-viewer__badge--selected">
+            <span>📍</span>
+            Selected: Bar {selectedBarIndex + 1}
+          </span>
+        ) : null}
       </div>
       {!scoreXml ? (
         <div className="score-viewer__empty">
@@ -366,7 +498,17 @@ const ScoreViewer = ({
           </span>
         </div>
       ) : null}
-      <div className="score-viewer__canvas" ref={containerRef} />
+      <div className="score-viewer__canvas-shell">
+        <div className="score-viewer__canvas score-viewer__canvas--interactive" ref={containerRef} />
+        {selectionBox ? (
+          <div className="score-viewer__selection-layer" aria-hidden="true">
+            <div
+              className="score-viewer__measure-selection"
+              style={selectionBoxStyle(selectionBox)}
+            />
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 };

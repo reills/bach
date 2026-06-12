@@ -2,6 +2,7 @@ export type MeasureMap = Record<string, string>;
 export type EventHitMap = Record<string, string>;
 export type InstrumentMode = 'guitar' | 'piano';
 export type ScoreViewTab = 'score' | 'tab';
+export type ScoreBranchKind = 'piano' | 'guitar';
 
 export interface RenderView {
   xml: string;
@@ -24,7 +25,12 @@ export interface HitKey {
   noteIndex?: number;
 }
 
-export interface ScoreState {
+export type GuitarConversionSettings = Record<string, unknown>;
+export type GuitarConversionDiagnostics = Record<string, unknown>;
+export type PianoToGuitarSourceMap = Array<Record<string, unknown>>;
+
+export interface ScoreBranchBase {
+  branch: ScoreBranchKind;
   scoreId: string | null;
   revision: number | null;
   document: ScoreDocumentBundle | null;
@@ -38,8 +44,92 @@ export interface ScoreState {
   changedMeasureIds: string[] | null;
   lastEventId: string | null;
   midi: string | null;
-  instrumentMode: InstrumentMode | null;
+  instrumentMode: InstrumentMode;
 }
+
+export interface PianoScoreBranch extends ScoreBranchBase {
+  branch: 'piano';
+  instrumentMode: 'piano';
+}
+
+export interface GuitarScoreBranch extends ScoreBranchBase {
+  branch: 'guitar';
+  instrumentMode: 'guitar';
+  sourcePianoRevisionId: string | null;
+  conversionSettings: GuitarConversionSettings | null;
+  diagnostics: GuitarConversionDiagnostics | null;
+  sourceMap: PianoToGuitarSourceMap;
+}
+
+export type ScoreBranch = PianoScoreBranch | GuitarScoreBranch;
+
+export interface ProjectScoreState {
+  activeBranch: ScoreBranchKind;
+  piano: PianoScoreBranch;
+  guitar: GuitarScoreBranch | null;
+}
+
+export type ScoreState = ProjectScoreState;
+
+type PianoBranchOverrides = Partial<Omit<PianoScoreBranch, 'branch' | 'instrumentMode'>>;
+type GuitarBranchOverrides = Partial<Omit<GuitarScoreBranch, 'branch' | 'instrumentMode'>>;
+
+export const createPianoBranch = (
+  overrides: PianoBranchOverrides = {},
+): PianoScoreBranch => ({
+  branch: 'piano',
+  scoreId: null,
+  revision: null,
+  document: null,
+  draftId: null,
+  draftDocument: null,
+  draftBaseRevision: null,
+  highlightMeasureId: null,
+  selectedMeasureId: null,
+  selectedBarIndex: null,
+  lockedEventIds: null,
+  changedMeasureIds: null,
+  lastEventId: null,
+  midi: null,
+  instrumentMode: 'piano',
+  ...overrides,
+});
+
+export const createGuitarBranch = (
+  overrides: GuitarBranchOverrides = {},
+): GuitarScoreBranch => ({
+  branch: 'guitar',
+  scoreId: null,
+  revision: null,
+  document: null,
+  draftId: null,
+  draftDocument: null,
+  draftBaseRevision: null,
+  highlightMeasureId: null,
+  selectedMeasureId: null,
+  selectedBarIndex: null,
+  lockedEventIds: null,
+  changedMeasureIds: null,
+  lastEventId: null,
+  midi: null,
+  instrumentMode: 'guitar',
+  sourcePianoRevisionId: null,
+  conversionSettings: null,
+  diagnostics: null,
+  sourceMap: [],
+  ...overrides,
+});
+
+export const createInitialProjectScoreState = (): ProjectScoreState => ({
+  activeBranch: 'piano',
+  piano: createPianoBranch(),
+  guitar: null,
+});
+
+export const getActiveScoreBranch = (
+  state: ProjectScoreState,
+): ScoreBranch | null =>
+  state.activeBranch === 'guitar' ? state.guitar : state.piano;
 
 export const inferInstrumentMode = (xml: string): InstrumentMode => {
   if (xml.includes('<staves>2</staves>')) {
@@ -54,7 +144,7 @@ export const inferInstrumentMode = (xml: string): InstrumentMode => {
     return 'guitar';
   }
 
-  return 'guitar';
+  return 'piano';
 };
 
 export const canUseGuitarNoteActions = (

@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 import argparse
+import itertools
 import json
 import random
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 import pandas as pd
@@ -15,6 +17,7 @@ sys.path.insert(0, str(ROOT))
 
 from src.api.render.midi import canonical_score_to_midi
 from src.api.render.musicxml import canonical_score_to_musicxml
+from src.api.canonical import CanonicalScore, Part, PartInfo
 from src.inference.controls import ComposeControls
 from src.inference.hybrid import (
     HybridContext,
@@ -37,19 +40,28 @@ from src.instrumental_v3.representation import (
 from src.instrumental_v4.model import CompoundConfig
 from src.instrumental_v4.representation import PLAN_FIELD_NAMES, V4_FIELD_NAMES
 from src.instrumental_v5.model import build_generator
+from src.instrumental_v5.ace_step import (
+    ACE_STEP_DEFAULT_MODEL,
+    ACE_STEP_DEFAULT_TAG,
+    build_ace_step_setup_plan,
+    write_ace_step_handoff,
+    write_ace_step_manifest,
+)
+from src.instrumental_v5.form_planner import build_v5_form_plan
 from src.instrumental_v5.representation import (
     V5_COUNTERPOINT_FIELD_NAMES,
     V5_FEATURE_SPECS,
     V5_FIELD_NAMES,
     counterpoint_features_for_transition,
 )
+from src.tabber.heuristic import STANDARD_GUITAR_TUNING, tab_events
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate/export from a v5 checkpoint.")
-    parser.add_argument("--checkpoint", default="out/instrumental_v5_overfit_sample/checkpoint_latest.pt")
-    parser.add_argument("--data-dir", default="data/instrumental_v5/keyboard_overture_cnorm_outer2_v5_sample")
-    parser.add_argument("--out-dir", default="out/instrumental_v5_overfit_sample/generated")
+    parser.add_argument("--checkpoint", default="out/instrumental_v5_onset_strict_ft/checkpoint_latest.pt")
+    parser.add_argument("--data-dir", default="data/instrumental_v5/keyboard_overture_cnorm_outer2_v5")
+    parser.add_argument("--out-dir", default="out/instrumental_v5_onset_strict_ft/generated")
     parser.add_argument("--samples", type=int, default=1)
     parser.add_argument("--piece-index", type=int, default=0)
     parser.add_argument("--prompt-rows", type=int, default=64)
@@ -57,6 +69,25 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--temperature", type=float, default=0.8)
     parser.add_argument("--top-p", type=float, default=0.95)
     parser.add_argument("--top-k", type=int, default=0)
+    parser.add_argument(
+        "--pitch-strategy",
+        choices=["sampled", "interval", "blend"],
+        default="interval",
+        help=(
+            "How NOTE pitches are repaired. 'sampled' keeps the old absolute-pitch path; "
+            "'interval' derives pitch primarily from the melodic-interval head; "
+            "'blend' considers both interval and absolute pitch candidates."
+        ),
+    )
+    parser.add_argument(
+        "--counterpoint-policy",
+        choices=["strict", "soft", "off"],
+        default="strict",
+        help=(
+            "Strict rejects crossings, parallel perfect intervals, and extreme spacing; "
+            "exposed/direct perfects remain strongly penalized."
+        ),
+    )
     parser.add_argument("--candidates", type=int, default=4, help="Generate N candidates and keep the best objective score.")
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--seed", type=int, default=2604)
@@ -74,6 +105,32 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--measures", type=int, default=0, help="Planning length in measures. Defaults from prompt+generation rows.")
     parser.add_argument("--texture", type=int, default=2, help="Planning texture/voice count.")
     parser.add_argument("--retrieval-limit", type=int, default=1, help="Fragments to consider per plan step.")
+    parser.add_argument(
+        "--form",
+        choices=["auto", "invention", "sinfonia", "fugue", "suite", "partita", "prelude"],
+        default="auto",
+        help="CAST-style symbolic form plan to condition v5 generation.",
+    )
+    parser.add_argument(
+        "--subject",
+        default=None,
+        help='Optional subject pitch sequence, e.g. "D4 E4 F4 A4 G4 F4 E4 D4".',
+    )
+    parser.add_argument(
+        "--instrument",
+        choices=["piano", "classical_guitar", "nylon_guitar", "lute", "harpsichord"],
+        default="piano",
+        help="Export arrangement target. Guitar/lute targets require playable tab fingerings.",
+    )
+    parser.add_argument("--tempo", type=int, default=92, help="Tempo metadata for ACE-Step handoff.")
+    parser.add_argument(
+        "--ace-step-handoff",
+        action="store_true",
+        help="Write ACE-Step 1.5 prompt/lyrics/metadata sidecars without making ACE-Step the notation generator.",
+    )
+    parser.add_argument("--ace-step-model", default=ACE_STEP_DEFAULT_MODEL)
+    parser.add_argument("--ace-step-tag", default=ACE_STEP_DEFAULT_TAG)
+    parser.add_argument("--ace-step-thinking", action="store_true", help="Set thinking=true in ACE-Step API request JSON.")
     return parser.parse_args()
 
 
@@ -118,6 +175,7 @@ def main() -> None:
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     reports = []
+    ace_handoffs = []
     for sample_idx in range(args.samples):
         rows, rerank_diagnostics = _generate_best_rows(
             model,
@@ -129,6 +187,8 @@ def main() -> None:
             temperature=args.temperature,
             top_p=args.top_p,
             top_k=args.top_k,
+            pitch_strategy=args.pitch_strategy,
+            counterpoint_policy=args.counterpoint_policy,
             hybrid_context=hybrid_context,
             candidate_count=args.candidates,
             source_pieces=source_pieces,
@@ -145,9 +205,25 @@ def main() -> None:
             source_pieces=source_pieces,
             hybrid_diagnostics=hybrid_context.diagnostics() if hybrid_context is not None else None,
             rerank_diagnostics=rerank_diagnostics,
+            instrument=args.instrument,
+            tempo=args.tempo,
+            ace_step_handoff=args.ace_step_handoff,
+            ace_step_model=args.ace_step_model,
+            ace_step_thinking=args.ace_step_thinking,
+            form=args.form if args.form != "auto" else None,
+            subject=args.subject,
         )
         reports.append(report)
-    print(json.dumps({"samples": reports}, indent=2, sort_keys=True))
+        if report.get("ace_step") is not None:
+            ace_handoffs.append(report["ace_step"])
+    manifest_path = None
+    if ace_handoffs:
+        manifest_path = write_ace_step_manifest(
+            out_dir,
+            ace_handoffs,
+            setup_plan=build_ace_step_setup_plan(recommended_tag=args.ace_step_tag),
+        )
+    print(json.dumps({"samples": reports, "ace_step_manifest": None if manifest_path is None else str(manifest_path)}, indent=2, sort_keys=True))
 
 
 def _generate_rows(
@@ -161,6 +237,8 @@ def _generate_rows(
     temperature: float,
     top_p: float,
     top_k: int,
+    pitch_strategy: str = "interval",
+    counterpoint_policy: str = "strict",
     hybrid_context: HybridContext | None = None,
 ) -> list[list[int]]:
     rows = [row[:] for row in prompt_rows]
@@ -174,7 +252,13 @@ def _generate_rows(
         for name in V5_FIELD_NAMES:
             value = _sample(logits[name][0, -1], temperature=temperature, top_p=top_p, top_k=top_k)
             next_row.append(max(0, min(V5_FEATURE_SPECS[name] - 1, value)))
-        _repair_generated_row(next_row, rows, template)
+        _repair_generated_row(
+            next_row,
+            rows,
+            template,
+            pitch_strategy=pitch_strategy,
+            counterpoint_policy=counterpoint_policy,
+        )
         if hybrid_context is not None:
             next_row = apply_conditioning_to_v5_row(
                 next_row,
@@ -197,6 +281,8 @@ def _generate_best_rows(
     temperature: float,
     top_p: float,
     top_k: int,
+    pitch_strategy: str = "interval",
+    counterpoint_policy: str = "strict",
     hybrid_context: HybridContext | None = None,
     candidate_count: int = 1,
     source_pieces: list[InstrumentalV3Piece] | None = None,
@@ -214,6 +300,8 @@ def _generate_best_rows(
         temperature=temperature,
         top_p=top_p,
         top_k=top_k,
+        pitch_strategy=pitch_strategy,
+        counterpoint_policy=counterpoint_policy,
         hybrid_context=hybrid_context,
         candidate_count=candidate_count,
     )
@@ -223,6 +311,7 @@ def _generate_best_rows(
             template=template,
             prompt_row_count=len(prompt_rows),
             source_pieces=source_pieces,
+            counterpoint_policy=counterpoint_policy,
         )
         diagnostics["candidate_index"] = candidate_idx
         candidates.append((score, rows, diagnostics))
@@ -248,6 +337,8 @@ def _generate_rows_batch(
     temperature: float,
     top_p: float,
     top_k: int,
+    pitch_strategy: str = "interval",
+    counterpoint_policy: str = "strict",
     hybrid_context: HybridContext | None = None,
     candidate_count: int = 1,
 ) -> list[list[list[int]]]:
@@ -269,7 +360,13 @@ def _generate_rows_batch(
                 max(0, min(V5_FEATURE_SPECS[name] - 1, int(sampled_by_field[name][candidate_idx].item())))
                 for name in V5_FIELD_NAMES
             ]
-            _repair_generated_row(next_row, rows, template)
+            _repair_generated_row(
+                next_row,
+                rows,
+                template,
+                pitch_strategy=pitch_strategy,
+                counterpoint_policy=counterpoint_policy,
+            )
             if hybrid_context is not None:
                 next_row = apply_conditioning_to_v5_row(
                     next_row,
@@ -287,6 +384,7 @@ def _score_candidate_rows(
     template: InstrumentalV3Piece,
     prompt_row_count: int,
     source_pieces: list[InstrumentalV3Piece],
+    counterpoint_policy: str = "soft",
 ) -> tuple[float, dict[str, object]]:
     continuation = rows[prompt_row_count:] or rows
     v3_rows = [row[: len(V3_FIELD_NAMES)] for row in continuation]
@@ -321,6 +419,11 @@ def _score_candidate_rows(
     score -= 35.0 * balance_penalty
     score -= 120.0 * overlap_rate
     score -= 1.5 * max(0.0, contiguous - 8.0)
+    if counterpoint_policy == "strict" and (
+        float(report["voice_crossing_rate"]) > 0.0
+        or float(report["parallel_fifth_octave_rate"]) > 0.0
+    ):
+        score = -1_000_000_000.0
 
     diagnostics = {
         "score": round(score, 4),
@@ -338,7 +441,14 @@ def _score_candidate_rows(
     return score, diagnostics
 
 
-def _repair_generated_row(row: list[int], rows: list[list[int]], template: InstrumentalV3Piece) -> None:
+def _repair_generated_row(
+    row: list[int],
+    rows: list[list[int]],
+    template: InstrumentalV3Piece,
+    *,
+    pitch_strategy: str = "interval",
+    counterpoint_policy: str = "soft",
+) -> None:
     prev = rows[-1]
     idx = len(rows)
     bar = min(V3_FEATURE_SPECS["bar"] - 1, idx // template.steps_per_bar)
@@ -353,6 +463,7 @@ def _repair_generated_row(row: list[int], rows: list[list[int]], template: Instr
     row[V5_FIELD_NAMES.index("voice_count")] = 2
 
     active: list[int | None] = []
+    pitch_candidates: dict[int, list[int]] = {}
     for voice in (0, 1):
         state_i = V5_FIELD_NAMES.index(f"v{voice}_state")
         pitch_i = V5_FIELD_NAMES.index(f"v{voice}_pitch")
@@ -378,14 +489,50 @@ def _repair_generated_row(row: list[int], rows: list[list[int]], template: Instr
             row[degree_i] = _scale_degree_id(prev_pitch, template.key_pc, template.mode)
             active.append(prev_pitch)
             continue
-        if row[pitch_i] <= 0:
-            row[pitch_i] = prev_pitch if prev_pitch > 0 else (48 if voice == 0 else 60)
-        row[pitch_i] = _clip_midi_pitch(row[pitch_i])
         row[state_i] = STATE_NOTE
         row[dur_i] = max(1, row[dur_i])
         row[tie_i] = 0
-        row[degree_i] = _scale_degree_id(row[pitch_i], template.key_pc, template.mode)
-        active.append(row[pitch_i])
+        if pitch_strategy == "sampled":
+            if row[pitch_i] <= 0:
+                row[pitch_i] = prev_pitch if prev_pitch > 0 else (48 if voice == 0 else 60)
+            row[pitch_i] = _clip_midi_pitch(row[pitch_i])
+            previous_note = _previous_note_pitch(rows, voice)
+            row[mel_i] = _encode_melody_delta(None if previous_note is None else row[pitch_i] - previous_note)
+            row[degree_i] = _scale_degree_id(row[pitch_i], template.key_pc, template.mode)
+            active.append(row[pitch_i])
+            continue
+        candidates = _note_pitch_candidates(
+            row,
+            rows,
+            voice,
+            template,
+            pitch_strategy=pitch_strategy,
+            counterpoint_policy=counterpoint_policy,
+        )
+        pitch_candidates[voice] = candidates
+        active.append(candidates[0])
+
+    if pitch_candidates:
+        active = _choose_active_pitches(
+            row,
+            rows,
+            template,
+            active,
+            pitch_candidates,
+            pitch_strategy=pitch_strategy,
+            counterpoint_policy=counterpoint_policy,
+        )
+        for voice, pitch in enumerate(active):
+            state_i = V5_FIELD_NAMES.index(f"v{voice}_state")
+            pitch_i = V5_FIELD_NAMES.index(f"v{voice}_pitch")
+            mel_i = V5_FIELD_NAMES.index(f"v{voice}_mel")
+            degree_i = V5_FIELD_NAMES.index(f"v{voice}_degree")
+            if row[state_i] != STATE_NOTE or pitch is None:
+                continue
+            previous_note = _previous_note_pitch(rows, voice)
+            row[pitch_i] = pitch
+            row[mel_i] = _encode_melody_delta(None if previous_note is None else pitch - previous_note)
+            row[degree_i] = _scale_degree_id(pitch, template.key_pc, template.mode)
 
     _derive_vertical(row, active)
     _derive_counterpoint_transition(row, prev)
@@ -393,6 +540,206 @@ def _repair_generated_row(row: list[int], rows: list[list[int]], template: Instr
     for name in PLAN_FIELD_NAMES:
         idx = V5_FIELD_NAMES.index(name)
         row[idx] = max(0, min(V5_FEATURE_SPECS[name] - 1, row[idx]))
+
+
+def _note_pitch_candidates(
+    row: list[int],
+    rows: list[list[int]],
+    voice: int,
+    template: InstrumentalV3Piece,
+    *,
+    pitch_strategy: str,
+    counterpoint_policy: str,
+) -> list[int]:
+    pitch_i = V5_FIELD_NAMES.index(f"v{voice}_pitch")
+    mel_i = V5_FIELD_NAMES.index(f"v{voice}_mel")
+    sampled_pitch = _valid_sampled_pitch(row[pitch_i])
+    previous_note = _previous_note_pitch(rows, voice)
+    previous_active = _active_pitch_from_row(rows[-1], voice)
+    anchor = previous_note or previous_active
+    default_pitch = 48 if voice == 0 else 60
+    decoded_interval = _decode_melody_id(row[mel_i])
+    candidates: list[int] = []
+
+    if pitch_strategy in {"interval", "blend"} and anchor is not None and decoded_interval is not None:
+        interval_pitch = anchor + decoded_interval
+        candidates.extend([interval_pitch, interval_pitch - 12, interval_pitch + 12])
+
+    if pitch_strategy in {"sampled", "blend"} and sampled_pitch is not None:
+        candidates.append(sampled_pitch)
+
+    plan_pitch = _plan_pitch(row, voice)
+    if plan_pitch is not None:
+        candidates.append(plan_pitch)
+
+    if sampled_pitch is not None:
+        candidates.append(sampled_pitch)
+    if previous_active is not None:
+        candidates.append(previous_active)
+    if counterpoint_policy == "strict" and anchor is not None:
+        candidates.extend(anchor + delta for delta in (-7, -5, -4, -3, -2, -1, 1, 2, 3, 4, 5, 7))
+    candidates.append(default_pitch)
+
+    low, high = _voice_range(voice)
+    bounded: list[int] = []
+    for pitch in candidates:
+        clipped = _clip_midi_pitch(pitch)
+        if clipped < low:
+            clipped = low
+        elif clipped > high:
+            clipped = high
+        if clipped not in bounded:
+            bounded.append(clipped)
+    return bounded or [default_pitch]
+
+
+def _choose_active_pitches(
+    row: list[int],
+    rows: list[list[int]],
+    template: InstrumentalV3Piece,
+    active: list[int | None],
+    pitch_candidates: dict[int, list[int]],
+    *,
+    pitch_strategy: str,
+    counterpoint_policy: str,
+) -> list[int | None]:
+    options_by_voice = [
+        pitch_candidates.get(0, [active[0]] if active[0] is not None else [None]),
+        pitch_candidates.get(1, [active[1]] if active[1] is not None else [None]),
+    ]
+    best_score: float | None = None
+    best_pair: tuple[int | None, int | None] = (active[0], active[1])
+    for pitch0, pitch1 in itertools.product(options_by_voice[0], options_by_voice[1]):
+        pair = (pitch0, pitch1)
+        score = _score_pitch_pair(
+            row,
+            rows,
+            template,
+            pair,
+            pitch_strategy=pitch_strategy,
+            counterpoint_policy=counterpoint_policy,
+        )
+        if best_score is None or score > best_score:
+            best_score = score
+            best_pair = pair
+    return [best_pair[0], best_pair[1]]
+
+
+def _score_pitch_pair(
+    row: list[int],
+    rows: list[list[int]],
+    template: InstrumentalV3Piece,
+    pair: tuple[int | None, int | None],
+    *,
+    pitch_strategy: str,
+    counterpoint_policy: str,
+) -> float:
+    score = 0.0
+    prev_pair = (_active_pitch_from_row(rows[-1], 0), _active_pitch_from_row(rows[-1], 1))
+    pos = row[V5_FIELD_NAMES.index("pos")]
+    cadence_zone = row[V5_FIELD_NAMES.index("cadence_zone")]
+
+    for voice, pitch in enumerate(pair):
+        if pitch is None:
+            continue
+        sampled = _valid_sampled_pitch(row[V5_FIELD_NAMES.index(f"v{voice}_pitch")])
+        previous_note = _previous_note_pitch(rows, voice)
+        decoded_interval = _decode_melody_id(row[V5_FIELD_NAMES.index(f"v{voice}_mel")])
+        if previous_note is not None:
+            actual_delta = pitch - previous_note
+            if decoded_interval is not None:
+                interval_weight = 2.2 if pitch_strategy == "interval" else 1.2 if pitch_strategy == "blend" else 0.25
+                score -= interval_weight * abs(actual_delta - decoded_interval)
+            leap = abs(actual_delta)
+            if leap > 12:
+                score -= 18.0 + (leap - 12) * 2.0
+            elif leap > 7:
+                score -= 6.0 + (leap - 7) * 1.2
+            elif leap <= 2:
+                score += 1.4
+            if actual_delta == 0:
+                score -= 0.4 * _same_active_pitch_run(rows, voice, pitch)
+        elif decoded_interval is None:
+            score += 0.5
+
+        if sampled is not None:
+            sampled_weight = 1.1 if pitch_strategy == "sampled" else 0.45 if pitch_strategy == "blend" else 0.15
+            score -= sampled_weight * min(24, abs(pitch - sampled))
+
+        low, high = _voice_range(voice)
+        if pitch < low:
+            score -= 4.0 * (low - pitch)
+        elif pitch > high:
+            score -= 4.0 * (pitch - high)
+        degree = _scale_degree_id(pitch, template.key_pc, template.mode)
+        if degree >= 8:
+            score -= 1.25
+
+    low_pitch, high_pitch = pair
+    if low_pitch is None or high_pitch is None:
+        return score
+
+    if counterpoint_policy == "strict" and low_pitch >= high_pitch:
+        return float("-inf")
+    if low_pitch > high_pitch:
+        score -= 80.0 + (low_pitch - high_pitch) * 3.0
+    elif low_pitch == high_pitch:
+        score -= 10.0
+
+    spacing = abs(high_pitch - low_pitch)
+    if counterpoint_policy == "strict" and spacing > 28:
+        return float("-inf")
+    interval_pc = spacing % 12
+    if spacing > 24:
+        score -= 3.0 * (spacing - 24)
+    if spacing > 19:
+        score -= 1.2 * (spacing - 19)
+    if spacing < 3:
+        score -= 5.0
+    if interval_pc in {3, 4, 8, 9}:
+        score += 2.5
+    elif interval_pc == 7:
+        score += 1.5
+    elif interval_pc == 0:
+        score -= 1.5 if not cadence_zone else -1.0
+    elif interval_pc in {1, 2, 6, 10, 11}:
+        weak_position = bool(pos % 2)
+        score -= 1.0 if weak_position else 4.0
+
+    if prev_pair[0] is not None and prev_pair[1] is not None:
+        if pair == prev_pair:
+            score -= 8.0
+        prev_spacing = abs(prev_pair[1] - prev_pair[0])
+        prev_pc = prev_spacing % 12
+        motion0 = low_pitch - prev_pair[0]
+        motion1 = high_pitch - prev_pair[1]
+        same_direction = motion0 * motion1 > 0
+        parallel_perfect = (
+            same_direction
+            and prev_pc in {0, 7}
+            and interval_pc == prev_pc
+            and motion0 != 0
+            and motion1 != 0
+        )
+        direct_perfect = (
+            same_direction
+            and interval_pc in {0, 7}
+            and (abs(motion0) > 2 or abs(motion1) > 2)
+        )
+        if counterpoint_policy == "strict" and parallel_perfect:
+            return float("-inf")
+        if motion0 * motion1 < 0:
+            score += 1.5
+        elif motion0 == 0 or motion1 == 0:
+            score += 0.6
+        elif motion0 * motion1 > 0:
+            score -= 0.8
+        if counterpoint_policy != "off" and parallel_perfect:
+            score -= 55.0
+        if counterpoint_policy != "off" and direct_perfect:
+            score -= 36.0 if counterpoint_policy == "strict" else 24.0
+
+    return score
 
 
 def _sample(logits: torch.Tensor, *, temperature: float, top_p: float, top_k: int) -> int:
@@ -452,10 +799,18 @@ def _write_exports(
     source_pieces: list[InstrumentalV3Piece],
     hybrid_diagnostics: dict[str, object] | None = None,
     rerank_diagnostics: dict[str, object] | None = None,
+    instrument: str = "piano",
+    tempo: int = 92,
+    ace_step_handoff: bool = False,
+    ace_step_model: str = ACE_STEP_DEFAULT_MODEL,
+    ace_step_thinking: bool = False,
+    form: str | None = None,
+    subject: str | None = None,
 ) -> dict[str, object]:
     v3_rows = [row[: len(V3_FIELD_NAMES)] for row in rows]
     piece = slice_rows_to_piece(v3_rows, template=template, piece_id=piece_id, source_path=checkpoint)
-    score = piece_to_canonical_score(piece)
+    score = _score_with_tempo(piece_to_canonical_score(piece), tempo=tempo)
+    score = _arrange_score_for_instrument(score, instrument=instrument)
     report = evaluate_slices(piece.slices)
     novelty = source_overlap_report(piece.slices, [source.slices for source in source_pieces], ngram=16)
 
@@ -470,6 +825,7 @@ def _write_exports(
         metrics["hybrid"] = hybrid_diagnostics
     if rerank_diagnostics is not None:
         metrics["candidate_rerank"] = rerank_diagnostics
+    metrics["instrument"] = instrument
     metrics_path.write_text(json.dumps(metrics, indent=2, sort_keys=True), encoding="utf-8")
     rows_path.write_text(
         json.dumps(
@@ -481,22 +837,48 @@ def _write_exports(
                 "field_names": V5_FIELD_NAMES,
                 "hybrid": hybrid_diagnostics,
                 "candidate_rerank": rerank_diagnostics,
+                "instrument": instrument,
+                "form": form,
+                "subject": subject,
                 "rows": rows,
             },
             indent=2,
         ),
         encoding="utf-8",
     )
+    ace_step = None
+    if ace_step_handoff:
+        duration_seconds = max(10.0, score.total_ticks / score.header.tpq * 60.0 / max(1, tempo))
+        handoff = write_ace_step_handoff(
+            out_dir,
+            sample_id=piece_id,
+            musicxml_path=xml_path,
+            midi_path=midi_path,
+            key=template.key,
+            time_signature=template.time_signature,
+            bpm=tempo,
+            duration_seconds=duration_seconds,
+            form=form,
+            instrument=instrument,
+            voices=2,
+            bars=max(1, len(rows) // max(1, template.steps_per_bar)),
+            subject=subject,
+            model=ace_step_model,
+            thinking=ace_step_thinking,
+        )
+        ace_step = handoff.to_dict()
     return {
         "piece_id": piece_id,
         "musicxml": str(xml_path),
         "midi": str(midi_path),
         "metrics": str(metrics_path),
         "rows": str(rows_path),
+        "instrument": instrument,
         "counterpoint": report.to_dict(),
         "source_overlap": novelty,
         "hybrid": hybrid_diagnostics,
         "candidate_rerank": rerank_diagnostics,
+        "ace_step": ace_step,
     }
 
 
@@ -507,11 +889,25 @@ def _hybrid_context_from_args(
     data_dir: Path,
     total_rows: int,
 ) -> HybridContext | None:
-    if not getattr(args, "hybrid_conditioning", False):
+    form = getattr(args, "form", "auto")
+    subject = getattr(args, "subject", None)
+    form_requested = form != "auto" or bool(subject)
+    if not getattr(args, "hybrid_conditioning", False) and not form_requested:
         return None
     fragment_path = _resolve_fragment_path(getattr(args, "fragment_path", None), data_dir=data_dir)
     measures = int(getattr(args, "measures", 0) or _rows_to_measures(total_rows, template.steps_per_bar))
     key = getattr(args, "key", None) or template.key or "C"
+    form_plan = None
+    planning_metadata = None
+    if form_requested:
+        form_plan = build_v5_form_plan(
+            form="invention" if form == "auto" else form,
+            measures=measures,
+            key=key,
+            texture=int(getattr(args, "texture", 2) or 2),
+            subject=subject,
+        )
+        planning_metadata = form_plan.to_dict()
     return build_hybrid_context(
         ComposeControls(
             key=key,
@@ -520,6 +916,8 @@ def _hybrid_context_from_args(
         ),
         fragment_path=fragment_path,
         retrieval_limit=int(getattr(args, "retrieval_limit", 1) or 1),
+        plan=None if form_plan is None else form_plan.steps,
+        planning_metadata=planning_metadata,
     )
 
 
@@ -527,6 +925,39 @@ def _resolve_fragment_path(fragment_path: str | None, *, data_dir: Path) -> Path
     if fragment_path:
         return Path(fragment_path)
     return data_dir / "train_emi_fragments.jsonl"
+
+
+def _score_with_tempo(score: CanonicalScore, *, tempo: int) -> CanonicalScore:
+    return CanonicalScore(
+        header=replace(score.header, tempo_map={0: max(1, int(tempo))}),
+        measures=score.measures,
+        parts=score.parts,
+    )
+
+
+def _arrange_score_for_instrument(score: CanonicalScore, *, instrument: str) -> CanonicalScore:
+    if instrument == "piano":
+        return score
+    part = score.parts[0]
+    if instrument == "harpsichord":
+        arranged_part = Part(
+            info=PartInfo(id=part.info.id, instrument="harpsichord", midi_program=6),
+            events=part.events,
+        )
+    elif instrument in {"classical_guitar", "nylon_guitar", "lute"}:
+        midi_program = 24 if instrument in {"classical_guitar", "nylon_guitar"} else 24
+        arranged_part = Part(
+            info=PartInfo(
+                id=part.info.id,
+                instrument="classical_guitar" if instrument == "nylon_guitar" else instrument,
+                tuning=list(STANDARD_GUITAR_TUNING),
+                midi_program=midi_program,
+            ),
+            events=tab_events(part.events, tuning=STANDARD_GUITAR_TUNING),
+        )
+    else:
+        raise ValueError(f"unsupported export instrument: {instrument!r}")
+    return CanonicalScore(header=score.header, measures=score.measures, parts=[arranged_part])
 
 
 def _rows_to_measures(row_count: int, steps_per_bar: int) -> int:
@@ -574,6 +1005,71 @@ def _derive_counterpoint_transition(row: list[int], previous_row: list[int] | No
     features = counterpoint_features_for_transition(previous_v4, row[: len(V4_FIELD_NAMES)])
     for idx, name in enumerate(V5_COUNTERPOINT_FIELD_NAMES):
         row[V5_FIELD_NAMES.index(name)] = features[idx]
+
+
+def _valid_sampled_pitch(value: int) -> int | None:
+    value = int(value)
+    if value <= 0:
+        return None
+    return _clip_midi_pitch(value)
+
+
+def _decode_melody_id(value: int) -> int | None:
+    value = int(value)
+    if value <= 0:
+        return None
+    return max(-24, min(24, value - 25))
+
+
+def _encode_melody_delta(delta: int | None) -> int:
+    if delta is None:
+        return 0
+    return max(-24, min(24, int(delta))) + 25
+
+
+def _active_pitch_from_row(row: list[int], voice: int) -> int | None:
+    state = row[V5_FIELD_NAMES.index(f"v{voice}_state")]
+    pitch = row[V5_FIELD_NAMES.index(f"v{voice}_pitch")]
+    if state in {STATE_NOTE, STATE_HOLD} and pitch > 0:
+        return _clip_midi_pitch(pitch)
+    return None
+
+
+def _previous_note_pitch(rows: list[list[int]], voice: int) -> int | None:
+    state_i = V5_FIELD_NAMES.index(f"v{voice}_state")
+    pitch_i = V5_FIELD_NAMES.index(f"v{voice}_pitch")
+    for previous in reversed(rows):
+        if previous[state_i] == STATE_NOTE and previous[pitch_i] > 0:
+            return _clip_midi_pitch(previous[pitch_i])
+    return None
+
+
+def _same_active_pitch_run(rows: list[list[int]], voice: int, pitch: int) -> int:
+    run = 0
+    for previous in reversed(rows):
+        active = _active_pitch_from_row(previous, voice)
+        if active != pitch:
+            break
+        run += 1
+    return run
+
+
+def _plan_pitch(row: list[int], voice: int) -> int | None:
+    pc_name = "plan_bass_pc" if voice == 0 else "plan_top_pc"
+    oct_name = "plan_bass_oct" if voice == 0 else "plan_top_oct"
+    pc = row[V5_FIELD_NAMES.index(pc_name)]
+    octave = row[V5_FIELD_NAMES.index(oct_name)]
+    if pc >= 12 or octave >= 10:
+        return None
+    pitch = octave * 12 + pc
+    if pitch <= 0:
+        return None
+    return _clip_midi_pitch(pitch)
+
+
+def _voice_range(voice: int) -> tuple[int, int]:
+    # Keyboard inventions frequently cross registers, but hard bounds prevent sampled outliers.
+    return (36, 72) if voice == 0 else (48, 96)
 
 
 def _scale_degree_id(pitch: int, key_pc: int, mode: int) -> int:

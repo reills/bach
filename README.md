@@ -104,6 +104,8 @@ predicts unrelated tokens such as `BAR`, `DUR_24`, `SOP_69`, and `KEY_Bb`.
    - Audio/Suno-style models are not the primary path because the output must be
      clean sheet music.
    - Audio models may later help as critics/rerankers or preference signals.
+   - ACE-Step 1.5 integration is downstream only: v5 writes MusicXML/MIDI/tab
+     and ACE-Step sidecars for audio styling or LoRA rendering.
 
 ## Environment
 
@@ -155,8 +157,22 @@ Useful backend environment variables:
 - `BACH_GEN_CHECKPOINT`
 - `BACH_GEN_VOCAB`
 - `BACH_GEN_DEVICE`
+- `BACH_GEN_ENGINE`
+- `BACH_GEN_V6_CHECKPOINT`
+- `BACH_GEN_V6_DATA_DIR`
+- `BACH_GEN_V6_CANDIDATES`
 - `BACH_GEN_USE_GRAMMAR_MASK`
 - `BACH_GEN_QUALITY_PASSES`
+
+For the current voice-aware instrumental v6 model:
+
+```bash
+BACH_GEN_ENGINE=instrumental_v6 \
+BACH_GEN_DEVICE=cuda \
+BACH_GEN_V6_CHECKPOINT=out/instrumental_v6_voice_aware_v2/checkpoint_best.pt \
+BACH_GEN_V6_DATA_DIR=data/instrumental_v6/clean_bach_large_v1 \
+uvicorn src.api.compose_app:app --port 8001
+```
 
 ## Frontend
 
@@ -180,6 +196,11 @@ model engine.
 - `src/tokens/eventizer.py`: MusicXML eventization.
 - `src/tokens/roundtrip.py`: token round-trip helpers.
 - `src/music/counterpoint.py`: counterpoint metrics.
+- `src/instrumental_v5/form_planner.py`: CAST-style form plans for v5
+  conditioning.
+- `src/instrumental_v5/ace_step.py`: ACE-Step 1.5 setup and downstream handoff
+  metadata.
+- `docs/ACE_STEP_15_INTEGRATION.md`: ACE-Step setup and handoff workflow.
 - `scripts/train_v1.py`: legacy flat-token trainer; useful reference, not the
   desired final model.
 - `src/models/notelm/`: legacy NoteLM model.
@@ -203,4 +224,3 @@ model engine.
 - Do not hard-code tests; test real behavior.
 - Prefer existing parsing, eventization, round-trip, canonical score, and export
   helpers over parallel implementations.
-

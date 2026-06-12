@@ -64,6 +64,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--temperature", type=float, default=0.8)
     parser.add_argument("--top-p", type=float, default=0.95)
     parser.add_argument("--top-k", type=int, default=0)
+    parser.add_argument(
+        "--pitch-strategy",
+        choices=["sampled", "interval", "blend"],
+        default="interval",
+        help="V5 pitch repair strategy passed through to generate_instrumental_v5.",
+    )
+    parser.add_argument(
+        "--counterpoint-policy",
+        choices=["strict", "soft", "off"],
+        default="strict",
+    )
     parser.add_argument("--candidates", type=int, default=4, help="Generate N candidates per sample and keep the best objective score.")
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--seed", type=int, default=42)
@@ -147,6 +158,8 @@ def main() -> None:
             temperature=args.temperature,
             top_p=args.top_p,
             top_k=args.top_k,
+            pitch_strategy=args.pitch_strategy,
+            counterpoint_policy=args.counterpoint_policy,
             hybrid_context=hybrid_context,
             candidate_count=args.candidates,
             source_pieces=source_pieces,
@@ -198,6 +211,8 @@ def main() -> None:
             "temperature": args.temperature,
             "top_p": args.top_p,
             "top_k": args.top_k,
+            "pitch_strategy": args.pitch_strategy,
+            "counterpoint_policy": args.counterpoint_policy,
             "candidates": args.candidates,
             "seed": args.seed,
         },
@@ -374,6 +389,8 @@ def _write_notes(path: Path, *, args: argparse.Namespace, sample_ids: list[str])
         "Generation settings:",
         f"temperature = {args.temperature}",
         f"top_p = {args.top_p}",
+        f"pitch_strategy = {getattr(args, 'pitch_strategy', 'interval')}",
+        f"counterpoint_policy = {getattr(args, 'counterpoint_policy', 'strict')}",
         f"seed = {args.seed}",
         f"samples = {args.samples}",
         f"max_new_tokens = {args.max_new_tokens}",

@@ -1,12 +1,15 @@
 import type { InstrumentMode, ScoreDocumentBundle } from '../state/types';
 
 export interface ComposeConstraints {
-  engine?: 'transformer' | 'emi' | 'hybrid';
+  engine?: 'transformer' | 'emi' | 'hybrid' | 'instrumental_v6';
   useGrammarMask?: boolean;
   useScg?: boolean;
   texture?: number;
   voices?: number;
   voiceCount?: number;
+  measures?: number;
+  seed?: number;
+  randomSeed?: number;
   temperature?: number;
   topP?: number;
   maxLength?: number;
@@ -111,4 +114,43 @@ export interface ApplyFingeringRequest {
 export interface ApplyFingeringResponse {
   document: ScoreDocumentBundle;
   revision: number;
+}
+
+export interface AppendMeasuresRequest {
+  scoreId: string;
+  revision: number;
+  count: number;
+}
+
+export interface AppendMeasuresResponse {
+  document: ScoreDocumentBundle;
+  revision: number;
+  addedMeasureIds: string[];
+}
+
+export type MeasureGenerationOperation =
+  | 'prepend'
+  | 'insert_before'
+  | 'insert_after'
+  | 'append'
+  | 'replace';
+
+export interface GenerateMeasuresRequest {
+  scoreId: string;
+  revision: number;
+  operation: MeasureGenerationOperation;
+  count: number;
+  measureId?: string;
+  prompt?: string;
+  constraints?: ComposeConstraints & Record<string, unknown>;
+  render_mode?: InstrumentMode;
+}
+
+export interface GenerateMeasuresResponse {
+  document: ScoreDocumentBundle;
+  revision: number;
+  insertedMeasureIds: string[];
+  replacedMeasureIds: string[];
+  changedMeasureIds: string[];
+  diagnostics?: Record<string, unknown>;
 }

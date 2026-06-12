@@ -10,7 +10,12 @@ import torch
 from scripts.make_instrumental_v5_dataset import build_v5_outputs
 from src.instrumental_v3.representation import FIELD_NAMES as V3_FIELD_NAMES, InstrumentalV3Piece, SliceEvent
 from src.instrumental_v4.representation import build_v4_piece
-from src.instrumental_v5.model import build_generator, masked_multihead_loss
+from src.instrumental_v5.model import (
+    build_generator,
+    generation_field_weights,
+    generation_target_masks,
+    masked_multihead_loss,
+)
 from src.instrumental_v5.representation import V5_FEATURE_SPECS, V5_FIELD_NAMES
 from src.instrumental_v5.tokenize import (
     build_tokenized_split,
@@ -147,3 +152,43 @@ def test_masked_v5_loss_ignores_padded_tail(tmp_path: Path) -> None:
     assert "phrase_role_acc" in metrics
     assert "speac_label_acc" in metrics
     assert "retrieved_contour_bucket_acc" in metrics
+
+
+def test_v5_generation_target_masks_focus_note_fields_on_onsets() -> None:
+    targets = torch.zeros((1, 4, len(V5_FIELD_NAMES)), dtype=torch.long)
+    mask = torch.ones((1, 4), dtype=torch.bool)
+    state_i = V5_FIELD_NAMES.index("v0_state")
+    mel_i = V5_FIELD_NAMES.index("v0_mel")
+    targets[0, :, state_i] = torch.tensor([0, 1, 2, 2])
+    targets[0, :, mel_i] = torch.tensor([0, 0, 0, 27])
+
+    field_masks = generation_target_masks(targets, mask)
+
+    assert field_masks["v0_state"].sum().item() == 4
+    assert field_masks["v0_pitch"].sum().item() == 2
+    assert field_masks["v0_dur"].sum().item() == 2
+    assert field_masks["v0_mel"].sum().item() == 1
+
+
+def test_v5_loss_reports_onset_conditioned_target_counts() -> None:
+    targets = torch.zeros((1, 3, len(V5_FIELD_NAMES)), dtype=torch.long)
+    mask = torch.ones((1, 3), dtype=torch.bool)
+    targets[0, :, V5_FIELD_NAMES.index("v0_state")] = torch.tensor([1, 2, 2])
+    targets[0, :, V5_FIELD_NAMES.index("v0_mel")] = torch.tensor([0, 0, 27])
+    logits = {
+        name: torch.zeros((1, 3, V5_FEATURE_SPECS[name]), dtype=torch.float32)
+        for name in V5_FIELD_NAMES
+    }
+
+    loss, metrics = masked_multihead_loss(
+        logits,
+        targets,
+        mask,
+        field_weights=generation_field_weights(),
+        field_masks=generation_target_masks(targets, mask),
+    )
+
+    assert loss.item() > 0
+    assert metrics["v0_state_count"] == 3
+    assert metrics["v0_pitch_count"] == 2
+    assert metrics["v0_mel_count"] == 1

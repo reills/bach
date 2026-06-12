@@ -1,4 +1,5 @@
 import os
+import random
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Literal, Optional
@@ -31,7 +32,7 @@ from src.utils.decoding.voice_state import (
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CHECKPOINT_PATH = REPO_ROOT / "out" / "notelm_v1" / "notelm_step5000.pt"
 DEFAULT_VOCAB_PATH = REPO_ROOT / "out" / "notelm_v1" / "vocab.json"
-EngineMode = Literal["transformer", "emi", "hybrid"]
+EngineMode = Literal["transformer", "emi", "hybrid", "instrumental_v6"]
 
 
 @dataclass(frozen=True)
@@ -45,6 +46,17 @@ class ComposeRuntimeConfig:
     v5_prompt_rows: int = 64
     v5_piece_index: int = 0
     v5_candidates: int = 4
+    v6_checkpoint_path: Optional[Path] = None
+    v6_data_dir: Optional[Path] = None
+    v6_prompt_rows: int = 64
+    v6_piece_index: int = 0
+    v6_candidates: int = 4
+    v6_temperature: float = 0.4
+    v6_duration_temperature: float = 0.8
+    v6_duration_prior_strength: float = 0.1
+    v6_top_k: int = 12
+    v6_beam_size: int = 96
+    v6_tempo: int = 88
     hybrid_allow_emi_debug_fallback: bool = False
     device: str = "cpu"
     max_length: int = 512
@@ -61,8 +73,18 @@ class ComposeRuntimeConfig:
     voice_leading: VoiceLeadingMode = VOICE_LEADING_DEFAULT
 
 
+@dataclass(frozen=True)
+class _LoadedV6Runtime:
+    model: Any
+    model_config: Any
+    pieces: list[Any]
+    device: torch.device
+    checkpoint_step: int | None
+
+
 def build_compose_service(config: ComposeRuntimeConfig) -> ComposeHandler:
     loaded_cache = None
+    loaded_v6_cache = None
 
     def loaded_notelm():
         nonlocal loaded_cache
@@ -73,6 +95,12 @@ def build_compose_service(config: ComposeRuntimeConfig) -> ComposeHandler:
                 device=config.device,
             )
         return loaded_cache
+
+    def loaded_v6() -> _LoadedV6Runtime:
+        nonlocal loaded_v6_cache
+        if loaded_v6_cache is None:
+            loaded_v6_cache = _load_v6_runtime(config)
+        return loaded_v6_cache
 
     def generator(
         checkpoint_path: str | Path,
@@ -119,6 +147,15 @@ def build_compose_service(config: ComposeRuntimeConfig) -> ComposeHandler:
                 config=config,
                 constraints=constraints,
                 requested_engine=engine,
+            )
+
+        if engine == "instrumental_v6":
+            return _compose_v6_result(
+                request,
+                controls=controls,
+                config=config,
+                constraints=constraints,
+                runtime=loaded_v6(),
             )
 
         if engine == "hybrid" and config.v5_checkpoint_path is not None and config.v5_data_dir is not None:
@@ -268,6 +305,17 @@ def _runtime_config_from_env() -> ComposeRuntimeConfig:
         v5_prompt_rows=_env_int("BACH_GEN_V5_PROMPT_ROWS", 64),
         v5_piece_index=_env_int("BACH_GEN_V5_PIECE_INDEX", 0),
         v5_candidates=_env_int("BACH_GEN_V5_CANDIDATES", 4),
+        v6_checkpoint_path=_env_optional_path("BACH_GEN_V6_CHECKPOINT"),
+        v6_data_dir=_env_optional_path("BACH_GEN_V6_DATA_DIR"),
+        v6_prompt_rows=_env_int("BACH_GEN_V6_PROMPT_ROWS", 64),
+        v6_piece_index=_env_int("BACH_GEN_V6_PIECE_INDEX", 0),
+        v6_candidates=_env_int("BACH_GEN_V6_CANDIDATES", 4),
+        v6_temperature=_env_float("BACH_GEN_V6_TEMPERATURE", 0.4),
+        v6_duration_temperature=_env_float("BACH_GEN_V6_DURATION_TEMPERATURE", 0.8),
+        v6_duration_prior_strength=_env_float("BACH_GEN_V6_DURATION_PRIOR_STRENGTH", 0.1),
+        v6_top_k=_env_int("BACH_GEN_V6_TOP_K", 12),
+        v6_beam_size=_env_int("BACH_GEN_V6_BEAM_SIZE", 96),
+        v6_tempo=_env_int("BACH_GEN_V6_TEMPO", 88),
         hybrid_allow_emi_debug_fallback=_env_bool("BACH_GEN_HYBRID_EMI_DEBUG_FALLBACK", False),
         device=device,
         max_length=_env_int("BACH_GEN_MAX_LENGTH", 512),
@@ -284,6 +332,281 @@ def _runtime_config_from_env() -> ComposeRuntimeConfig:
             _env_int("BACH_GEN_QUALITY_PASSES", QUALITY_PASSES_DEFAULT)
         ),
         voice_leading=normalize_voice_leading(os.environ.get("BACH_GEN_VOICE_LEADING")),
+    )
+
+
+def _load_v6_runtime(config: ComposeRuntimeConfig) -> _LoadedV6Runtime:
+    if config.v6_checkpoint_path is None or config.v6_data_dir is None:
+        raise ValueError("instrumental_v6 requires BACH_GEN_V6_CHECKPOINT and BACH_GEN_V6_DATA_DIR")
+
+    from src.instrumental_v6.data import load_dataset
+    from src.instrumental_v6.model import build_generator, config_from_checkpoint
+
+    device = torch.device(config.device)
+    if device.type == "cuda":
+        if not torch.cuda.is_available():
+            raise ValueError("CUDA requested but torch.cuda.is_available() is false")
+        torch.cuda.init()
+
+    checkpoint = torch.load(config.v6_checkpoint_path, map_location=device, weights_only=False)
+    model_config = config_from_checkpoint(checkpoint["config"])
+    model = build_generator(model_config).to(device)
+    model.load_state_dict(checkpoint["model_state"])
+    model.eval()
+    pieces, _ = load_dataset(config.v6_data_dir / "pieces.json")
+    if not pieces:
+        raise ValueError("instrumental_v6 dataset contains no pieces")
+    return _LoadedV6Runtime(
+        model=model,
+        model_config=model_config,
+        pieces=pieces,
+        device=device,
+        checkpoint_step=checkpoint.get("step"),
+    )
+
+
+def _compose_v6_result(
+    request: ComposeRequest,
+    *,
+    controls: ComposeControls,
+    config: ComposeRuntimeConfig,
+    constraints: dict[str, Any],
+    runtime: _LoadedV6Runtime,
+) -> ComposeServiceResult:
+    from scripts.generate_instrumental_v6 import (
+        _candidate_score,
+        _continuation_piece,
+        _duration_log_prior,
+        _motif_report,
+        _select_template,
+        _subject_contour,
+        _with_tempo,
+        generate_rows,
+    )
+    from src.instrumental_v6.metrics import evaluate_piece_rows, source_overlap_report
+    from src.instrumental_v6.representation import piece_to_canonical_score, rows_to_piece
+
+    voice_count = controls.texture or 2
+    if not 2 <= voice_count <= runtime.model_config.max_voices:
+        raise ValueError(
+            f"instrumental_v6 voices must be between 2 and {runtime.model_config.max_voices}"
+        )
+
+    form = _constraint_v6_form(constraints, voice_count=voice_count)
+    piece_id = _constraint_text(constraints, "piece_id", "pieceId")
+    piece_index = _constraint_int(
+        constraints,
+        "piece_index",
+        "pieceIndex",
+        default=config.v6_piece_index,
+    ) or 0
+    template = _select_template(
+        runtime.pieces,
+        voices=voice_count,
+        requested_form=form,
+        piece_id=piece_id,
+        piece_index=piece_index,
+    )
+    prompt_count = min(max(2, config.v6_prompt_rows), len(template.global_rows))
+    prompt = (
+        [row[:] for row in template.global_rows[:prompt_count]],
+        [[voice[:] for voice in row] for row in template.voice_rows[:prompt_count]],
+        [
+            [[pair[:] for pair in left] for left in row]
+            for row in template.pair_rows[:prompt_count]
+        ],
+    )
+    measure_count = controls.measures or 4
+    max_new_rows = _constraint_int(
+        constraints,
+        "max_new_rows",
+        "maxNewRows",
+        default=measure_count * template.steps_per_bar,
+    ) or 1
+    max_new_rows = max(1, max_new_rows)
+    candidate_count = max(
+        1,
+        _constraint_int(
+            constraints,
+            "candidates",
+            "candidateCount",
+            default=config.v6_candidates,
+        )
+        or 1,
+    )
+    temperature = _constraint_float(
+        constraints,
+        "temperature",
+        default=config.v6_temperature,
+    )
+    duration_temperature = _constraint_float(
+        constraints,
+        "duration_temperature",
+        "durationTemperature",
+        default=config.v6_duration_temperature,
+    )
+    duration_prior_strength = max(
+        0.0,
+        _constraint_float(
+            constraints,
+            "duration_prior_strength",
+            "durationPriorStrength",
+            default=config.v6_duration_prior_strength,
+        ),
+    )
+    top_k = max(
+        1,
+        _constraint_int(constraints, "top_k", "topK", default=config.v6_top_k) or 1,
+    )
+    beam_size = max(
+        1,
+        _constraint_int(
+            constraints,
+            "beam_size",
+            "beamSize",
+            default=config.v6_beam_size,
+        )
+        or 1,
+    )
+    tempo = max(
+        1,
+        _constraint_int(constraints, "tempo", default=config.v6_tempo) or config.v6_tempo,
+    )
+    seed = _constraint_int(constraints, "seed", "randomSeed", default=2604) or 2604
+    random.seed(seed)
+    torch.manual_seed(seed)
+    if runtime.device.type == "cuda":
+        torch.cuda.manual_seed_all(seed)
+
+    source_rows = [
+        piece.voice_rows
+        for piece in runtime.pieces
+        if piece.voice_count == voice_count
+    ]
+    duration_log_prior = _duration_log_prior(
+        runtime.pieces,
+        voices=voice_count,
+        form=form,
+        device=runtime.device,
+    )
+    source_start = prompt_count
+    source_end = min(len(template.global_rows), source_start + max_new_rows)
+    source_baseline = evaluate_piece_rows(
+        template.global_rows[source_start:source_end],
+        template.voice_rows[source_start:source_end],
+        template.pair_rows[source_start:source_end],
+        voice_count=voice_count,
+    )
+    subject = _subject_contour(prompt[1], voice_count)
+
+    candidates: list[tuple[float, Any, dict[str, object]]] = []
+    for candidate_index in range(candidate_count):
+        generated = generate_rows(
+            runtime.model,
+            prompt=prompt,
+            template=template,
+            form=form,
+            voice_count=voice_count,
+            max_new_rows=max_new_rows,
+            device=runtime.device,
+            max_context=runtime.model_config.max_seq_len,
+            temperature=temperature,
+            duration_temperature=duration_temperature,
+            top_k=top_k,
+            beam_size=beam_size,
+            duration_log_prior=duration_log_prior,
+            duration_prior_strength=duration_prior_strength,
+        )
+        generated_piece = rows_to_piece(
+            global_rows=generated[0],
+            voice_rows=generated[1],
+            pair_rows=generated[2],
+            template=replace(template, form=form, voice_count=voice_count),
+            piece_id=f"instrumental_v6_{voice_count}v_candidate{candidate_index:02d}",
+        )
+        continuation = _continuation_piece(generated_piece, prompt_count)
+        report = evaluate_piece_rows(
+            continuation.global_rows,
+            continuation.voice_rows,
+            continuation.pair_rows,
+            voice_count=voice_count,
+        )
+        overlap = source_overlap_report(
+            continuation.voice_rows,
+            source_rows,
+            voice_count=voice_count,
+            ngram=16,
+        )
+        motif = _motif_report(
+            generated_piece.voice_rows,
+            subject=subject,
+            voice_count=voice_count,
+        )
+        score_value = _candidate_score(
+            report,
+            overlap,
+            source_baseline=source_baseline,
+            motif_report=motif,
+        )
+        candidates.append(
+            (
+                score_value,
+                continuation,
+                {
+                    "candidate_index": candidate_index,
+                    "score": score_value,
+                    "counterpoint": report,
+                    "motif": motif,
+                    "source_overlap": overlap,
+                },
+            )
+        )
+
+    candidates.sort(key=lambda item: item[0], reverse=True)
+    _, best_piece, selected = candidates[0]
+    best_piece = replace(
+        best_piece,
+        piece_id=f"instrumental_v6_{voice_count}v_{form.lower()}",
+    )
+    score = _with_tempo(piece_to_canonical_score(best_piece), tempo)
+    diagnostics: dict[str, object] = {
+        "engine": "instrumental_v6",
+        "requestedEngine": "instrumental_v6",
+        "proposalEngine": "voice_aware_v2",
+        "checkpoint": str(config.v6_checkpoint_path),
+        "checkpointStep": runtime.checkpoint_step,
+        "dataDir": str(config.v6_data_dir),
+        "architecture": runtime.model_config.architecture,
+        "voices": voice_count,
+        "form": form,
+        "templatePieceId": template.piece_id,
+        "promptRows": prompt_count,
+        "generatedRows": max_new_rows,
+        "candidates": candidate_count,
+        "temperature": temperature,
+        "durationTemperature": duration_temperature,
+        "durationPriorStrength": duration_prior_strength,
+        "tempo": tempo,
+        "seed": seed,
+        "sourceBaseline": source_baseline,
+        "selected": selected,
+        "candidateScores": [candidate[2] for candidate in candidates],
+    }
+    return compose_canonical_score(
+        score,
+        generation=GenerationResult(
+            ids=[],
+            tokens=[
+                "INSTRUMENTAL_V6",
+                "VOICE_AWARE_V2",
+                f"VOICES_{voice_count}",
+                f"FORM_{form}",
+                f"ROWS_{max_new_rows}",
+            ],
+            stopped_on_eos=True,
+        ),
+        render_mode=request.render_mode,
+        diagnostics=diagnostics,
     )
 
 
@@ -502,10 +825,13 @@ def normalize_engine(value: str | None, *, default: EngineMode = "transformer") 
         "symbolic": "emi",
         "hybrid": "hybrid",
         "both": "hybrid",
+        "instrumental-v6": "instrumental_v6",
+        "v6": "instrumental_v6",
+        "voice-aware-v2": "instrumental_v6",
     }
     engine = aliases.get(normalized)
     if engine is None:
-        raise ValueError("engine must be one of: transformer, emi, hybrid")
+        raise ValueError("engine must be one of: transformer, emi, hybrid, instrumental_v6")
     return engine  # type: ignore[return-value]
 
 
@@ -578,6 +904,17 @@ def _constraint_quality_passes(constraints: dict[str, Any], *, default: int) -> 
 def _constraint_engine(constraints: dict[str, Any], *, default: EngineMode) -> EngineMode:
     value = _constraint_text(constraints, "engine", "compositionEngine")
     return normalize_engine(value, default=default)
+
+
+def _constraint_v6_form(constraints: dict[str, Any], *, voice_count: int) -> str:
+    value = _constraint_text(constraints, "form")
+    if value is None:
+        return {2: "INVENTION", 3: "SINFONIA"}.get(voice_count, "FUGUE")
+    normalized = value.strip().upper()
+    valid = {"INVENTION", "SINFONIA", "FUGUE", "SUITE", "PARTITA", "PRELUDE"}
+    if normalized not in valid:
+        raise ValueError(f"instrumental_v6 form must be one of: {', '.join(sorted(valid))}")
+    return normalized
 
 
 def _constraint_voice_leading(

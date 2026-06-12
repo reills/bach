@@ -11,6 +11,7 @@ from src.api.canonical.fingering import FingeringSelection, apply_fingering_sele
 from src.api.canonical.from_tokens import tokens_to_canonical_score
 from src.api.canonical.ops import (
     EventNotFoundError,
+    MeasureSpliceResult,
     MeasureNotFoundError,
     carry_in_events_for_measure,
     event_by_id,
@@ -19,6 +20,7 @@ from src.api.canonical.ops import (
     get_measure_by_id,
     measure_by_id,
     replace_events_in_measure,
+    splice_generated_measures,
 )
 
 __all__ = [
@@ -29,6 +31,7 @@ __all__ = [
     "GuitarFingering",
     "Measure",
     "MeasureNotFoundError",
+    "MeasureSpliceResult",
     "Part",
     "PartInfo",
     "ScoreHeader",
@@ -40,5 +43,6 @@ __all__ = [
     "get_measure_by_id",
     "measure_by_id",
     "replace_events_in_measure",
+    "splice_generated_measures",
     "tokens_to_canonical_score",
 ]

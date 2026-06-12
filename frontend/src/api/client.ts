@@ -1,6 +1,8 @@
 import type {
   AltPositionsRequest,
   AltPositionsResponse,
+  AppendMeasuresRequest,
+  AppendMeasuresResponse,
   ApplyFingeringRequest,
   ApplyFingeringResponse,
   CommitDraftRequest,
@@ -9,6 +11,8 @@ import type {
   ComposeResponse,
   DiscardDraftRequest,
   DiscardDraftResponse,
+  GenerateMeasuresRequest,
+  GenerateMeasuresResponse,
   InpaintPreviewRequest,
   InpaintPreviewResponse,
 } from './types';
@@ -68,3 +72,13 @@ export const applyFingering = (
   body: ApplyFingeringRequest,
 ): Promise<ApplyFingeringResponse> =>
   apiPost<ApplyFingeringResponse>('/apply_fingering', body);
+
+export const appendMeasures = (
+  body: AppendMeasuresRequest,
+): Promise<AppendMeasuresResponse> =>
+  apiPost<AppendMeasuresResponse>('/append_measures', body);
+
+export const generateMeasures = (
+  body: GenerateMeasuresRequest,
+): Promise<GenerateMeasuresResponse> =>
+  apiPost<GenerateMeasuresResponse>('/generate_measures', body);

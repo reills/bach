@@ -15,16 +15,22 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from src.instrumental_v4.model import CompoundConfig
-from src.instrumental_v5.model import build_generator, masked_multihead_loss
+from src.instrumental_v5.model import (
+    build_generator,
+    generation_field_weights,
+    generation_target_masks,
+    masked_multihead_loss,
+    objective_metadata,
+)
 from src.instrumental_v5.representation import V5_FEATURE_SPECS, V5_FIELD_NAMES
 from src.instrumental_v5.tokenize import load_tokenized_split, load_v5_vocab
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train tiny/experimental instrumental_v5 generator from tokenized tensors.")
-    parser.add_argument("--data-dir", default="data/instrumental_v5/keyboard_overture_cnorm_outer2_v5_sample")
+    parser.add_argument("--data-dir", default="data/instrumental_v5/keyboard_overture_cnorm_outer2_v5")
     parser.add_argument("--tokenized-dir", default=None)
-    parser.add_argument("--output-dir", default="out/instrumental_v5_overfit_sample")
+    parser.add_argument("--output-dir", default="out/instrumental_v5_onset_aware")
     parser.add_argument("--d-model", type=int, default=128)
     parser.add_argument("--n-heads", "--heads", dest="n_heads", type=int, default=4)
     parser.add_argument("--n-layers", "--layers", dest="n_layers", type=int, default=2)
@@ -39,6 +45,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--log-every", type=int, default=25)
     parser.add_argument("--val-every", type=int, default=100)
     parser.add_argument("--save-every", type=int, default=250)
+    parser.add_argument(
+        "--resume-checkpoint",
+        default=None,
+        help="Warm-start model weights/config from a compatible v5 checkpoint.",
+    )
     return parser.parse_args()
 
 
@@ -68,21 +79,41 @@ def main() -> None:
         val_windows, val_mask = _crop(val_data["windows"], val_data["mask"], max_seq_len=args.max_seq_len)
         val_loader = DataLoader(TensorDataset(val_windows, val_mask), batch_size=args.batch_size, shuffle=False)
 
-    config = CompoundConfig(
-        d_model=args.d_model,
-        n_heads=args.n_heads,
-        n_layers=args.n_layers,
-        dropout=args.dropout,
-        max_seq_len=args.max_seq_len,
-    )
+    resume = None
+    if args.resume_checkpoint:
+        resume = torch.load(args.resume_checkpoint, map_location=device, weights_only=False)
+        if list(resume.get("field_names", [])) != V5_FIELD_NAMES:
+            raise SystemExit("resume checkpoint field_names do not match the current v5 representation")
+        if dict(resume.get("feature_specs", {})) != V5_FEATURE_SPECS:
+            raise SystemExit("resume checkpoint feature_specs do not match the current v5 representation")
+        config = CompoundConfig(**resume["config"])
+        if config.max_seq_len < args.max_seq_len:
+            raise SystemExit(
+                f"resume checkpoint max_seq_len={config.max_seq_len} is smaller than requested "
+                f"--max-seq-len={args.max_seq_len}"
+            )
+    else:
+        config = CompoundConfig(
+            d_model=args.d_model,
+            n_heads=args.n_heads,
+            n_layers=args.n_layers,
+            dropout=args.dropout,
+            max_seq_len=args.max_seq_len,
+        )
     model = build_generator(config).to(device)
+    if resume is not None:
+        model.load_state_dict(resume["model_state"])
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=0.01)
     scaler = torch.amp.GradScaler("cuda", enabled=args.amp and device.type == "cuda")
 
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     metrics_log: list[dict[str, object]] = []
-    step = 0
+    step = int(resume.get("step", 0)) if resume is not None else 0
+    if step >= args.max_steps:
+        raise SystemExit(
+            f"resume checkpoint is already at step {step}; set --max-steps above {step}"
+        )
     last_metrics: dict[str, float] = {}
     model.train()
     while step < args.max_steps:
@@ -94,7 +125,13 @@ def main() -> None:
             target_mask = mask[:, 1:]
             with torch.amp.autocast("cuda", enabled=args.amp and device.type == "cuda"):
                 logits = model(inputs)
-                loss, metrics = masked_multihead_loss(logits, targets, target_mask, field_weights=_field_weights())
+                loss, metrics = masked_multihead_loss(
+                    logits,
+                    targets,
+                    target_mask,
+                    field_weights=generation_field_weights(),
+                    field_masks=generation_target_masks(targets, target_mask),
+                )
             optimizer.zero_grad(set_to_none=True)
             scaler.scale(loss).backward()
             scaler.unscale_(optimizer)
@@ -126,12 +163,55 @@ def main() -> None:
             if step >= args.max_steps:
                 break
 
+    train_loss, final_train_metrics = _evaluate(model, train_loader, device=device)
+    final_val_metrics = None
+    final_line: dict[str, object] = {
+        "step": step,
+        "final_train_loss": train_loss,
+        "final_train": _focus_metrics(final_train_metrics),
+    }
+    if val_loader is not None:
+        final_val_loss, final_val_metrics = _evaluate(model, val_loader, device=device)
+        final_line["final_val_loss"] = final_val_loss
+        final_line["final_val"] = _focus_metrics(final_val_metrics)
+    metrics_log.append(final_line)
+    print(json.dumps(final_line, sort_keys=True))
+    last_metrics = final_train_metrics
+
     ckpt_path = output_dir / f"checkpoint_step{step}.pt"
-    _save_checkpoint(ckpt_path, model, config, args, vocab, step, last_metrics)
+    _save_checkpoint(
+        ckpt_path,
+        model,
+        config,
+        args,
+        vocab,
+        step,
+        last_metrics,
+        val_metrics=final_val_metrics,
+    )
     latest_path = output_dir / "checkpoint_latest.pt"
-    _save_checkpoint(latest_path, model, config, args, vocab, step, last_metrics)
+    _save_checkpoint(
+        latest_path,
+        model,
+        config,
+        args,
+        vocab,
+        step,
+        last_metrics,
+        val_metrics=final_val_metrics,
+    )
     with (output_dir / "train_metrics.json").open("w", encoding="utf-8") as f:
-        json.dump({"log": metrics_log, "last_train_metrics": last_metrics}, f, indent=2, sort_keys=True)
+        json.dump(
+            {
+                "objective": objective_metadata(),
+                "log": metrics_log,
+                "last_train_metrics": last_metrics,
+                "last_val_metrics": final_val_metrics,
+            },
+            f,
+            indent=2,
+            sort_keys=True,
+        )
     print(f"wrote {ckpt_path}")
     print(f"wrote {latest_path}")
 
@@ -143,21 +223,45 @@ def _crop(windows: torch.Tensor, mask: torch.Tensor, *, max_seq_len: int) -> tup
 
 
 def _evaluate(model: torch.nn.Module, loader: DataLoader, *, device: torch.device) -> tuple[float, dict[str, float]]:
+    was_training = model.training
     model.eval()
     total_loss = 0.0
-    total_batches = 0
-    last_metrics: dict[str, float] = {}
+    total_tokens = 0
+    correct_by_metric: dict[str, float] = {}
+    count_by_field: dict[str, float] = {}
     with torch.no_grad():
         for windows, mask in loader:
             windows = windows.to(device)
             mask = mask.to(device)
+            targets = windows[:, 1:, :]
+            target_mask = mask[:, 1:]
             logits = model(windows[:, :-1, :])
-            loss, metrics = masked_multihead_loss(logits, windows[:, 1:, :], mask[:, 1:], field_weights=_field_weights())
-            total_loss += float(loss.item())
-            total_batches += 1
-            last_metrics = metrics
-    model.train()
-    return total_loss / max(1, total_batches), last_metrics
+            loss, metrics = masked_multihead_loss(
+                logits,
+                targets,
+                target_mask,
+                field_weights=generation_field_weights(),
+                field_masks=generation_target_masks(targets, target_mask),
+            )
+            token_count = int(target_mask.sum().item())
+            total_loss += float(loss.item()) * token_count
+            total_tokens += token_count
+            for key, value in metrics.items():
+                if not key.endswith("_acc"):
+                    continue
+                field = key.removesuffix("_acc")
+                count = float(metrics.get(f"{field}_count", 0.0))
+                correct_by_metric[key] = correct_by_metric.get(key, 0.0) + float(value) * count
+                count_by_field[field] = count_by_field.get(field, 0.0) + count
+    if was_training:
+        model.train()
+    aggregated = {
+        key: correct / max(1.0, count_by_field[key.removesuffix("_acc")])
+        for key, correct in correct_by_metric.items()
+    }
+    for field, count in count_by_field.items():
+        aggregated[f"{field}_count"] = count
+    return total_loss / max(1, total_tokens), aggregated
 
 
 def _save_checkpoint(
@@ -168,6 +272,8 @@ def _save_checkpoint(
     vocab: dict[str, object],
     step: int,
     metrics: dict[str, float],
+    *,
+    val_metrics: dict[str, float] | None = None,
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     torch.save(
@@ -179,36 +285,12 @@ def _save_checkpoint(
             "vocab": vocab,
             "args": vars(args),
             "step": step,
+            "objective": objective_metadata(),
             "last_train_metrics": metrics,
+            "last_val_metrics": val_metrics,
         },
         path,
     )
-
-
-def _field_weights() -> dict[str, float]:
-    return {
-        "v0_state": 2.0,
-        "v1_state": 2.0,
-        "v0_pitch": 2.0,
-        "v1_pitch": 2.0,
-        "v0_mel": 1.5,
-        "v1_mel": 1.5,
-        "vertical_interval": 1.5,
-        "cp_v0_motion": 1.5,
-        "cp_v1_motion": 1.5,
-        "cp_motion_type": 1.6,
-        "cp_parallel_perfect": 2.0,
-        "cp_direct_perfect": 1.8,
-        "cp_voice_crossing": 1.8,
-        "cp_spacing_violation": 1.5,
-        "phrase_role": 1.25,
-        "speac_label": 1.15,
-        "cmmc_function": 1.2,
-        "cadence_target": 1.15,
-        "harmonic_function": 1.15,
-        "retrieved_contour_bucket": 1.25,
-        "retrieved_rhythm_bucket": 1.25,
-    }
 
 
 def _focus_metrics(metrics: dict[str, float]) -> dict[str, float]:
@@ -217,6 +299,10 @@ def _focus_metrics(metrics: dict[str, float]) -> dict[str, float]:
         "v1_state_acc",
         "v0_pitch_acc",
         "v1_pitch_acc",
+        "v0_mel_acc",
+        "v1_mel_acc",
+        "v0_dur_acc",
+        "v1_dur_acc",
         "cp_motion_type_acc",
         "cp_parallel_perfect_acc",
         "cp_direct_perfect_acc",

@@ -17,9 +17,8 @@ Current strategic decision:
 - Preferred Python runtime: `conda run -n bach python`
 - For commands that should stream output, use:
   `CONDA_NO_PLUGINS=true conda run --no-capture-output -n bach python -u ...`
-- GPU/CUDA commands require explicit escalated permission from the user before running.
 - When using CUDA in Python scripts, initialize/resolve CUDA before reading parquet datasets with pandas/pyarrow. In this project, reading parquet first can make later `torch.cuda` initialization fail with `CUDA driver initialization failed` even when `nvidia-smi` sees the GPU. Prefer resolving the device and calling the seed/CUDA initialization before dataset construction/loading.
-- If CUDA fails unexpectedly, check with escalated `nvidia-smi` and a minimal PyTorch CUDA probe before falling back to CPU. Do not silently run full training on CPU.
+- If CUDA fails unexpectedly, check `nvidia-smi` and a minimal PyTorch CUDA probe before falling back to CPU. Do not silently run full training on CPU.
 - Optional local venv fallback:
   `python -m venv .venv && source .venv/bin/activate`
 - Environment check:

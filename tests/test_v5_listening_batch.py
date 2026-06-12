@@ -104,10 +104,85 @@ def test_repair_generated_v5_row_clamps_sampled_pitch_to_valid_midi() -> None:
         row[V5_FIELD_NAMES.index(f"v{voice}_state")] = STATE_NOTE
         row[V5_FIELD_NAMES.index(f"v{voice}_pitch")] = 128
 
-    _repair_generated_row(row, [previous], _Template())
+    _repair_generated_row(row, [previous], _Template(), pitch_strategy="sampled")
 
     assert row[V5_FIELD_NAMES.index("v0_pitch")] == 127
     assert row[V5_FIELD_NAMES.index("v1_pitch")] == 127
+
+
+def test_repair_generated_v5_row_uses_melodic_interval_before_sampled_pitch() -> None:
+    previous = [0] * len(V5_FIELD_NAMES)
+    row = [0] * len(V5_FIELD_NAMES)
+    previous[V5_FIELD_NAMES.index("v0_state")] = STATE_NOTE
+    previous[V5_FIELD_NAMES.index("v0_pitch")] = 60
+    previous[V5_FIELD_NAMES.index("v1_state")] = STATE_NOTE
+    previous[V5_FIELD_NAMES.index("v1_pitch")] = 72
+    row[V5_FIELD_NAMES.index("v0_state")] = STATE_NOTE
+    row[V5_FIELD_NAMES.index("v0_pitch")] = 40
+    row[V5_FIELD_NAMES.index("v0_mel")] = 27
+    row[V5_FIELD_NAMES.index("v1_state")] = STATE_NOTE
+    row[V5_FIELD_NAMES.index("v1_pitch")] = 96
+    row[V5_FIELD_NAMES.index("v1_mel")] = 23
+
+    _repair_generated_row(row, [previous], _Template(), pitch_strategy="interval")
+
+    assert row[V5_FIELD_NAMES.index("v0_pitch")] == 62
+    assert row[V5_FIELD_NAMES.index("v1_pitch")] == 70
+    assert row[V5_FIELD_NAMES.index("v0_mel")] == 27
+    assert row[V5_FIELD_NAMES.index("v1_mel")] == 23
+
+
+def test_repair_generated_v5_row_blend_avoids_obvious_crossing() -> None:
+    previous = [0] * len(V5_FIELD_NAMES)
+    row = [0] * len(V5_FIELD_NAMES)
+    previous[V5_FIELD_NAMES.index("v0_state")] = STATE_NOTE
+    previous[V5_FIELD_NAMES.index("v0_pitch")] = 60
+    previous[V5_FIELD_NAMES.index("v1_state")] = STATE_NOTE
+    previous[V5_FIELD_NAMES.index("v1_pitch")] = 72
+    row[V5_FIELD_NAMES.index("v0_state")] = STATE_NOTE
+    row[V5_FIELD_NAMES.index("v0_pitch")] = 80
+    row[V5_FIELD_NAMES.index("v0_mel")] = 27
+    row[V5_FIELD_NAMES.index("v1_state")] = STATE_NOTE
+    row[V5_FIELD_NAMES.index("v1_pitch")] = 55
+    row[V5_FIELD_NAMES.index("v1_mel")] = 23
+
+    _repair_generated_row(row, [previous], _Template(), pitch_strategy="blend")
+
+    assert row[V5_FIELD_NAMES.index("v0_pitch")] < row[V5_FIELD_NAMES.index("v1_pitch")]
+    assert row[V5_FIELD_NAMES.index("cp_voice_crossing")] == 0
+
+
+def test_strict_counterpoint_policy_rejects_parallel_fifths() -> None:
+    previous = [0] * len(V5_FIELD_NAMES)
+    row = [0] * len(V5_FIELD_NAMES)
+    for voice, previous_pitch, sampled_pitch, mel in (
+        (0, 60, 62, 27),
+        (1, 67, 69, 27),
+    ):
+        previous[V5_FIELD_NAMES.index(f"v{voice}_state")] = STATE_NOTE
+        previous[V5_FIELD_NAMES.index(f"v{voice}_pitch")] = previous_pitch
+        row[V5_FIELD_NAMES.index(f"v{voice}_state")] = STATE_NOTE
+        row[V5_FIELD_NAMES.index(f"v{voice}_pitch")] = sampled_pitch
+        row[V5_FIELD_NAMES.index(f"v{voice}_mel")] = mel
+
+    _repair_generated_row(
+        row,
+        [previous],
+        _Template(),
+        pitch_strategy="interval",
+        counterpoint_policy="strict",
+    )
+
+    current = (
+        row[V5_FIELD_NAMES.index("v0_pitch")],
+        row[V5_FIELD_NAMES.index("v1_pitch")],
+    )
+    motions = (current[0] - 60, current[1] - 67)
+    assert not (
+        abs(current[1] - current[0]) % 12 == 7
+        and motions[0] * motions[1] > 0
+    )
+    assert row[V5_FIELD_NAMES.index("cp_parallel_perfect")] == 0
 
 
 def test_candidate_score_prefers_valid_non_crossed_two_voice_motion() -> None:

@@ -20,6 +20,7 @@ from src.instrumental_v5.representation import (
     classify_contour_bucket,
     classify_rhythm_bucket,
 )
+from src.instrumental_v5.form_planner import FormEntry, V5FormPlan, build_v5_form_plan
 
 __all__ = [
     "CADENCE_TYPE_TO_ID",
@@ -37,7 +38,10 @@ __all__ = [
     "V5_FEATURE_SPECS",
     "V5_FIELD_NAMES",
     "V5Piece",
+    "FormEntry",
+    "V5FormPlan",
     "build_v5_piece",
+    "build_v5_form_plan",
     "classify_contour_bucket",
     "classify_rhythm_bucket",
 ]

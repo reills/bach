@@ -186,7 +186,7 @@ export class VerovioPlayer {
       await ctx.resume();
     }
 
-    const preset = (window as Record<string, object>)[PIANO_PRESET_VAR];
+    const preset = (window as unknown as Record<string, object>)[PIANO_PRESET_VAR];
     if (!preset) {
       console.error('VerovioPlayer: preset not available after loading');
       return;

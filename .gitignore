@@ -13,6 +13,8 @@
 /data/instrumental_v5/*/train_emi_fragments.jsonl
 /data/instrumental_v5/*/val_emi_fragments.jsonl
 /data/instrumental_v5/*/tokenized/
+/data/instrumental_v6/
+/data/musicxml_cleaned/
 *.omr
 
 # local research/reference data

@@ -90,6 +90,7 @@ def test_compose_route_stores_generated_score_and_returns_frontend_payload():
             midi=canonical_score_to_midi(score),
             measure_map=exported.measure_map,
             event_hit_map=exported.event_hit_map,
+            render_mode=request.render_mode,
         )
 
     client = CompatTestClient(
@@ -104,6 +105,7 @@ def test_compose_route_stores_generated_score_and_returns_frontend_payload():
             json={
                 "prompt": "Prelude",
                 "constraints": {"temperature": 0.5},
+                "render_mode": "guitar",
             },
         )
     finally:
@@ -534,7 +536,7 @@ def test_preview_then_commit_routes_update_score_and_revision():
     assert committed.score.parts[0].events[2].id == "part-0-m1-regen-0"
 
 
-def test_compose_route_render_mode_guitar_default_and_piano_explicit():
+def test_compose_route_render_mode_piano_default_and_guitar_explicit():
     """Compose request accepts render_mode; response always includes instrumentMode."""
     repository = InMemoryScoreRepository[CanonicalScore]()
     score = _build_score()
@@ -558,19 +560,19 @@ def test_compose_route_render_mode_guitar_default_and_piano_explicit():
         create_app(compose_service=fake_compose_service, repository=repository)
     )
     try:
-        # Default: guitar
+        # Default: piano
         r1 = client.post("/compose", json={})
         assert r1.status_code == 200
-        assert r1.json()["instrumentMode"] == "guitar"
+        assert r1.json()["instrumentMode"] == "piano"
 
-        # Explicit: piano
-        r2 = client.post("/compose", json={"render_mode": "piano"})
+        # Explicit: guitar remains supported for the legacy arranger path.
+        r2 = client.post("/compose", json={"render_mode": "guitar"})
         assert r2.status_code == 200
-        assert r2.json()["instrumentMode"] == "piano"
+        assert r2.json()["instrumentMode"] == "guitar"
     finally:
         client.close()
 
-    assert captured_modes == ["guitar", "piano"]
+    assert captured_modes == ["piano", "guitar"]
 
 
 def test_commit_draft_returns_409_for_stale_revision_conflicts():

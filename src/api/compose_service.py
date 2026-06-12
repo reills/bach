@@ -19,13 +19,14 @@ from src.api.render import (
     canonical_score_to_standard_musicxml,
     canonical_score_to_tab_musicxml,
 )
+from src.arrangers.guitar import GuitarArrangementSettings, convert_piano_score_to_guitar
 from src.inference.generate_v1 import GenerationConfig, GenerationResult, generate_v1
 from src.inference.rerank import (
     normalize_quality_passes,
     repair_generation_harmonic_metadata,
     rerank_generations,
 )
-from src.tabber import DEFAULT_MAX_FRET, tab_events
+from src.tabber import DEFAULT_MAX_FRET
 from src.tokens.roundtrip import parse_time_sig_token, parse_token_int
 from src.tokens.tokenizer import parse_voice_event
 from src.tokens.validator import validate_harm_tokens
@@ -44,7 +45,7 @@ class ComposeServiceResult:
     score: CanonicalScore
     document: "ScoreDocumentBundleExport"
     midi: bytes
-    render_mode: Literal["guitar", "piano"] = "guitar"
+    render_mode: Literal["guitar", "piano"] = "piano"
     diagnostics: dict[str, object] | None = None
 
     def __init__(
@@ -54,7 +55,7 @@ class ComposeServiceResult:
         score: CanonicalScore,
         document: "ScoreDocumentBundleExport" | None = None,
         midi: bytes,
-        render_mode: Literal["guitar", "piano"] = "guitar",
+        render_mode: Literal["guitar", "piano"] = "piano",
         score_xml: str | None = None,
         measure_map: dict[str, str] | None = None,
         event_hit_map: dict[str, str] | None = None,
@@ -154,7 +155,7 @@ def compose_baseline(
     tpq: int = 24,
     part_info: PartInfo | None = None,
     max_fret: int = DEFAULT_MAX_FRET,
-    render_mode: Literal["guitar", "piano"] = "guitar",
+    render_mode: Literal["guitar", "piano"] = "piano",
     generator: Callable[..., GenerationResult] = generate_v1,
     quality_passes: int = 1,
 ) -> ComposeServiceResult:
@@ -265,8 +266,7 @@ def compose_baseline(
 
     if render_mode == "guitar":
         try:
-            score = _normalize_to_guitar_range(score)
-            score = _tab_score(score, max_fret=max_fret)
+            score = _arrange_score_for_legacy_guitar(score, max_fret=max_fret)
         except ValueError as exc:
             if _should_fallback_to_piano_score(exc):
                 score = _to_piano_score(score)
@@ -340,7 +340,7 @@ def compose_canonical_score(
     score: CanonicalScore,
     *,
     generation: GenerationResult,
-    render_mode: Literal["guitar", "piano"] = "guitar",
+    render_mode: Literal["guitar", "piano"] = "piano",
     max_fret: int = DEFAULT_MAX_FRET,
     diagnostics: dict[str, object] | None = None,
 ) -> ComposeServiceResult:
@@ -349,8 +349,7 @@ def compose_canonical_score(
     resolved_render_mode = render_mode
     if render_mode == "guitar":
         try:
-            score = _normalize_to_guitar_range(score)
-            score = _tab_score(score, max_fret=max_fret)
+            score = _arrange_score_for_legacy_guitar(score, max_fret=max_fret)
         except ValueError as exc:
             if _should_fallback_to_piano_score(exc):
                 score = _to_piano_score(score)
@@ -721,19 +720,15 @@ def _normalize_to_guitar_range(score: CanonicalScore) -> CanonicalScore:
 
 
 def _tab_score(score: CanonicalScore, *, max_fret: int) -> CanonicalScore:
-    if len(score.parts) != 1:
-        raise ValueError("compose service supports exactly one part")
+    return _arrange_score_for_legacy_guitar(score, max_fret=max_fret)
 
-    part = score.parts[0]
-    tabbed_part = replace(
-        part,
-        events=tab_events(
-            part.events,
-            tuning=part.info.tuning,
-            max_fret=max_fret,
-        ),
+
+def _arrange_score_for_legacy_guitar(score: CanonicalScore, *, max_fret: int) -> CanonicalScore:
+    arrangement = convert_piano_score_to_guitar(
+        score,
+        settings=GuitarArrangementSettings.for_legacy_compose(max_fret=max_fret),
     )
-    return replace(score, parts=[tabbed_part])
+    return arrangement.score
 
 
 def _to_piano_score(score: CanonicalScore) -> CanonicalScore:

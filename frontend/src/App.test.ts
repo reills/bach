@@ -1,25 +1,33 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest';
-import { compose, inpaintPreview, commitDraft, discardDraft } from './api/client';
+import { compose, generateMeasures, commitDraft, discardDraft } from './api/client';
 import {
   canUseGuitarNoteActions,
+  createGuitarBranch,
+  createInitialProjectScoreState,
+  createPianoBranch,
   getActiveRenderView,
+  getActiveScoreBranch,
   getEventId,
   getMeasureId,
   inferInstrumentMode,
   type EventHitMap,
   type MeasureMap,
+  type ProjectScoreState,
+  type ScoreBranch,
+  type ScoreBranchKind,
   type ScoreDocumentBundle,
-  type ScoreState,
 } from './state/types';
 
 vi.mock('./api/client');
 
 const MINIMAL_XML = '<score-partwise version="3.1"/>';
+const PIANO_XML = '<score-partwise version="3.1"><!-- piano --></score-partwise>';
+const GUITAR_XML = '<score-partwise version="3.1"><!-- guitar --></score-partwise>';
 const DRAFT_XML = '<score-partwise version="3.1"><!-- draft --></score-partwise>';
 const COMMITTED_XML = '<score-partwise version="3.1"><!-- committed --></score-partwise>';
 
 const makeDocument = (
-  instrumentMode: 'guitar' | 'piano' = 'guitar',
+  instrumentMode: 'guitar' | 'piano' = 'piano',
   overrides?: {
     scoreMeasureMap?: MeasureMap;
     scoreEventHitMap?: EventHitMap;
@@ -39,7 +47,7 @@ const makeDocument = (
     ...(instrumentMode === 'guitar'
       ? {
           tab: {
-            xml: overrides?.tabXml ?? MINIMAL_XML,
+            xml: overrides?.tabXml ?? overrides?.scoreXml ?? MINIMAL_XML,
             measureMap: overrides?.tabMeasureMap,
             eventHitMap: overrides?.tabEventHitMap,
           },
@@ -48,183 +56,280 @@ const makeDocument = (
   },
 });
 
-const initialState: ScoreState = {
-  scoreId: null,
-  revision: null,
-  document: null,
-  draftId: null,
-  draftDocument: null,
-  draftBaseRevision: null,
-  highlightMeasureId: null,
-  selectedMeasureId: null,
-  selectedBarIndex: null,
-  lockedEventIds: null,
-  changedMeasureIds: null,
-  lastEventId: null,
-  midi: null,
-  instrumentMode: null,
-};
+const initialState = createInitialProjectScoreState();
+
+function updateBranch(
+  state: ProjectScoreState,
+  branchKind: ScoreBranchKind,
+  update: (branch: ScoreBranch) => ScoreBranch,
+): ProjectScoreState {
+  if (branchKind === 'piano') {
+    return {
+      ...state,
+      piano: update(state.piano) as ProjectScoreState['piano'],
+    };
+  }
+  if (!state.guitar) return state;
+  return {
+    ...state,
+    guitar: update(state.guitar) as NonNullable<ProjectScoreState['guitar']>,
+  };
+}
 
 function applyComposeResponse(
-  state: ScoreState,
+  state: ProjectScoreState,
   response: {
     scoreId: string;
     revision: number;
     document: ScoreDocumentBundle;
     midi?: string;
-    instrumentMode: 'guitar' | 'piano';
   },
-): ScoreState {
+): ProjectScoreState {
   return {
     ...state,
-    scoreId: response.scoreId,
-    revision: response.revision,
-    document: response.document,
-    midi: response.midi ?? null,
-    instrumentMode: response.instrumentMode,
-    draftId: null,
-    draftDocument: null,
-    draftBaseRevision: null,
-    highlightMeasureId: null,
-    selectedMeasureId: null,
-    selectedBarIndex: null,
-    lockedEventIds: null,
-    changedMeasureIds: null,
-    lastEventId: null,
+    activeBranch: 'piano',
+    piano: createPianoBranch({
+      scoreId: response.scoreId,
+      revision: response.revision,
+      document: response.document,
+      midi: response.midi ?? null,
+    }),
+    guitar: null,
   };
 }
 
-function applyMeasureSelect(state: ScoreState, barIndex: number, viewTab: 'score' | 'tab'): ScoreState {
-  const activeDocument = state.draftDocument ?? state.document;
+function applyMeasureSelect(
+  state: ProjectScoreState,
+  barIndex: number,
+  viewTab: 'score' | 'tab',
+): ProjectScoreState {
+  const branch = getActiveScoreBranch(state);
+  const activeDocument = branch?.draftDocument ?? branch?.document;
   const activeView = getActiveRenderView(activeDocument, viewTab);
-  return {
-    ...state,
+  return updateBranch(state, state.activeBranch, (currentBranch) => ({
+    ...currentBranch,
     selectedBarIndex: barIndex,
     selectedMeasureId: getMeasureId(activeView?.measureMap, barIndex),
-  };
+  }));
 }
 
-function applyInpaintPreviewResponse(
-  state: ScoreState,
+function applyGenerateMeasuresResponse(
+  state: ProjectScoreState,
   response: {
-    draftId: string;
     document: ScoreDocumentBundle;
-    baseRevision: number;
-    highlightMeasureId?: string;
-    lockedEventIds?: string[];
-    changedMeasureIds?: string[];
+    revision: number;
+    insertedMeasureIds: string[];
+    changedMeasureIds: string[];
   },
-): ScoreState {
+): ProjectScoreState {
+  const changedMeasureId = response.insertedMeasureIds[0] ?? response.changedMeasureIds[0] ?? null;
   return {
     ...state,
-    draftId: response.draftId,
-    draftDocument: response.document,
-    draftBaseRevision: response.baseRevision,
-    highlightMeasureId: response.highlightMeasureId ?? null,
-    lockedEventIds: response.lockedEventIds ?? null,
-    changedMeasureIds: response.changedMeasureIds ?? null,
+    activeBranch: 'piano',
+    piano: {
+      ...state.piano,
+      document: response.document,
+      revision: response.revision,
+      draftId: null,
+      draftDocument: null,
+      draftBaseRevision: null,
+      highlightMeasureId: changedMeasureId,
+      selectedMeasureId: changedMeasureId,
+      selectedBarIndex: null,
+      lockedEventIds: null,
+      changedMeasureIds: response.changedMeasureIds,
+    },
   };
 }
 
 function applyCommitResponse(
-  state: ScoreState,
+  state: ProjectScoreState,
   response: {
     document: ScoreDocumentBundle;
     revision: number;
   },
-): ScoreState {
-  return {
-    ...state,
+): ProjectScoreState {
+  return updateBranch(state, state.activeBranch, (branch) => ({
+    ...branch,
     document: response.document,
     revision: response.revision,
-    instrumentMode: response.document.instrumentMode,
     draftId: null,
     draftDocument: null,
     draftBaseRevision: null,
     highlightMeasureId: null,
     lockedEventIds: null,
     changedMeasureIds: null,
-  };
+  }));
 }
 
-function applyDiscardDraft(state: ScoreState): ScoreState {
-  return {
-    ...state,
+function applyDiscardDraft(state: ProjectScoreState): ProjectScoreState {
+  return updateBranch(state, state.activeBranch, (branch) => ({
+    ...branch,
     draftId: null,
     draftDocument: null,
     draftBaseRevision: null,
     highlightMeasureId: null,
     lockedEventIds: null,
     changedMeasureIds: null,
-  };
+  }));
 }
 
-describe('compose/inpaint workflow — render bundle state', () => {
+describe('compose/generated-measure workflow — branch model', () => {
   beforeEach(() => {
     vi.resetAllMocks();
   });
 
-  it('compose stores a bundled document instead of a raw score XML', async () => {
+  it('compose stores the generated score in the piano branch and clears guitar', async () => {
     const composeResponse = {
       scoreId: 'score-abc',
       revision: 0,
-      document: makeDocument('guitar', {
+      document: makeDocument('piano', {
         scoreMeasureMap: { '0': 'measure-1' },
-        tabMeasureMap: { '0': 'measure-1-tab' },
+        scoreXml: PIANO_XML,
       }),
-      instrumentMode: 'guitar' as const,
+      instrumentMode: 'piano' as const,
     };
     vi.mocked(compose).mockResolvedValue(composeResponse);
 
-    const state = applyComposeResponse(initialState, await compose({}));
+    const state = applyComposeResponse(
+      {
+        ...initialState,
+        guitar: createGuitarBranch({
+          scoreId: 'old-guitar',
+          document: makeDocument('guitar', { scoreXml: GUITAR_XML }),
+        }),
+      },
+      await compose({}),
+    );
 
-    expect(state.document?.views.score.measureMap).toEqual({ '0': 'measure-1' });
-    expect(state.document?.views.tab?.measureMap).toEqual({ '0': 'measure-1-tab' });
-    expect(state.draftDocument).toBeNull();
+    expect(state.activeBranch).toBe('piano');
+    expect(state.piano.document?.views.score.measureMap).toEqual({ '0': 'measure-1' });
+    expect(state.piano.document?.views.score.xml).toBe(PIANO_XML);
+    expect(state.guitar).toBeNull();
   });
 
-  it('measure selection resolves against the active score view', () => {
-    const state: ScoreState = {
+  it('allows switching to an empty guitar branch without losing piano', () => {
+    const state: ProjectScoreState = {
       ...initialState,
-      document: makeDocument('guitar', {
-        scoreMeasureMap: { '0': 'score-measure-1' },
-        tabMeasureMap: { '0': 'tab-measure-1' },
+      activeBranch: 'guitar',
+      piano: createPianoBranch({
+        scoreId: 'score-abc',
+        revision: 2,
+        document: makeDocument('piano', { scoreXml: PIANO_XML }),
+      }),
+      guitar: null,
+    };
+
+    expect(getActiveScoreBranch(state)).toBeNull();
+    expect(state.piano.document?.views.score.xml).toBe(PIANO_XML);
+  });
+
+  it('can hold an independent converted guitar branch beside piano', () => {
+    const state: ProjectScoreState = {
+      ...initialState,
+      piano: createPianoBranch({
+        scoreId: 'score-piano',
+        revision: 3,
+        document: makeDocument('piano', { scoreXml: PIANO_XML }),
+      }),
+      guitar: createGuitarBranch({
+        scoreId: 'score-guitar',
+        revision: 0,
+        document: makeDocument('guitar', { scoreXml: GUITAR_XML, tabXml: '<tab/>' }),
+        sourcePianoRevisionId: '3',
+        diagnostics: { droppedNotes: [] },
       }),
     };
 
-    expect(applyMeasureSelect(state, 0, 'score').selectedMeasureId).toBe('score-measure-1');
-    expect(applyMeasureSelect(state, 0, 'tab').selectedMeasureId).toBe('tab-measure-1');
+    const editedGuitarState: ProjectScoreState = {
+      ...state,
+      activeBranch: 'guitar',
+      guitar: state.guitar
+        ? {
+            ...state.guitar,
+            revision: 1,
+            document: makeDocument('guitar', {
+              scoreXml: '<score-partwise><!-- edited guitar --></score-partwise>',
+              tabXml: '<tab><!-- edited --></tab>',
+            }),
+          }
+        : null,
+    };
+
+    expect(editedGuitarState.piano.document?.views.score.xml).toBe(PIANO_XML);
+    expect(editedGuitarState.guitar?.document?.views.tab?.xml).toBe('<tab><!-- edited --></tab>');
+    expect(editedGuitarState.guitar?.sourcePianoRevisionId).toBe('3');
   });
 
-  it('inpaint preview stores a draft document bundle without mutating the committed document', async () => {
-    const committedDocument = makeDocument('guitar', { scoreXml: MINIMAL_XML });
-    const previewResponse = {
-      draftId: 'draft-xyz',
-      document: makeDocument('guitar', { scoreXml: DRAFT_XML, tabXml: DRAFT_XML }),
-      baseRevision: 0,
-      highlightMeasureId: 'measure-1',
-      lockedEventIds: ['evt-1'],
-      changedMeasureIds: ['measure-1'],
+  it('measure selection updates only the active branch', () => {
+    const state: ProjectScoreState = {
+      ...initialState,
+      piano: createPianoBranch({
+        document: makeDocument('piano', {
+          scoreMeasureMap: { '0': 'piano-measure-1' },
+        }),
+      }),
+      guitar: createGuitarBranch({
+        document: makeDocument('guitar', {
+          scoreMeasureMap: { '0': 'guitar-score-measure-1' },
+          tabMeasureMap: { '0': 'guitar-tab-measure-1' },
+        }),
+      }),
     };
-    vi.mocked(inpaintPreview).mockResolvedValue(previewResponse);
 
-    const state = applyInpaintPreviewResponse(
-      {
-        ...initialState,
-        scoreId: 'score-abc',
-        revision: 0,
-        document: committedDocument,
-        selectedMeasureId: 'measure-1',
-      },
-      await inpaintPreview({ scoreId: 'score-abc', measureId: 'measure-1', revision: 0 }),
+    const pianoSelected = applyMeasureSelect(state, 0, 'score');
+    const guitarSelected = applyMeasureSelect(
+      { ...pianoSelected, activeBranch: 'guitar' },
+      0,
+      'tab',
     );
 
-    expect(state.document).toBe(committedDocument);
-    expect(state.draftDocument?.views.score.xml).toBe(DRAFT_XML);
-    expect(state.highlightMeasureId).toBe('measure-1');
+    expect(guitarSelected.piano.selectedMeasureId).toBe('piano-measure-1');
+    expect(guitarSelected.guitar?.selectedMeasureId).toBe('guitar-tab-measure-1');
   });
 
-  it('commit replaces the committed document bundle and clears draft state', async () => {
+  it('generated measure operations update piano and preserve guitar', async () => {
+    const guitarBranch = createGuitarBranch({
+      scoreId: 'score-guitar',
+      revision: 5,
+      document: makeDocument('guitar', { scoreXml: GUITAR_XML }),
+    });
+    const generatedResponse = {
+      document: makeDocument('piano', { scoreXml: DRAFT_XML }),
+      revision: 1,
+      insertedMeasureIds: ['measure-1b'],
+      replacedMeasureIds: ['measure-1'],
+      changedMeasureIds: ['measure-1', 'measure-1b'],
+    };
+    vi.mocked(generateMeasures).mockResolvedValue(generatedResponse);
+
+    const state = applyGenerateMeasuresResponse(
+      {
+        ...initialState,
+        piano: createPianoBranch({
+          scoreId: 'score-abc',
+          revision: 0,
+          document: makeDocument('piano', { scoreXml: MINIMAL_XML }),
+          selectedMeasureId: 'measure-1',
+        }),
+        guitar: guitarBranch,
+      },
+      await generateMeasures({
+        scoreId: 'score-abc',
+        measureId: 'measure-1',
+        revision: 0,
+        operation: 'replace',
+        count: 1,
+      }),
+    );
+
+    expect(state.piano.document?.views.score.xml).toBe(DRAFT_XML);
+    expect(state.piano.highlightMeasureId).toBe('measure-1b');
+    expect(state.piano.changedMeasureIds).toEqual(['measure-1', 'measure-1b']);
+    expect(state.guitar).toBe(guitarBranch);
+  });
+
+  it('commit replaces only the active branch document and clears its draft', async () => {
     const commitResponse = {
       document: makeDocument('guitar', { scoreXml: COMMITTED_XML, tabXml: COMMITTED_XML }),
       revision: 1,
@@ -234,34 +339,47 @@ describe('compose/inpaint workflow — render bundle state', () => {
     const state = applyCommitResponse(
       {
         ...initialState,
-        scoreId: 'score-abc',
-        revision: 0,
-        document: makeDocument(),
-        draftId: 'draft-1',
-        draftDocument: makeDocument('guitar', { scoreXml: DRAFT_XML, tabXml: DRAFT_XML }),
+        activeBranch: 'guitar',
+        piano: createPianoBranch({
+          document: makeDocument('piano', { scoreXml: PIANO_XML }),
+        }),
+        guitar: createGuitarBranch({
+          scoreId: 'score-guitar',
+          revision: 0,
+          document: makeDocument('guitar', { scoreXml: GUITAR_XML }),
+          draftId: 'draft-1',
+          draftDocument: makeDocument('guitar', { scoreXml: DRAFT_XML, tabXml: DRAFT_XML }),
+        }),
       },
-      await commitDraft({ scoreId: 'score-abc', draftId: 'draft-1' }),
+      await commitDraft({ scoreId: 'score-guitar', draftId: 'draft-1' }),
     );
 
-    expect(state.document?.views.score.xml).toBe(COMMITTED_XML);
-    expect(state.draftDocument).toBeNull();
-    expect(state.revision).toBe(1);
+    expect(state.piano.document?.views.score.xml).toBe(PIANO_XML);
+    expect(state.guitar?.document?.views.score.xml).toBe(COMMITTED_XML);
+    expect(state.guitar?.draftDocument).toBeNull();
   });
 
-  it('discard clears only the draft bundle', async () => {
+  it('discard clears only the active branch draft bundle', async () => {
     vi.mocked(discardDraft).mockResolvedValue({ ok: true });
 
     const state = applyDiscardDraft({
       ...initialState,
-      scoreId: 'score-abc',
-      revision: 0,
-      document: makeDocument('guitar', { scoreXml: MINIMAL_XML }),
-      draftId: 'draft-1',
-      draftDocument: makeDocument('guitar', { scoreXml: DRAFT_XML }),
+      activeBranch: 'guitar',
+      piano: createPianoBranch({
+        draftDocument: makeDocument('piano', { scoreXml: DRAFT_XML }),
+      }),
+      guitar: createGuitarBranch({
+        scoreId: 'score-guitar',
+        revision: 0,
+        document: makeDocument('guitar', { scoreXml: GUITAR_XML }),
+        draftId: 'draft-1',
+        draftDocument: makeDocument('guitar', { scoreXml: DRAFT_XML }),
+      }),
     });
 
-    expect(state.document?.views.score.xml).toBe(MINIMAL_XML);
-    expect(state.draftDocument).toBeNull();
+    expect(state.piano.draftDocument?.views.score.xml).toBe(DRAFT_XML);
+    expect(state.guitar?.document?.views.score.xml).toBe(GUITAR_XML);
+    expect(state.guitar?.draftDocument).toBeNull();
   });
 
   it('guitar note actions stay gated by instrument mode', () => {
@@ -270,15 +388,19 @@ describe('compose/inpaint workflow — render bundle state', () => {
   });
 
   it('event lookup resolves from the active tab view map', () => {
-    const state: ScoreState = {
+    const state: ProjectScoreState = {
       ...initialState,
-      document: makeDocument('guitar', {
-        tabEventHitMap: { '0|0|-1|-1': 'evt-tab' },
+      activeBranch: 'guitar',
+      guitar: createGuitarBranch({
+        document: makeDocument('guitar', {
+          tabEventHitMap: { '0|0|-1|-1': 'evt-tab' },
+        }),
       }),
     };
 
+    const branch = getActiveScoreBranch(state);
     const eventId = getEventId(
-      getActiveRenderView(state.document, 'tab')?.eventHitMap,
+      getActiveRenderView(branch?.document, 'tab')?.eventHitMap,
       { barIndex: 0, voiceIndex: 0 },
     );
     expect(eventId).toBe('evt-tab');
@@ -287,5 +409,6 @@ describe('compose/inpaint workflow — render bundle state', () => {
   it('inferInstrumentMode still detects piano and guitar from XML content', () => {
     expect(inferInstrumentMode('<score-partwise><attributes><staves>2</staves></attributes></score-partwise>')).toBe('piano');
     expect(inferInstrumentMode('<score-partwise><staff-details><staff-tuning line="1"/></staff-details></score-partwise>')).toBe('guitar');
+    expect(inferInstrumentMode('<score-partwise version="3.1"/>')).toBe('piano');
   });
 });

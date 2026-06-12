@@ -1,6 +1,15 @@
 import { describe, it, expect } from 'vitest';
-import { getActiveRenderView, getEventId, getMeasureId, toHitKey } from './types';
-import type { HitKey, ScoreDocumentBundle, ScoreState } from './types';
+import {
+  createGuitarBranch,
+  createInitialProjectScoreState,
+  createPianoBranch,
+  getActiveRenderView,
+  getActiveScoreBranch,
+  getEventId,
+  getMeasureId,
+  toHitKey,
+} from './types';
+import type { HitKey, ScoreDocumentBundle, ProjectScoreState } from './types';
 
 describe('toHitKey', () => {
   it('produces a canonical pipe-delimited key with all fields', () => {
@@ -57,38 +66,52 @@ describe('getActiveRenderView', () => {
   });
 });
 
-describe('ScoreState draft bundle fields', () => {
-  const base: ScoreState = {
-    scoreId: null,
-    revision: null,
-    document: null,
-    draftId: null,
-    draftDocument: null,
-    draftBaseRevision: null,
-    highlightMeasureId: null,
-    selectedMeasureId: null,
-    selectedBarIndex: null,
-    lockedEventIds: null,
-    changedMeasureIds: null,
-    lastEventId: null,
-    midi: null,
-    instrumentMode: null,
-  };
+describe('ProjectScoreState branch fields', () => {
+  const base = createInitialProjectScoreState();
 
-  it('defaults changedMeasureIds to null', () => {
-    expect(base.changedMeasureIds).toBeNull();
+  it('starts on an empty piano branch with no guitar branch', () => {
+    expect(base.activeBranch).toBe('piano');
+    expect(base.piano.changedMeasureIds).toBeNull();
+    expect(base.guitar).toBeNull();
   });
 
-  it('accepts a draft document bundle', () => {
-    const state: ScoreState = {
+  it('accepts a draft document bundle on a specific branch', () => {
+    const state: ProjectScoreState = {
       ...base,
-      draftDocument: {
-        instrumentMode: 'guitar',
-        views: {
-          score: { xml: '<score/>' },
+      piano: createPianoBranch({
+        draftDocument: {
+          instrumentMode: 'piano',
+          views: {
+            score: { xml: '<score/>' },
+          },
         },
-      },
+      }),
     };
-    expect(state.draftDocument?.views.score.xml).toBe('<score/>');
+    expect(state.piano.draftDocument?.views.score.xml).toBe('<score/>');
+  });
+
+  it('returns null for an unconverted active guitar branch', () => {
+    const state: ProjectScoreState = {
+      ...base,
+      activeBranch: 'guitar',
+    };
+    expect(getActiveScoreBranch(state)).toBeNull();
+  });
+
+  it('stores source metadata on a converted guitar branch', () => {
+    const state: ProjectScoreState = {
+      ...base,
+      activeBranch: 'guitar',
+      guitar: createGuitarBranch({
+        sourcePianoRevisionId: 'piano-rev-4',
+        diagnostics: { warnings: ['octave shifted'] },
+        sourceMap: [{ pianoEventId: 'p1', guitarEventId: 'g1' }],
+      }),
+    };
+
+    expect(getActiveScoreBranch(state)?.instrumentMode).toBe('guitar');
+    expect(state.guitar?.sourcePianoRevisionId).toBe('piano-rev-4');
+    expect(state.guitar?.diagnostics?.warnings).toEqual(['octave shifted']);
+    expect(state.guitar?.sourceMap).toEqual([{ pianoEventId: 'p1', guitarEventId: 'g1' }]);
   });
 });

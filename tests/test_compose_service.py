@@ -99,8 +99,11 @@ def test_compose_baseline_runs_transformation_pipeline_with_stubbed_generation()
     }
 
     first_event, second_event = score.parts[0].events
-    assert first_event.fingering is not None
-    assert second_event.fingering is not None
+    assert result.render_mode == "piano"
+    assert score.parts[0].info.instrument == "piano"
+    assert score.parts[0].info.tuning == []
+    assert first_event.fingering is None
+    assert second_event.fingering is None
     assert result.event_hit_map == {
         "0|0|0|0": first_event.id,
         "0|0|2|0": second_event.id,
@@ -121,8 +124,9 @@ def test_compose_baseline_runs_transformation_pipeline_with_stubbed_generation()
         second_event.id,
         second_event.id,
     ]
-    assert all(note.findtext("./notations/technical/string") is not None for note in pitched_note_els)
-    assert all(note.findtext("./notations/technical/fret") is not None for note in pitched_note_els)
+    assert all(note.findtext("./staff") is not None for note in pitched_note_els)
+    assert all(note.findtext("./notations/technical/string") is None for note in pitched_note_els)
+    assert all(note.findtext("./notations/technical/fret") is None for note in pitched_note_els)
 
     midi_file = MidiFile()
     midi_file.readstr(result.midi)
@@ -440,6 +444,7 @@ def test_compose_baseline_persists_failure_report_with_stage_and_parse_diagnosti
             Path("/tmp/fake-checkpoint.pt"),
             seed_tokens=["KEY_C", "MEAS_4"],
             generation_config=GenerationConfig(max_length=32),
+            render_mode="guitar",
             generator=fake_generator,
         )
 
@@ -486,17 +491,29 @@ _MINIMAL_TOKENS = [
 ]
 
 
-def test_compose_baseline_guitar_mode_default_returns_guitar_render_mode():
+def test_compose_baseline_default_returns_piano_render_mode():
     result = compose_baseline(
         Path("/tmp/fake.pt"),
         seed_tokens=["KEY_C"],
         generation_config=GenerationConfig(max_length=32),
         generator=_make_fake_generator(_MINIMAL_TOKENS),
     )
+    assert result.render_mode == "piano"
+    assert result.score.parts[0].events[0].fingering is None
+    assert result.score.parts[0].info.instrument == "piano"
+    assert result.score.parts[0].info.tuning == []
+
+
+def test_compose_baseline_explicit_guitar_mode_returns_guitar_render_mode():
+    result = compose_baseline(
+        Path("/tmp/fake.pt"),
+        seed_tokens=["KEY_C"],
+        generation_config=GenerationConfig(max_length=32),
+        render_mode="guitar",
+        generator=_make_fake_generator(_MINIMAL_TOKENS),
+    )
     assert result.render_mode == "guitar"
-    # Guitar mode: fingering assigned
     assert result.score.parts[0].events[0].fingering is not None
-    # Part still has tuning (guitar string info)
     assert result.score.parts[0].info.tuning != []
 
 

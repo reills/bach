@@ -96,7 +96,7 @@ def score_to_musicxml(score: CanonicalScore) -> str:
 
 
 def _is_piano(part: Part) -> bool:
-    return part.info.instrument == "piano"
+    return part.info.instrument in {"piano", "harpsichord"}
 
 
 def _append_measure_attributes(

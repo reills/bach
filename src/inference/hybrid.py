@@ -35,6 +35,7 @@ class HybridContext:
     fragment_count: int
     retrieved_matches: list[FragmentMatch]
     copy_hashes: tuple[str, ...]
+    planning_metadata: dict[str, object] | None = None
 
     def model_conditioning(self) -> dict[str, object]:
         return {
@@ -62,6 +63,7 @@ class HybridContext:
             "roleCounts": dict(sorted(role_counts.items())),
             "retrievalReasonCounts": dict(sorted(match_reason_counts.items())),
             "copyRiskHashCount": len(self.copy_hashes),
+            "planningMetadata": self.planning_metadata,
         }
 
 
@@ -70,24 +72,30 @@ def build_hybrid_context(
     *,
     fragment_path: Path | None = None,
     retrieval_limit: int = 1,
+    plan: Sequence[PhrasePlanStep] | None = None,
+    planning_metadata: dict[str, object] | None = None,
 ) -> HybridContext:
     measures = controls.measures or 4
     texture = normalize_texture(controls.texture)
-    plan = build_phrase_plan(
-        measures=measures,
-        key=controls.key or "C",
-        texture=texture,
-    )
+    if plan is None:
+        resolved_plan = build_phrase_plan(
+            measures=measures,
+            key=controls.key or "C",
+            texture=texture,
+        )
+    else:
+        resolved_plan = list(plan)
     fragments = load_fragment_memory(fragment_path)
-    matches = retrieve_plan_fragments(plan, fragments, limit=retrieval_limit)
-    conditioning_rows = _conditioning_rows(plan, matches)
+    matches = retrieve_plan_fragments(resolved_plan, fragments, limit=retrieval_limit)
+    conditioning_rows = _conditioning_rows(resolved_plan, matches)
     copy_hashes = tuple(sorted({fragment.copy_hash for fragment in fragments if fragment.copy_hash}))
     return HybridContext(
-        plan=plan,
+        plan=resolved_plan,
         conditioning_rows=conditioning_rows,
         fragment_count=len(fragments),
         retrieved_matches=matches,
         copy_hashes=copy_hashes,
+        planning_metadata=planning_metadata,
     )
 
 

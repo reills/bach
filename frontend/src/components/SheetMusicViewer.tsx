@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import type { ScoreViewTab } from '../state/types';
 import { VerovioPlayer } from '../playback/VerovioPlayer';
 import { getVerovioCursorIds, type VerovioElementsAtTime } from '../playback/verovioCursor';
@@ -20,18 +20,33 @@ export interface SheetMusicPlayerAPI {
 interface SheetMusicViewerProps {
   scoreXml: string | null;
   highlightMeasureId: string | null;
+  selectedBarIndex?: number | null;
   instrumentMode: 'guitar' | 'piano' | null;
   viewTab: ScoreViewTab;
   onViewTabChange?: (tab: ScoreViewTab) => void;
+  onMeasureClick?: (barIndex: number) => void;
   onPlayerReady?: () => void;
   onPositionChanged?: (currentMs: number, totalMs: number) => void;
   onApiReady?: (api: SheetMusicPlayerAPI | null) => void;
 }
 
+interface MeasureSelectionBox {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+const selectionBoxStyle = (box: MeasureSelectionBox): CSSProperties => ({
+  left: `${box.left}px`,
+  top: `${box.top}px`,
+  width: `${box.width}px`,
+  height: `${box.height}px`,
+});
+
 // Verovio pageWidth is in units of 1/10 mm (VU). The SVG output width is
 // determined by pageWidth alone (scale only affects notation/staff size).
 // To convert container pixels → VU: px * 25.4 / (96 * 0.1) ≈ px * 2.646
-const VEROVIO_SCALE = 34;
 const PIXELS_TO_VU = 25.4 / (96 * 0.1);
 const MIN_PAGE_WIDTH = 1600;
 const MAX_PAGE_WIDTH = 4200;
@@ -152,9 +167,11 @@ export const __testing__ = {
 const SheetMusicViewer = ({
   scoreXml,
   highlightMeasureId,
+  selectedBarIndex = null,
   instrumentMode,
   viewTab,
   onViewTabChange,
+  onMeasureClick,
   onPlayerReady,
   onPositionChanged,
   onApiReady,
@@ -163,10 +180,39 @@ const SheetMusicViewer = ({
   const playerRef = useRef<VerovioPlayer | null>(null);
   const toolkitRef = useRef<VerovioToolkitLike | null>(null);
   const activeCursorIdsRef = useRef<string[]>([]);
+  const onMeasureClickRef = useRef(onMeasureClick);
   const onPlayerReadyRef = useRef(onPlayerReady);
   const onPositionChangedRef = useRef(onPositionChanged);
+  const selectedBarIndexRef = useRef<number | null>(selectedBarIndex);
+  const [selectionBox, setSelectionBox] = useState<MeasureSelectionBox | null>(null);
+  useEffect(() => { onMeasureClickRef.current = onMeasureClick; }, [onMeasureClick]);
   useEffect(() => { onPlayerReadyRef.current = onPlayerReady; }, [onPlayerReady]);
   useEffect(() => { onPositionChangedRef.current = onPositionChanged; }, [onPositionChanged]);
+  useEffect(() => { selectedBarIndexRef.current = selectedBarIndex; }, [selectedBarIndex]);
+
+  const updateSelectedMeasureOverlay = () => {
+    const container = containerRef.current;
+    const barIndex = selectedBarIndexRef.current;
+    if (!container || barIndex === null) {
+      setSelectionBox(null);
+      return;
+    }
+
+    const measureEl = Array.from(container.querySelectorAll<SVGGElement>('g.measure'))[barIndex];
+    if (!measureEl) {
+      setSelectionBox(null);
+      return;
+    }
+
+    const containerRect = container.getBoundingClientRect();
+    const measureRect = measureEl.getBoundingClientRect();
+    setSelectionBox({
+      left: measureRect.left - containerRect.left,
+      top: measureRect.top - containerRect.top,
+      width: measureRect.width,
+      height: measureRect.height,
+    });
+  };
 
   const clearPlaybackCursor = () => {
     const container = containerRef.current;
@@ -237,12 +283,36 @@ const SheetMusicViewer = ({
       return;
     }
 
+    const handleMeasureClick = (event: MouseEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) {
+        return;
+      }
+      const measureEl = target.closest<SVGGElement>('g.measure');
+      if (!measureEl || !container.contains(measureEl)) {
+        return;
+      }
+      const measures = Array.from(container.querySelectorAll<SVGGElement>('g.measure'));
+      const barIndex = measures.indexOf(measureEl);
+      if (barIndex >= 0) {
+        onMeasureClickRef.current?.(barIndex);
+      }
+    };
+
+    const handleMeasureScroll = () => updateSelectedMeasureOverlay();
+    container.addEventListener('click', handleMeasureClick);
+    container.addEventListener('scroll', handleMeasureScroll);
+
     if (!scoreXml) {
       clearPlaybackCursor();
       toolkitRef.current = null;
       container.innerHTML = '';
       playerRef.current?.stop();
-      return;
+      setSelectionBox(null);
+      return () => {
+        container.removeEventListener('click', handleMeasureClick);
+        container.removeEventListener('scroll', handleMeasureScroll);
+      };
     }
 
     let cancelled = false;
@@ -265,6 +335,7 @@ const SheetMusicViewer = ({
 
         if (!cancelled) {
           containerRef.current.innerHTML = svg;
+          window.requestAnimationFrame(updateSelectedMeasureOverlay);
         }
 
         // Load MIDI from the same toolkit state (loadData was called inside renderVerovioScore)
@@ -308,6 +379,8 @@ const SheetMusicViewer = ({
 
     return () => {
       cancelled = true;
+      container.removeEventListener('click', handleMeasureClick);
+      container.removeEventListener('scroll', handleMeasureScroll);
       clearPlaybackCursor();
       toolkitRef.current = null;
       if (animationFrameId !== null) {
@@ -316,6 +389,10 @@ const SheetMusicViewer = ({
       resizeObserver?.disconnect();
     };
   }, [scoreXml]);
+
+  useEffect(() => {
+    updateSelectedMeasureOverlay();
+  }, [selectedBarIndex, scoreXml, viewTab]);
 
   const label =
     instrumentMode === 'guitar'
@@ -366,6 +443,12 @@ const SheetMusicViewer = ({
             Draft: {highlightMeasureId}
           </span>
         ) : null}
+        {selectedBarIndex !== null ? (
+          <span className="score-viewer__badge score-viewer__badge--selected">
+            <span>📍</span>
+            Selected: Bar {selectedBarIndex + 1}
+          </span>
+        ) : null}
       </div>
       {!scoreXml ? (
         <div className="score-viewer__empty">
@@ -377,7 +460,17 @@ const SheetMusicViewer = ({
         </div>
       ) : null}
       {scoreXml ? <div className="score-viewer__score-title">{scoreTitle}</div> : null}
-      <div className="score-viewer__canvas score-viewer__canvas--sheet" ref={containerRef} />
+      <div className="score-viewer__canvas-shell">
+        <div className="score-viewer__canvas score-viewer__canvas--sheet" ref={containerRef} />
+        {selectionBox ? (
+          <div className="score-viewer__selection-layer" aria-hidden="true">
+            <div
+              className="score-viewer__measure-selection score-viewer__measure-selection--sheet"
+              style={selectionBoxStyle(selectionBox)}
+            />
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 };
