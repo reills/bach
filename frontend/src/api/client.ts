@@ -9,6 +9,8 @@ import type {
   CommitDraftResponse,
   ComposeRequest,
   ComposeResponse,
+  ConvertToGuitarRequest,
+  ConvertToGuitarResponse,
   DiscardDraftRequest,
   DiscardDraftResponse,
   GenerateMeasuresRequest,
@@ -82,3 +84,8 @@ export const generateMeasures = (
   body: GenerateMeasuresRequest,
 ): Promise<GenerateMeasuresResponse> =>
   apiPost<GenerateMeasuresResponse>('/generate_measures', body);
+
+export const convertToGuitar = (
+  body: ConvertToGuitarRequest,
+): Promise<ConvertToGuitarResponse> =>
+  apiPost<ConvertToGuitarResponse>('/api/convert-to-guitar', body);

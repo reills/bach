@@ -23,12 +23,16 @@ def score_from_json(data: str) -> CanonicalScore:
     return _score_from_dict(json.loads(data))
 
 
-def _score_from_dict(d: dict) -> CanonicalScore:
+def score_from_dict(d: dict) -> CanonicalScore:
     return CanonicalScore(
         header=_header_from_dict(d["header"]),
         measures=[_measure_from_dict(m) for m in d["measures"]],
         parts=[_part_from_dict(p) for p in d["parts"]],
     )
+
+
+def _score_from_dict(d: dict) -> CanonicalScore:
+    return score_from_dict(d)
 
 
 def _header_from_dict(d: dict) -> ScoreHeader:

@@ -22,6 +22,7 @@ from src.api.canonical import (
     splice_generated_measures,
 )
 from src.api.compose_service import ComposeServiceResult, export_score
+from src.api.render import canonical_score_to_midi
 from src.api.services import preview_window_inpaint
 from src.api.store import (
     DraftNotFoundError,
@@ -30,6 +31,8 @@ from src.api.store import (
     ScoreNotFoundError,
     StaleRevisionError,
 )
+from src.api.store_serde import score_from_dict
+from src.arrangers.guitar import GuitarArrangementSettings, convert_piano_score_to_guitar
 from src.tabber import alternate_fingerings_for_event
 
 ComposeHandler = Callable[[BaseModel], ComposeServiceResult]
@@ -193,6 +196,46 @@ class GenerateMeasuresResponse(BaseModel):
     replacedMeasureIds: list[str]
     changedMeasureIds: list[str]
     diagnostics: dict[str, Any] | None = None
+
+
+class GuitarConversionSettingsRequest(BaseModel):
+    difficulty: Literal["easy", "medium", "hard"] | None = None
+    maxFret: int | None = None
+    preferredPosition: int | None = None
+    allowOctaveShift: bool | None = None
+    octaveShiftPolicy: Literal["none", "below_range", "outside_range"] | None = None
+    allowDropNotes: bool | None = None
+    preserveMelody: bool | None = None
+    preserveBass: bool | None = None
+    maxHandSpanFrets: int | None = None
+    maxNotesPerOnset: int | None = None
+    tuning: list[int] | None = None
+
+
+class ConvertToGuitarRequest(BaseModel):
+    scoreId: str | None = None
+    revision: int | None = None
+    pianoScore: dict[str, Any] | None = None
+    sourcePianoRevisionId: str | None = None
+    settings: GuitarConversionSettingsRequest | None = None
+
+
+class ConvertToGuitarResponse(BaseModel):
+    scoreId: str
+    revision: int
+    branch: Literal["guitar"] = "guitar"
+    instrumentMode: Literal["guitar"] = "guitar"
+    document: dict[str, Any]
+    scoreXML: str
+    guitarMusicXml: str
+    guitarTabXml: str | None = None
+    midi: str
+    sourcePianoRevisionId: str
+    sourcePianoScoreId: str | None = None
+    sourcePianoRevision: int | None = None
+    conversionSettings: dict[str, Any]
+    diagnostics: dict[str, Any]
+    sourceMap: list[dict[str, Any]]
 
 
 def create_router(
@@ -514,7 +557,134 @@ def create_router(
             addedMeasureIds=response.insertedMeasureIds,
         )
 
+    @router.post("/api/convert-to-guitar", response_model=ConvertToGuitarResponse)
+    @router.post("/convert-to-guitar", response_model=ConvertToGuitarResponse)
+    async def convert_to_guitar(request: ConvertToGuitarRequest) -> ConvertToGuitarResponse:
+        try:
+            piano_score, source_score_id, source_revision, source_name = _resolve_piano_source(
+                score_repository,
+                request,
+            )
+            _validate_piano_source(piano_score)
+            arrangement = convert_piano_score_to_guitar(
+                piano_score,
+                settings=_build_guitar_arrangement_settings(request.settings),
+            )
+            exported = export_score(arrangement.score)
+            stored_guitar = score_repository.create_score(
+                arrangement.score,
+                name=f"Guitar arrangement of {source_name}",
+            )
+        except ScoreNotFoundError as exc:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        except StaleRevisionError as exc:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+        score_view = exported.views["score"]
+        tab_view = exported.views.get("tab")
+        arrangement_payload = arrangement.to_dict()
+        source_map_payload = arrangement.source_map.to_dict()
+        return ConvertToGuitarResponse(
+            scoreId=stored_guitar.score_id,
+            revision=stored_guitar.revision,
+            document=_bundle_to_response_dict(exported),
+            scoreXML=score_view.xml,
+            guitarMusicXml=score_view.xml,
+            guitarTabXml=tab_view.xml if tab_view else None,
+            midi=base64.b64encode(canonical_score_to_midi(arrangement.score)).decode("ascii"),
+            sourcePianoRevisionId=_source_piano_revision_id(
+                request,
+                source_score_id=source_score_id,
+                source_revision=source_revision,
+            ),
+            sourcePianoScoreId=source_score_id,
+            sourcePianoRevision=source_revision,
+            conversionSettings=arrangement_payload["settings"],  # type: ignore[index]
+            diagnostics=arrangement_payload["diagnostics"],  # type: ignore[index]
+            sourceMap=source_map_payload["notes"],  # type: ignore[index]
+        )
+
     return router
+
+
+def _resolve_piano_source(
+    repository: ScoreDraftRepository[CanonicalScore],
+    request: ConvertToGuitarRequest,
+) -> tuple[CanonicalScore, str | None, int | None, str]:
+    if request.scoreId and request.pianoScore is not None:
+        raise ValueError("provide either scoreId or pianoScore, not both")
+    if request.scoreId:
+        if request.revision is None:
+            raise ValueError("revision is required when scoreId is provided")
+        stored_score = repository.get_score(request.scoreId)
+        if stored_score.revision != request.revision:
+            raise StaleRevisionError(
+                f"score {request.scoreId!r} is at revision {stored_score.revision}, "
+                f"not {request.revision}"
+            )
+        return stored_score.score, stored_score.score_id, stored_score.revision, stored_score.name
+    if request.pianoScore is not None:
+        return score_from_dict(request.pianoScore), None, request.revision, "inline piano score"
+    raise ValueError("scoreId or pianoScore is required")
+
+
+def _validate_piano_source(score: CanonicalScore) -> None:
+    if len(score.parts) != 1:
+        raise ValueError("piano-to-guitar conversion requires exactly one source part")
+    instrument = score.parts[0].info.instrument
+    if instrument != "piano":
+        raise ValueError(f"piano-to-guitar conversion requires a piano source, got {instrument!r}")
+
+
+def _build_guitar_arrangement_settings(
+    request_settings: GuitarConversionSettingsRequest | None,
+) -> GuitarArrangementSettings:
+    if request_settings is None:
+        return GuitarArrangementSettings()
+
+    kwargs: dict[str, Any] = {}
+    if request_settings.difficulty is not None:
+        kwargs["difficulty"] = request_settings.difficulty
+    if request_settings.maxFret is not None:
+        kwargs["max_fret"] = request_settings.maxFret
+    if request_settings.preferredPosition is not None:
+        kwargs["preferred_position"] = request_settings.preferredPosition
+    if request_settings.allowOctaveShift is not None:
+        kwargs["octave_shift_policy"] = (
+            "outside_range" if request_settings.allowOctaveShift else "none"
+        )
+    if request_settings.octaveShiftPolicy is not None:
+        kwargs["octave_shift_policy"] = request_settings.octaveShiftPolicy
+    if request_settings.allowDropNotes is not None:
+        kwargs["allow_drop_notes"] = request_settings.allowDropNotes
+    if request_settings.preserveMelody is not None:
+        kwargs["preserve_melody"] = request_settings.preserveMelody
+    if request_settings.preserveBass is not None:
+        kwargs["preserve_bass"] = request_settings.preserveBass
+    if request_settings.maxHandSpanFrets is not None:
+        kwargs["max_hand_span_frets"] = request_settings.maxHandSpanFrets
+    if request_settings.maxNotesPerOnset is not None:
+        kwargs["max_notes_per_onset"] = request_settings.maxNotesPerOnset
+    if request_settings.tuning is not None:
+        kwargs["tuning"] = tuple(request_settings.tuning)
+    return GuitarArrangementSettings(**kwargs)
+
+
+def _source_piano_revision_id(
+    request: ConvertToGuitarRequest,
+    *,
+    source_score_id: str | None,
+    source_revision: int | None,
+) -> str:
+    if request.sourcePianoRevisionId:
+        return request.sourcePianoRevisionId
+    if source_score_id is not None and source_revision is not None:
+        return f"{source_score_id}@{source_revision}"
+    if source_revision is not None:
+        return str(source_revision)
+    return "inline"
 
 
 def _validate_draft_belongs_to_score(

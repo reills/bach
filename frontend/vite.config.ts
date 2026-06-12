@@ -15,6 +15,7 @@ export default defineConfig({
       '/apply_fingering': 'http://localhost:8001',
       '/append_measures': 'http://localhost:8001',
       '/generate_measures': 'http://localhost:8001',
+      '/api/convert-to-guitar': 'http://localhost:8001',
       '/health': 'http://localhost:8001',
     },
   },

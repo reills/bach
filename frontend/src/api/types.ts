@@ -154,3 +154,43 @@ export interface GenerateMeasuresResponse {
   changedMeasureIds: string[];
   diagnostics?: Record<string, unknown>;
 }
+
+export interface GuitarConversionSettings {
+  difficulty?: 'easy' | 'medium' | 'hard';
+  maxFret?: number;
+  preferredPosition?: number;
+  allowOctaveShift?: boolean;
+  octaveShiftPolicy?: 'none' | 'below_range' | 'outside_range';
+  allowDropNotes?: boolean;
+  preserveMelody?: boolean;
+  preserveBass?: boolean;
+  maxHandSpanFrets?: number;
+  maxNotesPerOnset?: number;
+  tuning?: number[];
+}
+
+export interface ConvertToGuitarRequest {
+  scoreId?: string;
+  revision?: number;
+  pianoScore?: Record<string, unknown>;
+  sourcePianoRevisionId?: string;
+  settings?: GuitarConversionSettings;
+}
+
+export interface ConvertToGuitarResponse {
+  scoreId: string;
+  revision: number;
+  branch: 'guitar';
+  instrumentMode: 'guitar';
+  document: ScoreDocumentBundle;
+  scoreXML: string;
+  guitarMusicXml: string;
+  guitarTabXml?: string | null;
+  midi: string;
+  sourcePianoRevisionId: string;
+  sourcePianoScoreId?: string | null;
+  sourcePianoRevision?: number | null;
+  conversionSettings: Record<string, unknown>;
+  diagnostics: Record<string, unknown>;
+  sourceMap: Array<Record<string, unknown>>;
+}

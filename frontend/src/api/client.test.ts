@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { compose, generateMeasures } from './client';
+import { compose, convertToGuitar, generateMeasures } from './client';
 
 describe('compose client', () => {
   afterEach(() => {
@@ -72,6 +72,52 @@ describe('compose client', () => {
           revision: 1,
           operation: 'append',
           count: 1,
+        }),
+      }),
+    );
+  });
+
+  it('posts guitar conversion requests to the backend route', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        scoreId: 'score-guitar-1',
+        revision: 1,
+        branch: 'guitar',
+        instrumentMode: 'guitar',
+        document: {
+          instrumentMode: 'guitar',
+          views: {
+            score: { xml: '<score-partwise version="3.1"/>' },
+            tab: { xml: '<score-partwise version="3.1"/>' },
+          },
+        },
+        scoreXML: '<score-partwise version="3.1"/>',
+        guitarMusicXml: '<score-partwise version="3.1"/>',
+        guitarTabXml: '<score-partwise version="3.1"/>',
+        midi: '',
+        sourcePianoRevisionId: 'score-1@2',
+        conversionSettings: {},
+        diagnostics: {},
+        sourceMap: [],
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await convertToGuitar({
+      scoreId: 'score-1',
+      revision: 2,
+      settings: { difficulty: 'medium', maxFret: 12 },
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/convert-to-guitar',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          scoreId: 'score-1',
+          revision: 2,
+          settings: { difficulty: 'medium', maxFret: 12 },
         }),
       }),
     );
