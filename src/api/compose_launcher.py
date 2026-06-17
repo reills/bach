@@ -815,24 +815,10 @@ def _metric(value: object) -> float:
 def normalize_engine(value: str | None, *, default: EngineMode = "transformer") -> EngineMode:
     if value is None:
         return default
-    normalized = value.strip().lower().replace("_", "-")
-    aliases = {
-        "transformer": "transformer",
-        "neural": "transformer",
-        "notelm": "transformer",
-        "emi": "emi",
-        "cope": "emi",
-        "symbolic": "emi",
-        "hybrid": "hybrid",
-        "both": "hybrid",
-        "instrumental-v6": "instrumental_v6",
-        "v6": "instrumental_v6",
-        "voice-aware-v2": "instrumental_v6",
-    }
-    engine = aliases.get(normalized)
-    if engine is None:
+    normalized = value.strip().lower()
+    if normalized not in {"transformer", "emi", "hybrid", "instrumental_v6"}:
         raise ValueError("engine must be one of: transformer, emi, hybrid, instrumental_v6")
-    return engine  # type: ignore[return-value]
+    return normalized  # type: ignore[return-value]
 
 
 def _constraints_dict(value: Any) -> dict[str, Any]:
@@ -902,7 +888,7 @@ def _constraint_quality_passes(constraints: dict[str, Any], *, default: int) -> 
 
 
 def _constraint_engine(constraints: dict[str, Any], *, default: EngineMode) -> EngineMode:
-    value = _constraint_text(constraints, "engine", "compositionEngine")
+    value = _constraint_text(constraints, "engine")
     return normalize_engine(value, default=default)
 
 
@@ -955,7 +941,6 @@ def _hybrid_debug_fallback_enabled(
 ) -> bool:
     return _constraint_bool(
         constraints,
-        "hybrid_allow_emi_fallback",
         "hybridAllowEmiFallback",
         default=config.hybrid_allow_emi_debug_fallback,
     )

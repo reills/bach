@@ -15,7 +15,6 @@ export interface ComposeConstraints {
   maxLength?: number;
   qualityPasses?: number;
   voiceLeading?: 'fast' | 'off' | 'balanced' | 'best';
-  hybridAllowEmiFallback?: boolean;
   noveltyNgram?: number;
   sourceTokenSequences?: string[][];
 }
