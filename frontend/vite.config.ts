@@ -6,6 +6,7 @@ export default defineConfig({
   plugins: [react(), alphaTab()],
   server: {
     port: 5173,
+    allowedHosts: ['stephen-reilly-ms-7d98.tail3e233f.ts.net'],
     proxy: {
       '/compose': 'http://localhost:8001',
       '/inpaint_preview': 'http://localhost:8001',

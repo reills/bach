@@ -65,9 +65,9 @@ class GuitarArrangementSettings:
         if self.max_hand_span_frets is not None:
             return self.max_hand_span_frets
         return {
-            "easy": 4,
-            "medium": 5,
-            "hard": 7,
+            "easy": 3,
+            "medium": 4,
+            "hard": 6,
         }[self.difficulty]
 
     @property

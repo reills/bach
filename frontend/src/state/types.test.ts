@@ -7,7 +7,11 @@ import {
   getActiveScoreBranch,
   getEventId,
   getMeasureId,
+  getPianoRevisionId,
+  isGuitarBranchStale,
   toHitKey,
+  updateGuitarBranch,
+  updatePianoBranch,
 } from './types';
 import type { HitKey, ScoreDocumentBundle, ProjectScoreState } from './types';
 
@@ -113,5 +117,52 @@ describe('ProjectScoreState branch fields', () => {
     expect(state.guitar?.sourcePianoRevisionId).toBe('piano-rev-4');
     expect(state.guitar?.diagnostics?.warnings).toEqual(['octave shifted']);
     expect(state.guitar?.sourceMap).toEqual([{ pianoEventId: 'p1', guitarEventId: 'g1' }]);
+  });
+
+  it('updates piano without replacing guitar and detects stale provenance', () => {
+    const guitar = createGuitarBranch({
+      sourcePianoRevisionId: 'score-piano@2',
+    });
+    const state: ProjectScoreState = {
+      ...base,
+      piano: createPianoBranch({
+        scoreId: 'score-piano',
+        revision: 2,
+      }),
+      guitar,
+    };
+
+    const edited = updatePianoBranch(state, (piano) => ({
+      ...piano,
+      revision: 3,
+    }));
+
+    expect(getPianoRevisionId(edited.piano)).toBe('score-piano@3');
+    expect(edited.guitar).toBe(guitar);
+    expect(isGuitarBranchStale(edited)).toBe(true);
+  });
+
+  it('updates guitar without replacing piano', () => {
+    const piano = createPianoBranch({
+      scoreId: 'score-piano',
+      revision: 2,
+    });
+    const state: ProjectScoreState = {
+      ...base,
+      piano,
+      guitar: createGuitarBranch({
+        revision: 0,
+        sourcePianoRevisionId: 'score-piano@2',
+      }),
+    };
+
+    const edited = updateGuitarBranch(state, (guitar) => ({
+      ...guitar,
+      revision: 1,
+    }));
+
+    expect(edited.piano).toBe(piano);
+    expect(edited.guitar?.revision).toBe(1);
+    expect(isGuitarBranchStale(edited)).toBe(false);
   });
 });

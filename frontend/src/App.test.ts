@@ -1,5 +1,5 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest';
-import { compose, generateMeasures, commitDraft, discardDraft } from './api/client';
+import { commitDraft, compose, convertToGuitar, discardDraft, generateMeasures } from './api/client';
 import {
   canUseGuitarNoteActions,
   createGuitarBranch,
@@ -10,6 +10,9 @@ import {
   getEventId,
   getMeasureId,
   inferInstrumentMode,
+  isGuitarBranchStale,
+  updateGuitarBranch,
+  updatePianoBranch,
   type EventHitMap,
   type MeasureMap,
   type ProjectScoreState,
@@ -142,6 +145,35 @@ function applyGenerateMeasuresResponse(
   };
 }
 
+function applyConvertToGuitarResponse(
+  state: ProjectScoreState,
+  response: {
+    scoreId: string;
+    revision: number;
+    document: ScoreDocumentBundle;
+    midi?: string;
+    sourcePianoRevisionId: string;
+    conversionSettings: Record<string, unknown>;
+    diagnostics: Record<string, unknown>;
+    sourceMap: Array<Record<string, unknown>>;
+  },
+): ProjectScoreState {
+  return {
+    ...state,
+    activeBranch: 'guitar',
+    guitar: createGuitarBranch({
+      scoreId: response.scoreId,
+      revision: response.revision,
+      document: response.document,
+      midi: response.midi ?? null,
+      sourcePianoRevisionId: response.sourcePianoRevisionId,
+      conversionSettings: response.conversionSettings,
+      diagnostics: response.diagnostics,
+      sourceMap: response.sourceMap,
+    }),
+  };
+}
+
 function applyCommitResponse(
   state: ProjectScoreState,
   response: {
@@ -261,6 +293,61 @@ describe('compose/generated-measure workflow — branch model', () => {
     expect(editedGuitarState.guitar?.sourcePianoRevisionId).toBe('3');
   });
 
+  it('stores convert-to-guitar results as an active independent branch', async () => {
+    const pianoBranch = createPianoBranch({
+      scoreId: 'score-piano',
+      revision: 3,
+      document: makeDocument('piano', { scoreXml: PIANO_XML }),
+      midi: 'piano-midi',
+    });
+    const convertedResponse = {
+      scoreId: 'score-guitar',
+      revision: 0,
+      branch: 'guitar' as const,
+      instrumentMode: 'guitar' as const,
+      document: makeDocument('guitar', { scoreXml: GUITAR_XML, tabXml: '<tab/>' }),
+      scoreXML: GUITAR_XML,
+      guitarMusicXml: GUITAR_XML,
+      guitarTabXml: '<tab/>',
+      midi: 'guitar-midi',
+      sourcePianoRevisionId: 'score-piano@3',
+      conversionSettings: { difficulty: 'medium' },
+      diagnostics: {
+        droppedNotes: [{ sourceEventId: 'p1' }],
+        octaveShiftedNotes: [],
+        warnings: ['dropped 1 note'],
+      },
+      sourceMap: [{ pianoEventId: 'p1', guitarEventId: null, dropped: true }],
+    };
+    vi.mocked(convertToGuitar).mockResolvedValue(convertedResponse);
+
+    const state = applyConvertToGuitarResponse(
+      {
+        ...initialState,
+        activeBranch: 'piano',
+        piano: pianoBranch,
+      },
+      await convertToGuitar({
+        scoreId: 'score-piano',
+        revision: 3,
+        sourcePianoRevisionId: 'score-piano@3',
+        settings: { difficulty: 'medium' },
+      }),
+    );
+
+    expect(state.activeBranch).toBe('guitar');
+    expect(state.piano).toBe(pianoBranch);
+    expect(state.piano.document?.views.score.xml).toBe(PIANO_XML);
+    expect(state.guitar?.scoreId).toBe('score-guitar');
+    expect(state.guitar?.document?.views.tab?.xml).toBe('<tab/>');
+    expect(state.guitar?.midi).toBe('guitar-midi');
+    expect(state.guitar?.sourcePianoRevisionId).toBe('score-piano@3');
+    expect(state.guitar?.diagnostics?.warnings).toEqual(['dropped 1 note']);
+    expect(state.guitar?.sourceMap).toEqual([
+      { pianoEventId: 'p1', guitarEventId: null, dropped: true },
+    ]);
+  });
+
   it('measure selection updates only the active branch', () => {
     const state: ProjectScoreState = {
       ...initialState,
@@ -327,6 +414,67 @@ describe('compose/generated-measure workflow — branch model', () => {
     expect(state.piano.highlightMeasureId).toBe('measure-1b');
     expect(state.piano.changedMeasureIds).toEqual(['measure-1', 'measure-1b']);
     expect(state.guitar).toBe(guitarBranch);
+  });
+
+  it('piano edits leave the converted guitar branch unchanged and mark it stale', () => {
+    const guitarBranch = createGuitarBranch({
+      scoreId: 'score-guitar',
+      revision: 2,
+      document: makeDocument('guitar', { scoreXml: GUITAR_XML }),
+      sourcePianoRevisionId: 'score-piano@3',
+    });
+    const state: ProjectScoreState = {
+      ...initialState,
+      piano: createPianoBranch({
+        scoreId: 'score-piano',
+        revision: 3,
+        document: makeDocument('piano', { scoreXml: PIANO_XML }),
+      }),
+      guitar: guitarBranch,
+    };
+
+    const edited = updatePianoBranch(state, (piano) => ({
+      ...piano,
+      revision: 4,
+      document: makeDocument('piano', { scoreXml: DRAFT_XML }),
+    }));
+
+    expect(edited.guitar).toBe(guitarBranch);
+    expect(edited.guitar?.document?.views.score.xml).toBe(GUITAR_XML);
+    expect(isGuitarBranchStale(edited)).toBe(true);
+  });
+
+  it('guitar edits leave the source piano branch unchanged', () => {
+    const pianoBranch = createPianoBranch({
+      scoreId: 'score-piano',
+      revision: 3,
+      document: makeDocument('piano', { scoreXml: PIANO_XML }),
+    });
+    const state: ProjectScoreState = {
+      ...initialState,
+      activeBranch: 'guitar',
+      piano: pianoBranch,
+      guitar: createGuitarBranch({
+        scoreId: 'score-guitar',
+        revision: 0,
+        document: makeDocument('guitar', { scoreXml: GUITAR_XML }),
+        sourcePianoRevisionId: 'score-piano@3',
+      }),
+    };
+
+    const edited = updateGuitarBranch(state, (guitar) => ({
+      ...guitar,
+      revision: 1,
+      document: makeDocument('guitar', {
+        scoreXml: COMMITTED_XML,
+        tabXml: COMMITTED_XML,
+      }),
+    }));
+
+    expect(edited.piano).toBe(pianoBranch);
+    expect(edited.piano.document?.views.score.xml).toBe(PIANO_XML);
+    expect(edited.guitar?.document?.views.tab?.xml).toBe(COMMITTED_XML);
+    expect(isGuitarBranchStale(edited)).toBe(false);
   });
 
   it('commit replaces only the active branch document and clears its draft', async () => {

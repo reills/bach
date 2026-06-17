@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type MutableRefObject } from 'react';
 import * as alphaTab from '@coderline/alphatab';
 import type { HitKey, InstrumentMode, ScoreViewTab } from '../state/types';
-import { VerovioPlayer } from '../playback/VerovioPlayer';
+import { VerovioPlayer, type VerovioPlaybackInstrument } from '../playback/VerovioPlayer';
 import { createAlphaTabExternalMediaHandler } from '../playback/alphaTabExternalMedia';
 import { getVerovioToolkit } from '../playback/verovioToolkit';
 import {
@@ -407,8 +407,11 @@ const ScoreViewer = ({
           return;
         }
 
+        const playbackInstrument: VerovioPlaybackInstrument =
+          instrumentModeRef.current === 'guitar' ? 'guitar' : 'piano';
         if (!midiPlayerRef.current) {
           midiPlayerRef.current = new VerovioPlayer({
+            playbackInstrument,
             onPositionChanged: (current, total) => {
               onPositionChangedRef.current?.(current, total);
               updateAlphaTabPlaybackPosition(current);
@@ -417,6 +420,7 @@ const ScoreViewer = ({
           });
         } else {
           midiPlayerRef.current.stop();
+          midiPlayerRef.current.setPlaybackInstrument(playbackInstrument);
         }
 
         midiPlayerRef.current.load(midiBase64);
@@ -434,7 +438,7 @@ const ScoreViewer = ({
     return () => {
       cancelled = true;
     };
-  }, [scoreXml]);
+  }, [scoreXml, instrumentMode]);
 
   useEffect(() => {
     updateSelectedMeasureOverlay();

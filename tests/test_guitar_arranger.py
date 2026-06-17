@@ -94,6 +94,35 @@ def test_convert_piano_score_to_guitar_preserves_melody_bass_and_harmony_notes()
     assert all(event.fingering is not None for event in arrangement.score.parts[0].events)
 
 
+def test_convert_piano_score_to_guitar_prefers_compact_voicing_over_position_bias() -> None:
+    score = _score(
+        [
+            Event(id="bass-g", start_tick=0, dur_tick=24, voice_id=0, pitch_midi=43),
+            Event(id="inner-e", start_tick=0, dur_tick=24, voice_id=1, pitch_midi=52),
+            Event(id="top-e", start_tick=0, dur_tick=24, voice_id=2, pitch_midi=64),
+            Event(id="top-g", start_tick=0, dur_tick=24, voice_id=3, pitch_midi=67),
+        ]
+    )
+
+    arrangement = convert_piano_score_to_guitar(
+        score,
+        settings=GuitarArrangementSettings(preferred_position=8, max_fret=12),
+    )
+
+    fingerings = {
+        event.id: (event.fingering.string_index, event.fingering.fret)
+        for event in arrangement.score.parts[0].events
+        if event.fingering is not None
+    }
+    assert fingerings == {
+        "gtr-bass-g": (0, 3),
+        "gtr-inner-e": (2, 2),
+        "gtr-top-e": (4, 5),
+        "gtr-top-g": (5, 3),
+    }
+    assert arrangement.diagnostics.hand_position_compromises == []
+
+
 def test_convert_piano_score_to_guitar_uses_difficulty_density() -> None:
     score = _score(
         [

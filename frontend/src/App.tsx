@@ -8,10 +8,11 @@ import {
   applyFingering,
   commitDraft,
   compose,
+  convertToGuitar,
   discardDraft,
   generateMeasures,
 } from './api/client';
-import type { MeasureGenerationOperation } from './api/types';
+import type { GuitarConversionSettings, MeasureGenerationOperation } from './api/types';
 import {
   canUseGuitarNoteActions,
   createGuitarBranch,
@@ -21,11 +22,14 @@ import {
   getActiveScoreBranch,
   getEventId,
   getMeasureId,
+  getPianoRevisionId,
   inferInstrumentMode,
+  isGuitarBranchStale,
+  updateGuitarBranch,
+  updatePianoBranch,
   type GuitarScoreBranch,
   type HitKey,
   type InstrumentMode,
-  type PianoScoreBranch,
   type ScoreBranch,
   type ScoreBranchKind,
   type ScoreViewTab,
@@ -156,9 +160,21 @@ const DEFAULT_MEASURE_TARGET = 8;
 const MAX_MEASURE_TARGET = 64;
 const MAX_GENERATED_MEASURE_COUNT = 32;
 const DEFAULT_GENERATION_INSTRUMENT_MODE: InstrumentMode = 'piano';
+const DEFAULT_GUITAR_CONVERSION_SETTINGS: GuitarConversionSettings = {
+  difficulty: 'medium',
+  maxFret: 12,
+  preferredPosition: 5,
+  allowOctaveShift: true,
+  allowDropNotes: true,
+  preserveMelody: true,
+  preserveBass: true,
+};
 
 const createRandomSeed = (): number =>
   Math.floor(Math.random() * 2_147_483_646) + 1;
+
+const isBackendScoreId = (scoreId: string | null): scoreId is string =>
+  Boolean(scoreId && scoreId !== 'demo' && !scoreId.startsWith('local:'));
 
 const clampInteger = (value: number, min: number, max: number): number => {
   if (!Number.isFinite(value)) return min;
@@ -187,26 +203,23 @@ const formatDiagnosticValue = (value: unknown): string => {
   return String(value);
 };
 
+const diagnosticArrayCount = (
+  diagnostics: Record<string, unknown> | null | undefined,
+  key: string,
+): number => {
+  const value = diagnostics?.[key];
+  return Array.isArray(value) ? value.length : 0;
+};
+
 const updateProjectBranch = (
   state: ScoreState,
   branchKind: ScoreBranchKind,
   update: (branch: ScoreBranch) => ScoreBranch,
 ): ScoreState => {
   if (branchKind === 'piano') {
-    return {
-      ...state,
-      piano: update(state.piano) as PianoScoreBranch,
-    };
+    return updatePianoBranch(state, (branch) => update(branch) as typeof branch);
   }
-
-  if (!state.guitar) {
-    return state;
-  }
-
-  return {
-    ...state,
-    guitar: update(state.guitar) as GuitarScoreBranch,
-  };
+  return updateGuitarBranch(state, (branch) => update(branch) as GuitarScoreBranch);
 };
 
 const clearBranchReviewState = <T extends ScoreBranch>(branch: T): T => ({
@@ -253,6 +266,7 @@ const App = () => {
   const activeInstrumentMode =
     activeDocument?.instrumentMode ?? activeBranch?.instrumentMode ?? state.activeBranch;
   const hasGuitarBranch = Boolean(state.guitar?.draftDocument ?? state.guitar?.document);
+  const guitarBranchIsStale = isGuitarBranchStale(state);
   const effectiveViewTab =
     state.activeBranch === 'guitar' && viewTab === 'tab' && activeDocument?.views.tab
       ? 'tab'
@@ -268,8 +282,33 @@ const App = () => {
   const canGeneratePianoMeasures =
     state.activeBranch === 'piano' &&
     dataSource === 'api' &&
-    Boolean(state.piano.scoreId) &&
+    isBackendScoreId(state.piano.scoreId) &&
     state.piano.revision !== null;
+  const hasBackendPianoScore =
+    dataSource === 'api' &&
+    Boolean(state.piano.document) &&
+    isBackendScoreId(state.piano.scoreId) &&
+    state.piano.revision !== null;
+  const canConvertToGuitar =
+    state.activeBranch === 'piano' &&
+    hasBackendPianoScore &&
+    !state.guitar &&
+    !busy;
+  const guitarDiagnostics = state.guitar?.diagnostics ?? null;
+  const guitarDroppedCount = diagnosticArrayCount(guitarDiagnostics, 'droppedNotes');
+  const guitarShiftedCount = diagnosticArrayCount(guitarDiagnostics, 'octaveShiftedNotes');
+  const guitarImpossibleCount = diagnosticArrayCount(guitarDiagnostics, 'impossibleChords');
+  const guitarWarningsCount = diagnosticArrayCount(guitarDiagnostics, 'warnings');
+  const hasGuitarConversionCompromises =
+    guitarDroppedCount + guitarShiftedCount + guitarImpossibleCount + guitarWarningsCount > 0;
+  const guitarConversionDetails = [
+    guitarDroppedCount ? `${guitarDroppedCount} dropped` : null,
+    guitarShiftedCount ? `${guitarShiftedCount} octave-shifted` : null,
+    guitarImpossibleCount ? `${guitarImpossibleCount} rewritten onset${guitarImpossibleCount === 1 ? '' : 's'}` : null,
+    guitarWarningsCount ? `${guitarWarningsCount} warning${guitarWarningsCount === 1 ? '' : 's'}` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
   const setStatus = (tone: StatusTone, message: string) => {
     setStatusTone(tone);
@@ -583,7 +622,7 @@ const App = () => {
       setStatus('error', 'Generating measures is available for backend scores only.');
       return;
     }
-    if (!pianoBranch.scoreId || pianoBranch.revision === null) {
+    if (!isBackendScoreId(pianoBranch.scoreId) || pianoBranch.revision === null) {
       setStatus('error', 'No backend score loaded. Compose first.');
       return;
     }
@@ -649,6 +688,70 @@ const App = () => {
       setStatus('success', 'Generated measure operation applied.');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Generate measures failed.';
+      setStatus('error', message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleConvertToGuitar = async () => {
+    const pianoBranch = state.piano;
+
+    if (state.activeBranch !== 'piano') {
+      setStatus('error', 'Switch to Piano before converting to guitar.');
+      return;
+    }
+    if (dataSource !== 'api') {
+      setStatus('error', 'Guitar conversion is available for backend scores only.');
+      return;
+    }
+    if (state.guitar) {
+      setStatus(
+        'error',
+        'A guitar arrangement already exists. Reconvert and duplicate workflows are not available yet.',
+      );
+      return;
+    }
+    if (
+      !pianoBranch.document ||
+      !isBackendScoreId(pianoBranch.scoreId) ||
+      pianoBranch.revision === null
+    ) {
+      setStatus('error', 'Generate a piano score before converting to guitar.');
+      return;
+    }
+
+    setBusy(true);
+    setStatus('busy', 'Converting piano score to guitar...');
+    try {
+      const response = await convertToGuitar({
+        scoreId: pianoBranch.scoreId,
+        revision: pianoBranch.revision,
+        sourcePianoRevisionId: getPianoRevisionId(pianoBranch) ?? undefined,
+        settings: DEFAULT_GUITAR_CONVERSION_SETTINGS,
+      });
+
+      resetLoadedScoreUi();
+      setState((prev) => ({
+        ...prev,
+        activeBranch: 'guitar',
+        guitar: createGuitarBranch({
+          scoreId: response.scoreId,
+          revision: response.revision,
+          document: response.document,
+          midi: response.midi ?? null,
+          sourcePianoRevisionId: response.sourcePianoRevisionId,
+          conversionSettings: response.conversionSettings,
+          diagnostics: response.diagnostics,
+          sourceMap: response.sourceMap ?? [],
+        }),
+      }));
+      setStatus(
+        'success',
+        'Guitar arrangement created. Some piano notes were octave-shifted or omitted for playability.',
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Guitar conversion failed.';
       setStatus('error', message);
     } finally {
       setBusy(false);
@@ -901,6 +1004,31 @@ const App = () => {
 
           {/* Measure Actions */}
         <aside className="panel panel--actions">
+          {state.activeBranch === 'piano' ? (
+            <div className="panel__section panel__section--conversion">
+              <div className="panel__title">
+                <span className="panel__title-icon">🎸</span>
+                Guitar Arrangement
+              </div>
+              <div className="control-card">
+                <button
+                  className="btn btn--primary"
+                  onClick={handleConvertToGuitar}
+                  disabled={!canConvertToGuitar}
+                >
+                  {state.guitar ? 'Guitar Arrangement Created' : 'Convert to Guitar'}
+                </button>
+                <div className="helper-text">
+                  {state.guitar
+                    ? 'The existing guitar branch is independent. Reconvert and duplicate workflows will be added separately.'
+                    : hasBackendPianoScore
+                    ? 'Creates a separate editable guitar branch from the current piano revision.'
+                    : 'Generate a backend piano score before converting.'}
+                </div>
+              </div>
+            </div>
+          ) : null}
+
           <div className="panel__section panel__section--measure-actions">
             <div className="panel__title">
               <span className="panel__title-icon">🎨</span>
@@ -1147,10 +1275,44 @@ const App = () => {
             >
               <span className="branch-tabs__label">Guitar Arrangement</span>
               <span className="branch-tabs__meta">
-                {hasGuitarBranch ? 'Editable branch' : 'Not converted'}
+                {hasGuitarBranch ? 'Independent copy' : 'Not converted'}
               </span>
             </button>
           </div>
+
+          {state.activeBranch === 'guitar' && guitarDiagnostics ? (
+            <div
+              className={`conversion-notice ${
+                guitarBranchIsStale || hasGuitarConversionCompromises
+                  ? 'conversion-notice--warning'
+                  : ''
+              }`}
+            >
+              <span className="conversion-notice__icon">
+                {guitarBranchIsStale || hasGuitarConversionCompromises ? '⚠️' : '🎸'}
+              </span>
+              <div className="conversion-notice__body">
+                <span className="conversion-notice__title">
+                  {guitarBranchIsStale
+                    ? 'The piano score changed after conversion. This guitar arrangement was not modified.'
+                    : hasGuitarConversionCompromises
+                    ? 'Guitar arrangement created. Some piano notes were octave-shifted or omitted for playability.'
+                    : 'Guitar arrangement created.'}
+                </span>
+                <span className="conversion-notice__meta">
+                  {[
+                    state.guitar?.sourcePianoRevisionId
+                      ? `Based on ${state.guitar.sourcePianoRevisionId}`
+                      : null,
+                    'Piano and guitar edits are independent',
+                    guitarConversionDetails || null,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </span>
+              </div>
+            </div>
+          ) : null}
 
           {showGuitarEmptyState ? (
             <div className="score-viewer">

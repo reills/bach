@@ -259,12 +259,16 @@
   order: 1;
 }
 
-.panel__section--measure-actions {
+.panel__section--conversion {
   order: 2;
 }
 
-.panel__section--fingering {
+.panel__section--measure-actions {
   order: 3;
+}
+
+.panel__section--fingering {
+  order: 4;
 }
 
 .panel--actions .button-row {
@@ -707,6 +711,42 @@
   letter-spacing: 0.01em;
   color: var(--bg-ink);
   padding: 0.25rem 0 0.1rem;
+}
+
+.conversion-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  margin: -0.25rem 0 0.75rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid rgba(43, 122, 120, 0.22);
+  border-radius: 12px;
+  background: rgba(43, 122, 120, 0.08);
+  font-size: 0.78rem;
+}
+
+.conversion-notice--warning {
+  border-color: rgba(224, 122, 95, 0.25);
+  background: rgba(224, 122, 95, 0.08);
+}
+
+.conversion-notice__icon {
+  line-height: 1.2;
+}
+
+.conversion-notice__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.conversion-notice__title {
+  font-weight: 600;
+}
+
+.conversion-notice__meta {
+  color: var(--muted);
+  font-size: 0.68rem;
 }
 
 .score-viewer__tab-section--hidden {

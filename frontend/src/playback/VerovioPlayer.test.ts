@@ -1,7 +1,20 @@
 import { describe, expect, it, vi } from 'vitest';
-import { VerovioPlayer } from './VerovioPlayer';
+import { VerovioPlayer, resolvePlaybackProgram } from './VerovioPlayer';
 
 describe('VerovioPlayer', () => {
+  it('maps guitar playback to the General MIDI nylon guitar program', () => {
+    expect(resolvePlaybackProgram('piano')).toBe(0);
+    expect(resolvePlaybackProgram('guitar')).toBe(24);
+  });
+
+  it('keeps the requested playback instrument until explicitly changed', () => {
+    const player = new VerovioPlayer({ playbackInstrument: 'guitar' });
+
+    expect((player as any).playbackInstrument).toBe('guitar');
+    player.setPlaybackInstrument('piano');
+    expect((player as any).playbackInstrument).toBe('piano');
+  });
+
   it('does not resume playback when seeking while already paused', () => {
     const player = new VerovioPlayer();
     const playSpy = vi.spyOn(player, 'play').mockResolvedValue();

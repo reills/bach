@@ -547,7 +547,7 @@ def _choose_onset_fingerings(
         candidate_lists.append(candidates[:_candidate_limit(settings)])
 
     best_combo: tuple[GuitarFingering, ...] | None = None
-    best_cost: tuple[int, int, int, int, int, int, tuple[int, ...]] | None = None
+    best_cost: tuple[int, int, int, int, int, int, int, tuple[int, ...]] | None = None
     combo_iter = product(*candidate_lists) if candidate_lists else [()]
     for combo in combo_iter:
         strings = {fingering.string_index for fingering in combo}
@@ -601,9 +601,10 @@ def _combo_fingering_cost(
     previous_by_voice: dict[int, GuitarFingering],
     previous_position: int | None,
     settings: GuitarArrangementSettings,
-) -> tuple[int, int, int, int, int, int, tuple[int, ...]]:
+) -> tuple[int, int, int, int, int, int, int, tuple[int, ...]]:
     span = _fret_span(combo)
     span_overage = max(0, span - settings.resolved_max_hand_span_frets)
+    max_fret_gap = _max_fret_gap(combo)
     position = _position_from_fingerings(combo)
     position_shift = 0 if previous_position is None else abs(position - previous_position)
     preferred_shift = 0 if settings.preferred_position is None else abs(position - settings.preferred_position)
@@ -616,19 +617,28 @@ def _combo_fingering_cost(
         open_string_cost += _open_string_cost(prepared, fingering, settings=settings)
         previous = previous_by_voice.get(prepared.target_event.voice_id)
         if previous is not None:
-            voice_movement += abs(previous.fret - fingering.fret) * 2 + abs(previous.string_index - fingering.string_index)
+            voice_movement += (
+                abs(previous.fret - fingering.fret) * 2
+                + abs(previous.string_index - fingering.string_index)
+            )
 
     position_weight = {
         "easy": 10,
         "medium": 8,
         "hard": 5,
     }[settings.difficulty]
+    span_weight = {
+        "easy": 20,
+        "medium": 16,
+        "hard": 10,
+    }[settings.difficulty]
     return (
         span_overage * 1000,
+        span * span_weight,
+        max_fret_gap * 8,
         position_shift * position_weight,
         voice_movement * 8,
         preferred_shift * 5,
-        span * 4,
         open_string_cost + total_fret,
         tuple(fingering.string_index for fingering in combo),
     )
@@ -675,6 +685,20 @@ def _fret_span(fingerings: Sequence[GuitarFingering]) -> int:
     if len(fretted) < 2:
         return 0
     return max(fretted) - min(fretted)
+
+
+def _max_fret_gap(fingerings: Sequence[GuitarFingering]) -> int:
+    fretted = sorted(
+        (fingering.string_index, fingering.fret)
+        for fingering in fingerings
+        if fingering.fret > 0
+    )
+    if len(fretted) < 2:
+        return 0
+    return max(
+        abs(right_fret - left_fret)
+        for (_, left_fret), (_, right_fret) in zip(fretted, fretted[1:])
+    )
 
 
 def _position_from_fingerings(fingerings: Sequence[GuitarFingering]) -> int:

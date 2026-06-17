@@ -9,6 +9,8 @@ import { Midi } from '@tonejs/midi';
 interface WafLoader {
   startLoad(ctx: AudioContext, url: string, varName: string): void;
   waitLoad(cb: () => void): void;
+  findInstrument(program: number): number;
+  instrumentInfo(index: number): WafPresetInfo;
 }
 
 interface WafEnvelope {
@@ -35,14 +37,25 @@ declare global {
 }
 
 // ---------------------------------------------------------------------------
-// Preset configuration
-// Acoustic Grand Piano from the GeneralUserGS soundfont.
-// The loader injects the preset as window[PIANO_PRESET_VAR].
+// Preset configuration.
 // ---------------------------------------------------------------------------
 
-const PIANO_PRESET_URL =
-  'https://surikov.github.io/webaudiofontdata/sound/0000_GeneralUserGS_sf2_file.js';
-const PIANO_PRESET_VAR = '_tone_0000_GeneralUserGS_sf2_file';
+export type VerovioPlaybackInstrument = 'guitar' | 'piano';
+
+interface WafPresetInfo {
+  variable: string;
+  url: string;
+  title: string;
+  pitch: number;
+}
+
+const PLAYBACK_PROGRAMS: Record<VerovioPlaybackInstrument, number> = {
+  piano: 0,
+  guitar: 24,
+};
+
+export const resolvePlaybackProgram = (instrument: VerovioPlaybackInstrument): number =>
+  PLAYBACK_PROGRAMS[instrument];
 
 // ---------------------------------------------------------------------------
 // Script loading — deduplicated by URL
@@ -74,7 +87,7 @@ function loadScript(src: string): Promise<void> {
 let sharedCtx: AudioContext | null = null;
 let sharedGain: GainNode | null = null;
 let sharedWafPlayer: WafPlayerInstance | null = null;
-let presetLoadPromise: Promise<void> | null = null;
+const presetLoadPromises = new Map<VerovioPlaybackInstrument, Promise<void>>();
 
 function getOrCreateAudio(): { ctx: AudioContext; gain: GainNode } {
   if (!sharedCtx) {
@@ -89,11 +102,20 @@ function getOrCreateAudio(): { ctx: AudioContext; gain: GainNode } {
   return { ctx: sharedCtx, gain: sharedGain! };
 }
 
-/** Loads the WebAudioFont player script + decodes the piano preset once. */
-function ensurePresetReady(): Promise<void> {
-  if (presetLoadPromise) return presetLoadPromise;
+function getPresetInfo(instrument: VerovioPlaybackInstrument): WafPresetInfo {
+  if (!sharedWafPlayer) {
+    sharedWafPlayer = new WebAudioFontPlayer();
+  }
+  const program = resolvePlaybackProgram(instrument);
+  return sharedWafPlayer.loader.instrumentInfo(sharedWafPlayer.loader.findInstrument(program));
+}
 
-  presetLoadPromise = (async () => {
+/** Loads the WebAudioFont player script + decodes the selected preset once. */
+function ensurePresetReady(instrument: VerovioPlaybackInstrument): Promise<void> {
+  const existing = presetLoadPromises.get(instrument);
+  if (existing) return existing;
+
+  const loadPromise = (async () => {
     // 1. Load the player library from our own /public dir
     await loadScript('/webaudiofont/WebAudioFontPlayer.js');
 
@@ -103,8 +125,9 @@ function ensurePresetReady(): Promise<void> {
       sharedWafPlayer = new WebAudioFontPlayer();
     }
 
-    // 3. Kick off download + decode of the piano preset
-    sharedWafPlayer.loader.startLoad(ctx, PIANO_PRESET_URL, PIANO_PRESET_VAR);
+    // 3. Kick off download + decode of the selected General MIDI preset
+    const presetInfo = getPresetInfo(instrument);
+    sharedWafPlayer.loader.startLoad(ctx, presetInfo.url, presetInfo.variable);
 
     // 4. Wait until all zones are decoded (buffers populated)
     await new Promise<void>((resolve) => {
@@ -112,7 +135,8 @@ function ensurePresetReady(): Promise<void> {
     });
   })();
 
-  return presetLoadPromise;
+  presetLoadPromises.set(instrument, loadPromise);
+  return loadPromise;
 }
 
 // ---------------------------------------------------------------------------
@@ -122,6 +146,7 @@ function ensurePresetReady(): Promise<void> {
 type PositionCallback = (currentMs: number, totalMs: number) => void;
 
 interface VerovioPlayerOptions {
+  playbackInstrument?: VerovioPlaybackInstrument;
   onPositionChanged?: PositionCallback;
   onStopped?: () => void;
 }
@@ -132,7 +157,7 @@ type PlayerState = 'idle' | 'playing' | 'paused';
  * Sample-based audio player for Verovio-rendered scores.
  *
  * Parses the MIDI produced by toolkit.renderToMIDI() and plays it back using
- * WebAudioFont (Acoustic Grand Piano preset) via the Web Audio API.
+ * WebAudioFont instrument presets via the Web Audio API.
  *
  * Public API: play(), pause(), stop(), playPause(), dispose(),
  *             onPositionChanged(currentMs, totalMs)
@@ -145,15 +170,26 @@ export class VerovioPlayer {
   private originTime = 0;
   private pauseOffsetMs = 0;
   private state: PlayerState = 'idle';
+  private playbackInstrument: VerovioPlaybackInstrument;
   private readonly onPositionChanged?: PositionCallback;
   private readonly onStopped?: () => void;
 
   constructor(opts: VerovioPlayerOptions = {}) {
+    this.playbackInstrument = opts.playbackInstrument ?? 'piano';
     this.onPositionChanged = opts.onPositionChanged;
     this.onStopped = opts.onStopped;
     // Start loading the preset eagerly so it's decoded by the time the user
     // clicks Play. Errors are swallowed here — play() will surface them.
-    void ensurePresetReady().catch(() => undefined);
+    void ensurePresetReady(this.playbackInstrument).catch(() => undefined);
+  }
+
+  setPlaybackInstrument(instrument: VerovioPlaybackInstrument): void {
+    if (this.playbackInstrument === instrument) {
+      return;
+    }
+    this.stop();
+    this.playbackInstrument = instrument;
+    void ensurePresetReady(this.playbackInstrument).catch(() => undefined);
   }
 
   /** Load a base64-encoded MIDI string returned by toolkit.renderToMIDI(). */
@@ -175,7 +211,7 @@ export class VerovioPlayer {
     if (!this.midi || this.state === 'playing') return;
 
     try {
-      await ensurePresetReady();
+      await ensurePresetReady(this.playbackInstrument);
     } catch (err) {
       console.error('VerovioPlayer: could not load instrument preset:', err);
       return;
@@ -186,7 +222,8 @@ export class VerovioPlayer {
       await ctx.resume();
     }
 
-    const preset = (window as unknown as Record<string, object>)[PIANO_PRESET_VAR];
+    const presetInfo = getPresetInfo(this.playbackInstrument);
+    const preset = (window as unknown as Record<string, object>)[presetInfo.variable];
     if (!preset) {
       console.error('VerovioPlayer: preset not available after loading');
       return;

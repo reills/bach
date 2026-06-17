@@ -131,6 +131,47 @@ export const getActiveScoreBranch = (
 ): ScoreBranch | null =>
   state.activeBranch === 'guitar' ? state.guitar : state.piano;
 
+export const updatePianoBranch = (
+  state: ProjectScoreState,
+  update: (branch: PianoScoreBranch) => PianoScoreBranch,
+): ProjectScoreState => ({
+  ...state,
+  piano: update(state.piano),
+});
+
+export const updateGuitarBranch = (
+  state: ProjectScoreState,
+  update: (branch: GuitarScoreBranch) => GuitarScoreBranch,
+): ProjectScoreState => {
+  if (!state.guitar) {
+    return state;
+  }
+  return {
+    ...state,
+    guitar: update(state.guitar),
+  };
+};
+
+export const getPianoRevisionId = (
+  piano: PianoScoreBranch,
+): string | null =>
+  piano.scoreId && piano.revision !== null
+    ? `${piano.scoreId}@${piano.revision}`
+    : null;
+
+export const isGuitarBranchStale = (
+  state: ProjectScoreState,
+): boolean => {
+  if (!state.guitar?.sourcePianoRevisionId) {
+    return false;
+  }
+  const currentPianoRevisionId = getPianoRevisionId(state.piano);
+  return Boolean(
+    currentPianoRevisionId &&
+      currentPianoRevisionId !== state.guitar.sourcePianoRevisionId,
+  );
+};
+
 export const inferInstrumentMode = (xml: string): InstrumentMode => {
   if (xml.includes('<staves>2</staves>')) {
     return 'piano';

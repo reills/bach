@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import type { ScoreViewTab } from '../state/types';
-import { VerovioPlayer } from '../playback/VerovioPlayer';
+import { VerovioPlayer, type VerovioPlaybackInstrument } from '../playback/VerovioPlayer';
 import { getVerovioCursorIds, type VerovioElementsAtTime } from '../playback/verovioCursor';
 import {
   getVerovioToolkit,
@@ -341,8 +341,11 @@ const SheetMusicViewer = ({
         // Load MIDI from the same toolkit state (loadData was called inside renderVerovioScore)
         const midiBase64 = toolkit.renderToMIDI();
         if (!cancelled && midiBase64) {
+          const playbackInstrument: VerovioPlaybackInstrument =
+            instrumentMode === 'guitar' ? 'guitar' : 'piano';
           if (!playerRef.current) {
             playerRef.current = new VerovioPlayer({
+              playbackInstrument,
               onPositionChanged: (cur, tot) => {
                 onPositionChangedRef.current?.(cur, tot);
                 updatePlaybackCursor(toolkitRef.current?.getElementsAtTime(cur));
@@ -352,6 +355,7 @@ const SheetMusicViewer = ({
           } else {
             playerRef.current.stop();
             clearPlaybackCursor();
+            playerRef.current.setPlaybackInstrument(playbackInstrument);
           }
           playerRef.current.load(midiBase64);
           onPlayerReadyRef.current?.();
@@ -388,7 +392,7 @@ const SheetMusicViewer = ({
       }
       resizeObserver?.disconnect();
     };
-  }, [scoreXml]);
+  }, [scoreXml, instrumentMode]);
 
   useEffect(() => {
     updateSelectedMeasureOverlay();
