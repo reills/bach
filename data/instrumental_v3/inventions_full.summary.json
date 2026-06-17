@@ -1,0 +1,24 @@
+{
+  "source_dir": "/home/stephen-reilly/dev/bach_gen/data/tobis_xml/instrumental-works/keyboard-works/BWV 772-786 Inventions",
+  "piece_count": 16,
+  "skipped": [],
+  "target": "Bach two-part inventions, instrumental_v3 continuation-first",
+  "pieces": [
+    "BWV_0772",
+    "BWV_0772a",
+    "BWV_0773",
+    "BWV_0774",
+    "BWV_0775",
+    "BWV_0776",
+    "BWV_0777",
+    "BWV_0778",
+    "BWV_0779",
+    "BWV_0780",
+    "BWV_0781",
+    "BWV_0782",
+    "BWV_0783",
+    "BWV_0784",
+    "BWV_0785",
+    "BWV_0786"
+  ]
+}

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Python Test Env"
+  short_description: "Set up environment and run pytest deterministically in this repo"
+  default_prompt: "Use the python-test-env skill to prepare environment and run tests reliably."

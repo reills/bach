@@ -1,0 +1,460 @@
+{
+  "source_dirs": [
+    "data/tobis_xml/instrumental-works/keyboard-works",
+    "data/tobis_xml/instrumental-works/Overtures sinfonias"
+  ],
+  "piece_count": 242,
+  "normalize_key": true,
+  "skipped": [
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1066_01/BWV_1066_01.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.4365234375
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1066_02/BWV_1066_02.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.44047619047619047
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1066_03_04/BWV_1066_03_04.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.5859375
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1066_05/BWV_1066_05.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.40625
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1066_06_07/BWV_1066_06_07.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.4673202614379085
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1066_08_09/BWV_1066_08_09.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.3463541666666667
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1066_10_11/BWV_1066_10_11.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.4361111111111111
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1067_01/BWV_1067_01.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.2607421875
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1067_02/BWV_1067_02.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.3942307692307692
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1067_03/BWV_1067_03.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.23958333333333334
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1067_04_05/BWV_1067_04_05.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.5868055555555556
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1067_06_07/BWV_1067_06_07.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.10256410256410256
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1067_08/BWV_1067_08.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.4652777777777778
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1067_09/BWV_1067_09.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.44375
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1068_01/BWV_1068_01.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.51171875
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1068_02/BWV_1068_02.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.5460526315789473
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1068_02_2/BWV_1068_02_2.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.27631578947368424
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1068_03_04/BWV_1068_03_04.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.4418103448275862
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1068_05/BWV_1068_05.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.46875
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1068_06/BWV_1068_06.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.3463541666666667
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1069_01/BWV_1069_01.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.359375
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1069_02_03/BWV_1069_02_03.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.43509615384615385
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1069_04/BWV_1069_04.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.51875
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1069_05_06/BWV_1069_05_06.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.47413793103448276
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1069_07/BWV_1069_07.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.5815972222222222
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1070_1/BWV_1070_1.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.5244140625
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1070_2/BWV_1070_2.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.34375
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1070_3/BWV_1070_3.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.443359375
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1070_4/BWV_1070_4.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.3399122807017544
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1070_5/BWV_1070_5.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.5338541666666666
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1070_6/BWV_1070_6.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.42578125
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1071_01/BWV_1071_01.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.439453125
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1071_02/BWV_1071_02.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.3247863247863248
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1071_03/BWV_1071_03.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.25961538461538464
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1071_04/BWV_1071_04.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.4722222222222222
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1071_05/BWV_1071_05.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.328125
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/keyboard-works/BWV 832-845 Suites and Suite Movements/BWV_0837/BWV_0837.xml",
+      "reason": "too_short",
+      "slices": 112
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/keyboard-works/BWV 910-923 Toccatas Fantasias and Preludes/BWV_0923a/BWV_0923a.musicxml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.1346153846153846
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/keyboard-works/BWV 971-987 Concertos/BWV_0973_Orig/BWV_0973_Orig.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.390625
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/keyboard-works/BWV 971-987 Concertos/BWV_0979/BWV_0979.xml",
+      "reason": "empty_rate",
+      "empty_rate": 0.11588541666666667
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/keyboard-works/BWV 988-994 Variations Capriccios and Miscellaneous/BWV_0991/BWV_0991.xml",
+      "reason": "empty_rate",
+      "empty_rate": 0.08888888888888889
+    }
+  ],
+  "target": "Bach two-part inventions, instrumental_v3 continuation-first",
+  "pieces": [
+    "BWV_0772",
+    "BWV_0772a",
+    "BWV_0773",
+    "BWV_0774",
+    "BWV_0775",
+    "BWV_0776",
+    "BWV_0777",
+    "BWV_0778",
+    "BWV_0779",
+    "BWV_0780",
+    "BWV_0781",
+    "BWV_0782",
+    "BWV_0783",
+    "BWV_0784",
+    "BWV_0785",
+    "BWV_0786",
+    "BWV_0787",
+    "BWV_0788",
+    "BWV_0789",
+    "BWV_0790",
+    "BWV_0791",
+    "BWV_0792",
+    "BWV_0793",
+    "BWV_0794",
+    "BWV_0795",
+    "BWV_0796",
+    "BWV_0797",
+    "BWV_0798",
+    "BWV_0799",
+    "BWV_0800",
+    "BWV_0801",
+    "BWV_0802",
+    "BWV_0803",
+    "BWV_0804",
+    "BWV_0805",
+    "BWV_0806",
+    "BWV_0807",
+    "BWV_0808",
+    "BWV_0809",
+    "BWV_0810",
+    "BWV_0811",
+    "BWV_0812",
+    "BWV_0813",
+    "BWV_0813a",
+    "BWV_0814",
+    "BWV_0815",
+    "BWV_0815a",
+    "BWV_0815v",
+    "BWV_0816",
+    "BWV_0817",
+    "BWV_0818",
+    "BWV_0818a",
+    "BWV_0819",
+    "BWV_0819a",
+    "BWV_0820",
+    "BWV_0821",
+    "BWV_0822",
+    "BWV_0823",
+    "BWV_0824",
+    "BWV_0825",
+    "BWV_0826",
+    "BWV_0827",
+    "BWV_0828",
+    "BWV_0829",
+    "BWV_0830",
+    "BWV_0831",
+    "BWV_0832",
+    "BWV_0833",
+    "BWV_0834",
+    "BWV_0835",
+    "BWV_0836",
+    "BWV_0838",
+    "BWV_0839",
+    "BWV_0840",
+    "BWV_0841",
+    "BWV_0842",
+    "BWV_0843",
+    "BWV_0844",
+    "BWV_0844a",
+    "BWV_0845",
+    "BWV_0846",
+    "BWV_0846a",
+    "BWV_0847",
+    "BWV_0847a",
+    "BWV_0848",
+    "BWV_0849",
+    "BWV_0850",
+    "BWV_0850a",
+    "BWV_0851",
+    "BWV_0851a",
+    "BWV_0852",
+    "BWV_0853",
+    "BWV_0854",
+    "BWV_0855",
+    "BWV_0855a",
+    "BWV_0856",
+    "BWV_0857",
+    "BWV_0858",
+    "BWV_0859",
+    "BWV_0860",
+    "BWV_0861",
+    "BWV_0862",
+    "BWV_0863",
+    "BWV_0864",
+    "BWV_0865",
+    "BWV_0866",
+    "BWV_0867",
+    "BWV_0868",
+    "BWV_0869",
+    "BWV_0870",
+    "BWV_0870a",
+    "BWV_0870b",
+    "BWV_0871",
+    "BWV_0872",
+    "BWV_0872a",
+    "BWV_0873",
+    "BWV_0874",
+    "BWV_0875",
+    "BWV_0875a",
+    "BWV_0876",
+    "BWV_0877",
+    "BWV_0878",
+    "BWV_0878_org",
+    "BWV_0879",
+    "BWV_0880",
+    "BWV_0881",
+    "BWV_0882",
+    "BWV_0883",
+    "BWV_0884",
+    "BWV_0885",
+    "BWV_0886",
+    "BWV_0887",
+    "BWV_0888",
+    "BWV_0889",
+    "BWV_0890",
+    "BWV_0891",
+    "BWV_0892",
+    "BWV_0893",
+    "BWV_0894",
+    "BWV_0895",
+    "BWV_0896",
+    "BWV_0897",
+    "BWV_0898",
+    "BWV_0899",
+    "BWV_0900",
+    "BWV_0901",
+    "BWV_0902",
+    "BWV_0902a",
+    "BWV_0903",
+    "BWV_0903a",
+    "BWV_0904",
+    "BWV_0905",
+    "BWV_0906",
+    "BWV_0907",
+    "BWV_0908",
+    "BWV_0909",
+    "BWV_0910",
+    "BWV_0911",
+    "BWV_0912",
+    "BWV_0912a",
+    "BWV_0913",
+    "BWV_0914",
+    "BWV_0915",
+    "BWV_0916",
+    "BWV_0917",
+    "BWV_0918",
+    "BWV_0919",
+    "BWV_0920",
+    "BWV_0921",
+    "BWV_0922",
+    "BWV_0923",
+    "BWV_0924",
+    "BWV_0924a",
+    "BWV_0925",
+    "BWV_0926",
+    "BWV_0927",
+    "BWV_0928",
+    "BWV_0929",
+    "BWV_0930",
+    "BWV_0931",
+    "BWV_0932",
+    "BWV_0933",
+    "BWV_0934",
+    "BWV_0935",
+    "BWV_0936",
+    "BWV_0937",
+    "BWV_0938",
+    "BWV_0939",
+    "BWV_0940",
+    "BWV_0941",
+    "BWV_0942",
+    "BWV_0943",
+    "BWV_0944",
+    "BWV_0945",
+    "BWV_0946",
+    "BWV_0947",
+    "BWV_0948",
+    "BWV_0949",
+    "BWV_0950",
+    "BWV_0951",
+    "BWV_0951a",
+    "BWV_0952",
+    "BWV_0953",
+    "BWV_0954",
+    "BWV_0955",
+    "BWV_0956",
+    "BWV_0957",
+    "BWV_0958",
+    "BWV_0959",
+    "BWV_0960",
+    "BWV_0961",
+    "BWV_0962",
+    "BWV_0963",
+    "BWV_0964",
+    "BWV_0965",
+    "BWV_0966",
+    "BWV_0967",
+    "BWV_0968",
+    "BWV_0969",
+    "BWV_0970",
+    "BWV_0971",
+    "BWV_0972",
+    "BWV_0973",
+    "BWV_0974",
+    "BWV_0975",
+    "BWV_0976",
+    "BWV_0977",
+    "BWV_0978",
+    "BWV_0980",
+    "BWV_0981",
+    "BWV_0982",
+    "BWV_0983",
+    "BWV_0984",
+    "BWV_0985",
+    "BWV_0986",
+    "BWV_0987",
+    "BWV_0988",
+    "BWV_0989",
+    "BWV_0990",
+    "BWV_0992",
+    "BWV_0993",
+    "BWV_0994"
+  ]
+}

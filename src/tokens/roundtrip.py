@@ -3,14 +3,14 @@ from typing import List, Optional, Tuple
 import music21
 
 
-def _parse_time_sig_token(token: str) -> Tuple[int, int]:
+def parse_time_sig_token(token: str) -> Tuple[int, int]:
     parts = token.split("_")
     if len(parts) != 4:
         raise ValueError(f"bad time signature token: {token}")
     return int(parts[2]), int(parts[3])
 
 
-def _parse_key_token(token: str) -> music21.key.Key:
+def parse_key_token(token: str) -> music21.key.Key:
     key_str = token[len("KEY_") :]
     mode = "major"
     if key_str.endswith("m"):
@@ -20,26 +20,26 @@ def _parse_key_token(token: str) -> music21.key.Key:
     return music21.key.Key(tonic, mode)
 
 
-def _parse_abs_voice(token: str) -> Tuple[int, int]:
+def parse_abs_voice_token(token: str) -> Tuple[int, int]:
     parts = token.split("_")
     if len(parts) != 4:
         raise ValueError(f"bad ABS_VOICE token: {token}")
     return int(parts[2]), int(parts[3])
 
 
-def _parse_pitch_from_token(token: str) -> int:
+def parse_token_int(token: str) -> int:
     return int(token.split("_", 1)[1])
 
 
-def _parse_signed_int(token: str) -> int:
+def parse_signed_token_int(token: str) -> int:
     return int(token.split("_")[-1])
 
 
-def _parse_last_int(token: str) -> int:
+def parse_last_token_int(token: str) -> int:
     return int(token.split("_")[-1])
 
 
-def _infer_num_voices(tokens: List[str]) -> int:
+def infer_num_voices(tokens: List[str]) -> int:
     max_idx = -1
     for tok in tokens:
         if tok.startswith("VOICE_"):
@@ -63,7 +63,7 @@ def _infer_num_voices(tokens: List[str]) -> int:
     return max_idx + 1 if max_idx >= 0 else 1
 
 
-def _tokenize_stream(text: str) -> List[str]:
+def tokenize_stream(text: str) -> List[str]:
     raw = text.replace("\n", ",")
     tokens = [tok.strip() for tok in raw.split(",")]
     return [tok for tok in tokens if tok]
@@ -71,7 +71,7 @@ def _tokenize_stream(text: str) -> List[str]:
 
 def tokens_to_score(tokens: List[str], tpq: int = 24) -> music21.stream.Score:
     score = music21.stream.Score()
-    num_voices = _infer_num_voices(tokens)
+    num_voices = infer_num_voices(tokens)
     parts = []
     for v in range(num_voices):
         part = music21.stream.Part(id=f"Voice{v}")
@@ -98,7 +98,7 @@ def tokens_to_score(tokens: List[str], tpq: int = 24) -> music21.stream.Score:
             continue
 
         if tok.startswith("TIME_SIG_"):
-            num, denom = _parse_time_sig_token(tok)
+            num, denom = parse_time_sig_token(tok)
             time_sig = (num, denom)
             bar_len_ticks = int(round((num * (4.0 / denom)) * tpq))
             for part in parts:
@@ -108,20 +108,20 @@ def tokens_to_score(tokens: List[str], tpq: int = 24) -> music21.stream.Score:
 
         if tok.startswith("KEY_"):
             key_token = tok
-            key_obj = _parse_key_token(tok)
+            key_obj = parse_key_token(tok)
             for part in parts:
                 part.insert(bar_start / tpq, music21.key.Key(key_obj.tonic, key_obj.mode))
             i += 1
             continue
 
         if tok.startswith("POS_"):
-            pos_tick = _parse_pitch_from_token(tok)
+            pos_tick = parse_token_int(tok)
             current_time = bar_start + pos_tick
             i += 1
             continue
 
         if tok.startswith("ABS_BASS_"):
-            prev_pitch[0] = _parse_last_int(tok)
+            prev_pitch[0] = parse_last_token_int(tok)
             i += 1
             continue
 
@@ -132,12 +132,12 @@ def tokens_to_score(tokens: List[str], tpq: int = 24) -> music21.stream.Score:
                     part = music21.stream.Part(id=f"Voice{v}")
                     parts.append(part)
                     score.append(part)
-            prev_pitch[3] = _parse_last_int(tok)
+            prev_pitch[3] = parse_last_token_int(tok)
             i += 1
             continue
 
         if tok.startswith("ABS_VOICE_"):
-            v, pitch = _parse_abs_voice(tok)
+            v, pitch = parse_abs_voice_token(tok)
             if v >= len(prev_pitch):
                 for idx in range(len(prev_pitch), v + 1):
                     prev_pitch.append(None)
@@ -175,8 +175,8 @@ def tokens_to_score(tokens: List[str], tpq: int = 24) -> music21.stream.Score:
                 next_idx += 1
             mel_tok = tokens[next_idx]
 
-            duration_ticks = _parse_pitch_from_token(dur_tok)
-            mel_int = _parse_signed_int(mel_tok)
+            duration_ticks = parse_token_int(dur_tok)
+            mel_int = parse_signed_token_int(mel_tok)
 
             if prev_pitch[voice] is None:
                 raise ValueError(f"missing anchor for voice {voice} at token index {i}")
@@ -202,4 +202,4 @@ def tokens_to_midi(tokens: List[str], midi_path: str, tpq: int = 24) -> None:
 
 def load_tokens_file(path: str) -> List[str]:
     with open(path, "r", encoding="utf-8") as f:
-        return _tokenize_stream(f.read())
+        return tokenize_stream(f.read())

@@ -78,3 +78,24 @@ def test_dataset_and_model_forward(mock_vocab, mock_events):
     
     assert logits.shape == (1, len(sample.ids), config.vocab_size)
     print("\nForward pass successful!")
+
+
+def test_model_accepts_2d_desc_embed(mock_vocab, mock_events):
+    dataset = BarDataset(str(mock_events), str(mock_vocab))
+    sample = dataset[0]
+
+    ids = torch.tensor([sample.ids])
+    config = NoteLMConfig(
+        vocab_size=len(dataset.vocab),
+        d_model=128,
+        n_heads=4,
+        n_layers=2,
+        desc_embed_dim=16,
+        bar_token_id=dataset.vocab["BAR"],
+    )
+    model = NoteLM(config)
+
+    desc_embed = torch.randn(1, 16)
+    logits = model(ids, desc_embed=desc_embed)
+
+    assert logits.shape == (1, len(sample.ids), config.vocab_size)

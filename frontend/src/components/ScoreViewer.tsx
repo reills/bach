@@ -1,13 +1,71 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type MutableRefObject } from 'react';
 import * as alphaTab from '@coderline/alphatab';
-import type { HitKey } from '../state/types';
+import type { HitKey, InstrumentMode, ScoreViewTab } from '../state/types';
+import { VerovioPlayer, type VerovioPlaybackInstrument } from '../playback/VerovioPlayer';
+import { createAlphaTabExternalMediaHandler } from '../playback/alphaTabExternalMedia';
+import { getVerovioToolkit } from '../playback/verovioToolkit';
+import {
+  getScoreViewerLabel,
+  getStaffVisibility,
+  resolveStaveProfile,
+  shouldShowTabSwitcher,
+} from './scoreViewerStaves';
+
+export interface ScoreViewerPlaybackAPI {
+  pause: () => void;
+  play: () => void;
+  playPause: () => void;
+  stop: () => void;
+}
+
+interface ScoreViewerPlaybackControllerOptions {
+  alphaTabApiRef: MutableRefObject<any>;
+  midiPlayerRef: MutableRefObject<VerovioPlayer | null>;
+  updatePosition: (timeMs: number) => void;
+}
+
+export const createScoreViewerPlaybackController = ({
+  alphaTabApiRef,
+  midiPlayerRef,
+  updatePosition,
+}: ScoreViewerPlaybackControllerOptions): ScoreViewerPlaybackAPI => ({
+  play: () => {
+    if (alphaTabApiRef.current?.play) {
+      void alphaTabApiRef.current.play();
+      return;
+    }
+    void midiPlayerRef.current?.play();
+  },
+  pause: () => {
+    midiPlayerRef.current?.pause();
+    alphaTabApiRef.current?.pause?.();
+  },
+  playPause: () => {
+    if (alphaTabApiRef.current?.playPause) {
+      alphaTabApiRef.current.playPause();
+      return;
+    }
+    void midiPlayerRef.current?.play();
+  },
+  stop: () => {
+    midiPlayerRef.current?.stop();
+    alphaTabApiRef.current?.stop?.();
+    updatePosition(0);
+  },
+});
 
 interface ScoreViewerProps {
   scoreXml: string | null;
   highlightMeasureId: string | null;
+  selectedBarIndex?: number | null;
+  instrumentMode: InstrumentMode | null;
+  viewTab: ScoreViewTab;
+  onViewTabChange?: (viewTab: ScoreViewTab) => void;
   onMeasureClick?: (barIndex: number) => void;
   onNoteClick?: (hit: HitKey) => void;
-  onApiReady?: (api: unknown) => void;
+  onApiReady?: (api: ScoreViewerPlaybackAPI | null) => void;
+  onPlayerReady?: () => void;
+  onPositionChanged?: (currentTime: number, endTime: number) => void;
 }
 
 const loadScoreXml = (api: any, scoreXml: string) => {
@@ -16,10 +74,8 @@ const loadScoreXml = (api: any, scoreXml: string) => {
     return;
   }
   try {
-    // Convert string to Uint8Array for AlphaTab
     const encoder = new TextEncoder();
     const data = encoder.encode(scoreXml);
-
     if (typeof api?.load === 'function') {
       api.load(data);
       return;
@@ -35,16 +91,14 @@ const loadScoreXml = (api: any, scoreXml: string) => {
 };
 
 const resolveHitKey = (args: any): HitKey | null => {
-  const note = args?.note;
-  const beat = note?.beat;
+  const note = args?.note ?? args;
+  const beat = note?.beat ?? args?.beatBounds?.beat ?? args?.beat;
   const voice = beat?.voice;
   const bar = voice?.bar;
-  const barIndex = bar?.index;
-
+  const barIndex = resolveBarIndex(args) ?? bar?.index;
   if (typeof barIndex !== 'number') {
     return null;
   }
-
   return {
     barIndex,
     voiceIndex: typeof voice?.index === 'number' ? voice.index : undefined,
@@ -53,37 +107,181 @@ const resolveHitKey = (args: any): HitKey | null => {
   };
 };
 
+const resolveBarIndex = (value: any): number | null => {
+  const candidates = [
+    value?.barBounds?.masterBarBounds?.index,
+    value?.beatBounds?.barBounds?.masterBarBounds?.index,
+    value?.masterBarBounds?.index,
+    value?.beat?.voice?.bar?.index,
+    value?.note?.beat?.voice?.bar?.index,
+    value?.voice?.bar?.index,
+    value?.bar?.index,
+  ];
+  for (const candidate of candidates) {
+    if (typeof candidate === 'number') {
+      return candidate;
+    }
+  }
+  return null;
+};
+
+const getBoundsLookup = (api: any) =>
+  api?.boundsLookup ?? api?.renderer?.boundsLookup ?? null;
+
+interface MeasureSelectionBox {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+const selectionBoxStyle = (box: MeasureSelectionBox): CSSProperties => ({
+  left: `${box.left}px`,
+  top: `${box.top}px`,
+  width: `${box.width}px`,
+  height: `${box.height}px`,
+});
+
 const ScoreViewer = ({
   scoreXml,
   highlightMeasureId,
+  selectedBarIndex = null,
+  instrumentMode,
+  viewTab,
+  onViewTabChange,
   onMeasureClick,
   onNoteClick,
   onApiReady,
+  onPlayerReady,
+  onPositionChanged,
 }: ScoreViewerProps) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const apiRef = useRef<any>(null);
+  const midiPlayerRef = useRef<VerovioPlayer | null>(null);
+  const alphaTabReadyRef = useRef(false);
+  const midiReadyRef = useRef(false);
   const onMeasureClickRef = useRef<ScoreViewerProps['onMeasureClick']>();
   const onNoteClickRef = useRef<ScoreViewerProps['onNoteClick']>();
   const onApiReadyRef = useRef<ScoreViewerProps['onApiReady']>();
+  const onPlayerReadyRef = useRef<ScoreViewerProps['onPlayerReady']>();
+  const onPositionChangedRef = useRef<ScoreViewerProps['onPositionChanged']>();
+  const instrumentModeRef = useRef(instrumentMode);
+  const viewTabRef = useRef(viewTab);
+  const selectedBarIndexRef = useRef<number | null>(selectedBarIndex);
+  const [selectionBox, setSelectionBox] = useState<MeasureSelectionBox | null>(null);
 
-  useEffect(() => {
-    onMeasureClickRef.current = onMeasureClick;
-  }, [onMeasureClick]);
+  useEffect(() => { onMeasureClickRef.current = onMeasureClick; }, [onMeasureClick]);
+  useEffect(() => { onNoteClickRef.current = onNoteClick; }, [onNoteClick]);
+  useEffect(() => { onApiReadyRef.current = onApiReady; }, [onApiReady]);
+  useEffect(() => { onPlayerReadyRef.current = onPlayerReady; }, [onPlayerReady]);
+  useEffect(() => { onPositionChangedRef.current = onPositionChanged; }, [onPositionChanged]);
+  useEffect(() => { instrumentModeRef.current = instrumentMode; }, [instrumentMode]);
+  useEffect(() => { viewTabRef.current = viewTab; }, [viewTab]);
+  useEffect(() => { selectedBarIndexRef.current = selectedBarIndex; }, [selectedBarIndex]);
 
-  useEffect(() => {
-    onNoteClickRef.current = onNoteClick;
-  }, [onNoteClick]);
+  const updateSelectedMeasureOverlay = () => {
+    const barIndex = selectedBarIndexRef.current;
+    const container = containerRef.current;
+    const lookup = getBoundsLookup(apiRef.current);
+    if (barIndex === null || !container || !lookup) {
+      setSelectionBox(null);
+      return;
+    }
 
-  useEffect(() => {
-    onApiReadyRef.current = onApiReady;
-  }, [onApiReady]);
+    const masterBar =
+      lookup.findMasterBarByIndex?.(barIndex) ??
+      lookup._masterBarLookup?.get?.(barIndex) ??
+      null;
+    const bounds = masterBar?.realBounds ?? masterBar?.visualBounds ?? null;
+    if (!bounds) {
+      setSelectionBox(null);
+      return;
+    }
 
+    setSelectionBox({
+      left: bounds.x - container.scrollLeft,
+      top: bounds.y - container.scrollTop,
+      width: bounds.w,
+      height: bounds.h,
+    });
+  };
+
+  const resolveBarIndexFromPointer = (event: MouseEvent): number | null => {
+    const container = containerRef.current;
+    const lookup = getBoundsLookup(apiRef.current);
+    if (!container || !lookup) {
+      return null;
+    }
+
+    const rect = container.getBoundingClientRect();
+    const x = event.clientX - rect.left + container.scrollLeft;
+    const y = event.clientY - rect.top + container.scrollTop;
+    const beatBounds = lookup.getBeatAtPos?.(x, y) ?? null;
+    const beatBarIndex = resolveBarIndex(beatBounds);
+    if (beatBarIndex !== null) {
+      return beatBarIndex;
+    }
+
+    const systems = Array.isArray(lookup.staffSystems) ? lookup.staffSystems : [];
+    for (const system of systems) {
+      const bounds = system?.realBounds;
+      if (!bounds || y < bounds.y || y > bounds.y + bounds.h) {
+        continue;
+      }
+      const bar = system.findBarAtPos?.(x) ?? null;
+      const barIndex = resolveBarIndex(bar);
+      if (barIndex !== null) {
+        return barIndex;
+      }
+    }
+
+    return null;
+  };
+
+  const bindExternalPlayer = () => {
+    const api = apiRef.current;
+    const midiPlayer = midiPlayerRef.current;
+    const output = api?.player?.output;
+
+    if (!api || !midiPlayer || !output) {
+      return;
+    }
+
+    output.handler = createAlphaTabExternalMediaHandler(midiPlayer);
+    output.updatePosition?.(0);
+  };
+
+  const updateAlphaTabPlaybackPosition = (timeMs: number) => {
+    apiRef.current?.player?.output?.updatePosition?.(timeMs);
+  };
+
+  const maybeNotifyPlayerReady = () => {
+    if (alphaTabReadyRef.current && midiReadyRef.current) {
+      onPlayerReadyRef.current?.();
+    }
+  };
+
+  const applyStaffVisibility = (score: any) => {
+    const visibility = getStaffVisibility(
+      instrumentModeRef.current ?? null,
+      viewTabRef.current,
+    );
+
+    for (const track of score?.tracks ?? []) {
+      for (const staff of track?.staves ?? []) {
+        staff.showStandardNotation = visibility.showStandardNotation;
+        staff.showTablature = visibility.showTablature;
+      }
+    }
+  };
+
+  // Mount: create single AlphaTab instance
   useEffect(() => {
     if (!containerRef.current || apiRef.current) {
       return;
     }
 
-    const settings = {
+    const api = new (alphaTab as any).AlphaTabApi(containerRef.current, {
       core: {
         includeNoteBounds: true,
         fontDirectory: '/font/',
@@ -97,22 +295,42 @@ const ScoreViewer = ({
         stretchForce: 0.6,
         justifyLastSystem: false,
         padding: [36, 8, 64, 24],
-        staveProfile:
-          (alphaTab as any).StaveProfile?.ScoreTab ??
-          (alphaTab as any).LayoutStaveProfile?.ScoreTab ??
-          0,
+        staveProfile: resolveStaveProfile(alphaTab, instrumentMode, viewTab),
         resources: {
           copyrightFont: '11px Arial',
         },
       },
       player: {
         enablePlayer: true,
+        playerMode:
+          (alphaTab as any).PlayerMode?.EnabledExternalMedia ??
+          (alphaTab as any).PlayerMode?.EnabledSynthesizer,
+        enableCursor: true,
+        enableElementHighlighting: true,
       },
-    };
-
-    const api = new (alphaTab as any).AlphaTabApi(containerRef.current, settings);
+    });
     apiRef.current = api;
-    onApiReadyRef.current?.(api);
+    onApiReadyRef.current?.(
+      createScoreViewerPlaybackController({
+        alphaTabApiRef: apiRef,
+        midiPlayerRef,
+        updatePosition: updateAlphaTabPlaybackPosition,
+      }),
+    );
+
+    if (api?.scoreLoaded?.on) {
+      api.scoreLoaded.on((score: any) => {
+        applyStaffVisibility(score);
+      });
+    }
+
+    if (api?.playerReady?.on) {
+      api.playerReady.on(() => {
+        alphaTabReadyRef.current = true;
+        bindExternalPlayer();
+        maybeNotifyPlayerReady();
+      });
+    }
 
     if (api?.noteMouseDown?.on) {
       api.noteMouseDown.on((args: unknown) => {
@@ -122,42 +340,156 @@ const ScoreViewer = ({
         }
         onMeasureClickRef.current?.(hit.barIndex);
         onNoteClickRef.current?.(hit);
+        window.requestAnimationFrame(updateSelectedMeasureOverlay);
       });
     }
 
-    if (api?.barMouseDown?.on) {
-      api.barMouseDown.on((args: any) => {
-        const barIndex = args?.bar?.index;
-        if (typeof barIndex === 'number') {
+    if (api?.beatMouseDown?.on) {
+      api.beatMouseDown.on((args: any) => {
+        const barIndex = resolveBarIndex(args);
+        if (barIndex !== null) {
           onMeasureClickRef.current?.(barIndex);
+          window.requestAnimationFrame(updateSelectedMeasureOverlay);
         }
       });
     }
 
+    const handleCanvasClick = (event: MouseEvent) => {
+      const barIndex = resolveBarIndexFromPointer(event);
+      if (barIndex !== null) {
+        onMeasureClickRef.current?.(barIndex);
+        window.requestAnimationFrame(updateSelectedMeasureOverlay);
+      }
+    };
+    const handleCanvasScroll = () => updateSelectedMeasureOverlay();
+    containerRef.current.addEventListener('click', handleCanvasClick);
+    containerRef.current.addEventListener('scroll', handleCanvasScroll);
+
+    if (api?.postRenderFinished?.on) {
+      api.postRenderFinished.on(() => {
+        window.requestAnimationFrame(updateSelectedMeasureOverlay);
+      });
+    }
+
     return () => {
+      containerRef.current?.removeEventListener('click', handleCanvasClick);
+      containerRef.current?.removeEventListener('scroll', handleCanvasScroll);
+      onApiReadyRef.current?.(null);
+      midiPlayerRef.current?.dispose();
+      midiPlayerRef.current = null;
       apiRef.current?.destroy?.();
       apiRef.current = null;
     };
   }, []);
 
   useEffect(() => {
-    if (!apiRef.current || !scoreXml) {
+    if (!scoreXml || !apiRef.current) {
+      midiReadyRef.current = false;
+      midiPlayerRef.current?.stop();
       return;
     }
+
+    midiReadyRef.current = false;
     loadScoreXml(apiRef.current, scoreXml);
-  }, [scoreXml]);
+
+    let cancelled = false;
+
+    const loadPlaybackMidi = async () => {
+      try {
+        const toolkit = await getVerovioToolkit();
+        if (cancelled) {
+          return;
+        }
+
+        toolkit.loadData(scoreXml);
+        const midiBase64 = toolkit.renderToMIDI();
+        if (!midiBase64 || cancelled) {
+          return;
+        }
+
+        const playbackInstrument: VerovioPlaybackInstrument =
+          instrumentModeRef.current === 'guitar' ? 'guitar' : 'piano';
+        if (!midiPlayerRef.current) {
+          midiPlayerRef.current = new VerovioPlayer({
+            playbackInstrument,
+            onPositionChanged: (current, total) => {
+              onPositionChangedRef.current?.(current, total);
+              updateAlphaTabPlaybackPosition(current);
+            },
+            onStopped: () => updateAlphaTabPlaybackPosition(0),
+          });
+        } else {
+          midiPlayerRef.current.stop();
+          midiPlayerRef.current.setPlaybackInstrument(playbackInstrument);
+        }
+
+        midiPlayerRef.current.load(midiBase64);
+        bindExternalPlayer();
+        midiReadyRef.current = true;
+        maybeNotifyPlayerReady();
+      } catch (error) {
+        console.error('Failed to create tab playback MIDI:', error);
+      }
+    };
+
+    void loadPlaybackMidi();
+    window.requestAnimationFrame(updateSelectedMeasureOverlay);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [scoreXml, instrumentMode]);
+
+  useEffect(() => {
+    updateSelectedMeasureOverlay();
+  }, [selectedBarIndex, scoreXml, viewTab]);
+
+  const label = getScoreViewerLabel(instrumentMode, viewTab);
+  const showSwitcher = shouldShowTabSwitcher(instrumentMode);
 
   return (
     <div className="score-viewer">
       <div className="score-viewer__header">
         <span className="score-viewer__label">
           <span className="score-viewer__label-icon">🎼</span>
-          Score + Tab
+          {label}
         </span>
+          {showSwitcher ? (
+            <div
+              className="score-viewer__switcher"
+              role="tablist"
+              aria-label="Score view"
+            >
+              <button
+                type="button"
+                role="tab"
+                aria-selected={viewTab === 'score'}
+                className={`score-viewer__switch ${viewTab === 'score' ? 'score-viewer__switch--active' : ''}`}
+                onClick={() => onViewTabChange?.('score')}
+              >
+                Sheet Music
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={viewTab === 'tab'}
+                className={`score-viewer__switch ${viewTab === 'tab' ? 'score-viewer__switch--active' : ''}`}
+                onClick={() => onViewTabChange?.('tab')}
+              >
+                Guitar Tab
+              </button>
+            </div>
+          ) : null}
         {highlightMeasureId ? (
           <span className="score-viewer__badge">
             <span>✏️</span>
             Draft: {highlightMeasureId}
+          </span>
+        ) : null}
+        {selectedBarIndex !== null ? (
+          <span className="score-viewer__badge score-viewer__badge--selected">
+            <span>📍</span>
+            Selected: Bar {selectedBarIndex + 1}
           </span>
         ) : null}
       </div>
@@ -170,7 +502,17 @@ const ScoreViewer = ({
           </span>
         </div>
       ) : null}
-      <div className="score-viewer__canvas" ref={containerRef} />
+      <div className="score-viewer__canvas-shell">
+        <div className="score-viewer__canvas score-viewer__canvas--interactive" ref={containerRef} />
+        {selectionBox ? (
+          <div className="score-viewer__selection-layer" aria-hidden="true">
+            <div
+              className="score-viewer__measure-selection"
+              style={selectionBoxStyle(selectionBox)}
+            />
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 };

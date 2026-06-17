@@ -1,0 +1,47 @@
+"""Instrumental v5 EMI-conditioned compound counterpoint representation."""
+
+from src.instrumental_v5.representation import (
+    CADENCE_TYPE_TO_ID,
+    CMMC_FUNCTION_TO_ID,
+    CONTOUR_BUCKET_NAMES,
+    CP_MOTION_TYPE_NAMES,
+    CP_MOTION_TYPE_TO_ID,
+    HARMONIC_FUNCTION_TO_ID,
+    PHRASE_ROLE_NAMES,
+    RHYTHM_BUCKET_NAMES,
+    SPEAC_LABEL_NAMES,
+    SPEAC_LABEL_TO_ID,
+    V5_EMI_FIELD_NAMES,
+    V5_COUNTERPOINT_FIELD_NAMES,
+    V5_FEATURE_SPECS,
+    V5_FIELD_NAMES,
+    V5Piece,
+    build_v5_piece,
+    classify_contour_bucket,
+    classify_rhythm_bucket,
+)
+from src.instrumental_v5.form_planner import FormEntry, V5FormPlan, build_v5_form_plan
+
+__all__ = [
+    "CADENCE_TYPE_TO_ID",
+    "CMMC_FUNCTION_TO_ID",
+    "CONTOUR_BUCKET_NAMES",
+    "CP_MOTION_TYPE_NAMES",
+    "CP_MOTION_TYPE_TO_ID",
+    "HARMONIC_FUNCTION_TO_ID",
+    "PHRASE_ROLE_NAMES",
+    "RHYTHM_BUCKET_NAMES",
+    "SPEAC_LABEL_NAMES",
+    "SPEAC_LABEL_TO_ID",
+    "V5_EMI_FIELD_NAMES",
+    "V5_COUNTERPOINT_FIELD_NAMES",
+    "V5_FEATURE_SPECS",
+    "V5_FIELD_NAMES",
+    "V5Piece",
+    "FormEntry",
+    "V5FormPlan",
+    "build_v5_piece",
+    "build_v5_form_plan",
+    "classify_contour_bucket",
+    "classify_rhythm_bucket",
+]

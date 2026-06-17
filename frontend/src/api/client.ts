@@ -1,13 +1,20 @@
 import type {
   AltPositionsRequest,
+  AltPositionsResponse,
+  AppendMeasuresRequest,
+  AppendMeasuresResponse,
   ApplyFingeringRequest,
   ApplyFingeringResponse,
   CommitDraftRequest,
   CommitDraftResponse,
   ComposeRequest,
   ComposeResponse,
+  ConvertToGuitarRequest,
+  ConvertToGuitarResponse,
   DiscardDraftRequest,
   DiscardDraftResponse,
+  GenerateMeasuresRequest,
+  GenerateMeasuresResponse,
   InpaintPreviewRequest,
   InpaintPreviewResponse,
 } from './types';
@@ -24,10 +31,17 @@ const apiPost = async <T>(path: string, body: unknown): Promise<T> => {
   });
 
   if (!response.ok) {
-    const message = await response.text();
-    throw new Error(
-      message || `POST ${path} failed with status ${response.status}`,
-    );
+    const raw = await response.text();
+    let message = raw;
+    try {
+      const json = JSON.parse(raw) as { detail?: unknown };
+      if (typeof json.detail === 'string') {
+        message = json.detail;
+      }
+    } catch {
+      // not JSON — use raw text as-is
+    }
+    throw new Error(message || `POST ${path} failed with status ${response.status}`);
   }
 
   return (await response.json()) as T;
@@ -53,10 +67,25 @@ export const discardDraft = (
 
 export const altPositions = (
   body: AltPositionsRequest,
-): Promise<Record<string, unknown>> =>
-  apiPost<Record<string, unknown>>('/alt_positions', body);
+): Promise<AltPositionsResponse> =>
+  apiPost<AltPositionsResponse>('/alt_positions', body);
 
 export const applyFingering = (
   body: ApplyFingeringRequest,
 ): Promise<ApplyFingeringResponse> =>
   apiPost<ApplyFingeringResponse>('/apply_fingering', body);
+
+export const appendMeasures = (
+  body: AppendMeasuresRequest,
+): Promise<AppendMeasuresResponse> =>
+  apiPost<AppendMeasuresResponse>('/append_measures', body);
+
+export const generateMeasures = (
+  body: GenerateMeasuresRequest,
+): Promise<GenerateMeasuresResponse> =>
+  apiPost<GenerateMeasuresResponse>('/generate_measures', body);
+
+export const convertToGuitar = (
+  body: ConvertToGuitarRequest,
+): Promise<ConvertToGuitarResponse> =>
+  apiPost<ConvertToGuitarResponse>('/api/convert-to-guitar', body);

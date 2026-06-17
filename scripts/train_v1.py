@@ -1,15 +1,18 @@
 import argparse
 import json
+import logging
+import math
 import random
 import re
 import time
 from dataclasses import asdict
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional
 
 import torch
 import torch.nn.functional as F
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 
 # Ensure project root is in path
 import sys
@@ -19,11 +22,14 @@ sys.path.insert(0, str(ROOT))
 
 from src.dataio.dataset import BarDataset
 from src.dataio.collate_miditok import (
+    DESC_EMBED_DIM,
     MidiTokCollator,
     PackedBarDataset,
     PrefixControlConfig,
 )
 from src.models.notelm.model import NoteLM, NoteLMConfig
+
+log = logging.getLogger(__name__)
 
 
 def _load_vocab(path: Path) -> Dict[str, int]:
@@ -72,6 +78,43 @@ def _collect_harm_class_ids(vocab: Dict[str, int]) -> List[int]:
     return ids
 
 
+def _parse_prefix_weight(value: str) -> tuple[str, float]:
+    if "=" not in value:
+        raise ValueError(f"loss prefix weights must use PREFIX=WEIGHT format: {value}")
+    prefix, raw_weight = value.split("=", 1)
+    prefix = prefix.strip()
+    if not prefix:
+        raise ValueError(f"loss prefix weight is missing a prefix: {value}")
+    try:
+        weight = float(raw_weight)
+    except ValueError as exc:
+        raise ValueError(f"invalid loss weight in {value}") from exc
+    if weight <= 0:
+        raise ValueError(f"loss weights must be positive: {value}")
+    return prefix, weight
+
+
+def _build_loss_weight_tensor(
+    vocab: Dict[str, int],
+    specs: Iterable[str],
+    *,
+    device: torch.device,
+) -> Optional[torch.Tensor]:
+    parsed = [_parse_prefix_weight(spec) for spec in specs]
+    if not parsed:
+        return None
+    weights = torch.ones(len(vocab), dtype=torch.float32, device=device)
+    for prefix, weight in parsed:
+        matched = False
+        for token, token_id in vocab.items():
+            if token.startswith(prefix):
+                weights[token_id] = weight
+                matched = True
+        if not matched:
+            log.warning("Loss prefix %r matched no vocab tokens.", prefix)
+    return weights
+
+
 def _build_measure_tokens(prefix: str, max_measures: int) -> List[str]:
     return [f"{prefix}_{i}" for i in range(1, max_measures + 1)]
 
@@ -88,6 +131,7 @@ def _save_checkpoint(
     optimizer: torch.optim.Optimizer,
     config: NoteLMConfig,
     vocab_path: Path,
+    args: argparse.Namespace,
 ) -> Path:
     ckpt = {
         "step": step,
@@ -95,10 +139,105 @@ def _save_checkpoint(
         "optimizer_state": optimizer.state_dict(),
         "config": asdict(config),
         "vocab_path": str(vocab_path),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "args": vars(args),
     }
     path = output_dir / f"notelm_step{step}.pt"
     torch.save(ckpt, path)
     return path
+
+
+def _load_resume_checkpoint(
+    resume_path: Path,
+    model: NoteLM,
+    optimizer: torch.optim.Optimizer,
+    device: torch.device,
+) -> int:
+    ckpt = torch.load(resume_path, map_location=device)
+    model.load_state_dict(ckpt["model_state"])
+    optimizer.load_state_dict(ckpt["optimizer_state"])
+    resumed_step = int(ckpt.get("step", 0))
+    log.info("Resumed from %s at step %d", resume_path, resumed_step)
+    return resumed_step
+
+
+def _compute_val_loss(
+    model: NoteLM,
+    loader: DataLoader,
+    device: torch.device,
+    pad_id: int,
+    label_smoothing: float,
+    loss_weights: Optional[torch.Tensor] = None,
+    mask_prefix: bool = False,
+    max_batches: int = 0,
+) -> float:
+    model.eval()
+    total_loss = 0.0
+    n_batches = 0
+    with torch.no_grad():
+        for batch in loader:
+            ids = batch.ids.to(device)
+            attn_mask = batch.attn_mask.to(device)
+            prefix_len = batch.prefix_len.to(device)
+            desc_embed = None
+            if model.config.desc_embed_dim > 0 and batch.desc_embed is not None:
+                desc_embed = batch.desc_embed.to(device)
+            inputs = ids[:, :-1].contiguous()
+            labels = ids[:, 1:].contiguous()
+            attn_mask = attn_mask[:, :-1]
+            if mask_prefix:
+                max_len = labels.size(1)
+                mask_len = torch.clamp(prefix_len - 1, min=0, max=max_len)
+                range_idx = torch.arange(max_len, device=device)[None, :]
+                labels = labels.masked_fill(range_idx < mask_len[:, None], pad_id)
+            logits = model(inputs, attn_mask=attn_mask, desc_embed=desc_embed)
+            loss = F.cross_entropy(
+                logits.reshape(-1, logits.size(-1)),
+                labels.reshape(-1),
+                ignore_index=pad_id,
+                label_smoothing=label_smoothing,
+                weight=loss_weights,
+            )
+            total_loss += loss.item()
+            n_batches += 1
+            if max_batches > 0 and n_batches >= max_batches:
+                break
+    model.train()
+    return total_loss / n_batches if n_batches > 0 else float("nan")
+
+
+def _get_lr(step: int, warmup_steps: int, base_lr: float, total_steps: int) -> float:
+    """Linear warmup then cosine decay to 0."""
+    if warmup_steps > 0 and step < warmup_steps:
+        return base_lr * step / warmup_steps
+    if total_steps > 0:
+        progress = (step - warmup_steps) / max(1, total_steps - warmup_steps)
+        return base_lr * 0.5 * (1.0 + math.cos(math.pi * min(progress, 1.0)))
+    return base_lr
+
+
+def _resolve_scheduler_total_steps(resumed_step: int, planned_steps: int) -> int:
+    """Ensure resumed runs keep a positive LR schedule horizon."""
+    if planned_steps < 1:
+        raise ValueError("planned_steps must be >= 1")
+    if resumed_step > 0 and planned_steps <= resumed_step:
+        return resumed_step + planned_steps
+    return planned_steps
+
+
+def _split_indices_by_piece_id(
+    piece_ids: List[str],
+    val_split: float,
+    seed: int,
+) -> tuple[List[int], List[int], int]:
+    unique_pieces = sorted(set(piece_ids))
+    rng = random.Random(seed)
+    rng.shuffle(unique_pieces)
+    n_val_pieces = max(1, int(len(unique_pieces) * val_split))
+    val_piece_set = set(unique_pieces[:n_val_pieces])
+    train_indices = [i for i, piece_id in enumerate(piece_ids) if piece_id not in val_piece_set]
+    val_indices = [i for i, piece_id in enumerate(piece_ids) if piece_id in val_piece_set]
+    return train_indices, val_indices, n_val_pieces
 
 
 def parse_args() -> argparse.Namespace:
@@ -109,9 +248,12 @@ def parse_args() -> argparse.Namespace:
 
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--max-seq-len", type=int, default=2048)
-    parser.add_argument("--bars-per-seq", type=int, default=1)
+    parser.add_argument("--bars-per-seq", type=int, default=4,
+                        help="Number of bars to pack per training sequence. Default 4 for multi-bar context.")
     parser.add_argument("--allow-truncate", action="store_true")
-    parser.add_argument("--shuffle", action="store_true")
+    parser.add_argument("--shuffle", action="store_true", default=True,
+                        help="Shuffle training data each epoch (default: on).")
+    parser.add_argument("--no-shuffle", dest="shuffle", action="store_false")
     parser.add_argument("--drop-last", action="store_true")
     parser.add_argument("--num-workers", type=int, default=0)
 
@@ -127,12 +269,32 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--epochs", type=int, default=1)
     parser.add_argument("--max-steps", type=int, default=0)
     parser.add_argument("--lr", type=float, default=3e-4)
+    parser.add_argument("--warmup-steps", type=int, default=100,
+                        help="Linear LR warmup steps (0=disabled).")
+    parser.add_argument("--lr-decay", action="store_true", default=True,
+                        help="Cosine LR decay to 0 over training (default: on).")
+    parser.add_argument("--no-lr-decay", dest="lr_decay", action="store_false")
     parser.add_argument("--weight-decay", type=float, default=0.01)
     parser.add_argument("--label-smoothing", type=float, default=0.0)
+    parser.add_argument("--loss-token-prefix-weight", action="append", default=[],
+                        help="Upweight labels whose token starts with PREFIX, format PREFIX=WEIGHT. Repeatable.")
+    parser.add_argument("--voice-token-loss-weight", type=float, default=1.0,
+                        help="Convenience weight for BASS_/TENOR_/ALTO_/SOP_ label tokens.")
     parser.add_argument("--harm-class-dropout", type=float, default=0.0)
     parser.add_argument("--grad-clip", type=float, default=1.0)
     parser.add_argument("--log-every", type=int, default=50)
     parser.add_argument("--save-every", type=int, default=500)
+
+    parser.add_argument("--val-split", type=float, default=0.0,
+                        help="Fraction of packed sequences to hold out for validation (0=disabled).")
+    parser.add_argument("--val-every", type=int, default=500,
+                        help="Compute validation loss every N steps (requires --val-split > 0).")
+
+    parser.add_argument("--resume", default=None,
+                        help="Path to a checkpoint .pt file to resume training from.")
+
+    parser.add_argument("--dry-run-batches", type=int, default=0,
+                        help="Run this many batches then exit; 0=disabled. Useful for smoke-testing.")
 
     parser.add_argument("--key", default=None)
     parser.add_argument("--style", default=None)
@@ -143,6 +305,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--no-key-from-plan", dest="key_from_plan", action="store_false")
     parser.set_defaults(key_from_plan=True)
     parser.add_argument("--mask-prefix-loss", action="store_true")
+    parser.add_argument("--desc-embed", action="store_true",
+                        help="Include bar-level descriptor embeddings in the model.")
 
     parser.add_argument("--pad-token", default="<pad>")
     parser.add_argument("--bos-token", default=None)
@@ -160,7 +324,20 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(message)s",
+        datefmt="%Y-%m-%dT%H:%M:%S",
+    )
+
     args = parse_args()
+    if args.voice_token_loss_weight <= 0:
+        raise SystemExit("--voice-token-loss-weight must be positive")
+    if args.voice_token_loss_weight != 1.0:
+        voice_weight = str(args.voice_token_loss_weight)
+        args.loss_token_prefix_weight.extend(
+            [f"BASS_={voice_weight}", f"TENOR_={voice_weight}", f"ALTO_={voice_weight}", f"SOP_={voice_weight}"]
+        )
 
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -203,7 +380,7 @@ def main() -> None:
         vocab_path = output_dir / "vocab.json"
         _save_vocab(vocab_path, vocab)
         if added:
-            print(f"Extended vocab with {len(added)} tokens.")
+            log.info("Extended vocab with %d tokens.", len(added))
     else:
         missing = [tok for tok in required_tokens if tok not in vocab]
         if missing:
@@ -217,20 +394,62 @@ def main() -> None:
     if bar_token not in vocab:
         raise SystemExit("Missing BAR token in vocab.")
 
+    device = _normalize_device(args.device)
+    _set_seed(args.seed)
+
     dataset = BarDataset(
         str(args.events),
         str(vocab_path),
         unk_token=args.unk_token,
     )
 
+    # Reserve space for prefix tokens the collator prepends to every sequence.
+    # MEAS token is always added; KEY is added when key_from_plan or key override is set.
+    _prefix_overhead = 1  # MEAS
+    if args.key_from_plan or args.key:
+        _prefix_overhead += 1  # KEY
+    if args.style:
+        _prefix_overhead += 1
+    if args.difficulty:
+        _prefix_overhead += 1
+    if args.prepend_bos:
+        _prefix_overhead += 1
+    if args.append_eos:
+        _prefix_overhead += 1
+    _dataset_max_seq_len = max(1, args.max_seq_len - _prefix_overhead)
+
     packed = PackedBarDataset(
         dataset,
-        max_seq_len=args.max_seq_len,
+        max_seq_len=_dataset_max_seq_len,
         bars_per_seq=args.bars_per_seq,
         allow_truncate=args.allow_truncate,
     )
     if len(packed) == 0:
         raise SystemExit("No sequences were built; check max_seq_len or dataset.")
+
+    # Optional validation split — split by piece_id so the same piece cannot
+    # appear in both train and val.
+    val_loader: Optional[DataLoader] = None
+    if args.val_split > 0.0:
+        seq_piece_ids = [packed[i].piece_id for i in range(len(packed))]
+        train_indices, val_indices, n_val_pieces = _split_indices_by_piece_id(
+            seq_piece_ids,
+            args.val_split,
+            args.seed,
+        )
+        if not train_indices:
+            raise SystemExit(
+                f"val_split={args.val_split} leaves no training sequences ({len(packed)} total)."
+            )
+        train_packed = Subset(packed, train_indices)
+        val_packed = Subset(packed, val_indices)
+        log.info(
+            "Train sequences: %d  Val sequences: %d  Val pieces: %d",
+            len(train_indices), len(val_indices), n_val_pieces,
+        )
+    else:
+        train_packed = packed
+        val_packed = None
 
     prefix_config = PrefixControlConfig(
         style=args.style,
@@ -251,13 +470,23 @@ def main() -> None:
     )
 
     loader = DataLoader(
-        packed,
+        train_packed,
         batch_size=args.batch_size,
         shuffle=args.shuffle,
         num_workers=args.num_workers,
         drop_last=args.drop_last,
         collate_fn=collator,
     )
+
+    if val_packed is not None:
+        val_loader = DataLoader(
+            val_packed,
+            batch_size=args.batch_size,
+            shuffle=False,
+            num_workers=args.num_workers,
+            drop_last=False,
+            collate_fn=collator,
+        )
 
     config = NoteLMConfig(
         vocab_size=len(vocab),
@@ -270,15 +499,17 @@ def main() -> None:
         rotary_base=args.rotary_base,
         bar_token_id=vocab[bar_token],
         tie_weights=args.tie_weights,
+        desc_embed_dim=DESC_EMBED_DIM if args.desc_embed else 0,
     )
-
-    device = _normalize_device(args.device)
-    _set_seed(args.seed)
 
     model = NoteLM(config).to(device)
     optimizer = torch.optim.AdamW(
         model.parameters(), lr=args.lr, weight_decay=args.weight_decay
     )
+
+    step = 0
+    if args.resume:
+        step = _load_resume_checkpoint(Path(args.resume), model, optimizer, device)
 
     harm_class_ids = _collect_harm_class_ids(vocab)
     harm_class_ids_tensor = (
@@ -289,20 +520,47 @@ def main() -> None:
         raise SystemExit("harm_class_dropout requires unk_token in vocab.")
 
     pad_id = vocab[args.pad_token]
+    loss_weight_tensor = _build_loss_weight_tensor(
+        vocab,
+        args.loss_token_prefix_weight,
+        device=device,
+    )
 
     (output_dir / "train_args.json").write_text(
         json.dumps(vars(args), indent=2), encoding="utf-8"
     )
 
-    step = 0
+    log.info(
+        "Starting training: device=%s vocab_size=%d params=%d",
+        device,
+        len(vocab),
+        sum(p.numel() for p in model.parameters()),
+    )
+    if args.dry_run_batches > 0:
+        log.info("Dry-run mode: will exit after %d batches.", args.dry_run_batches)
+
+    planned_total_steps = args.max_steps if args.max_steps > 0 else args.epochs * len(loader)
+    total_steps = _resolve_scheduler_total_steps(step, planned_total_steps)
+    if total_steps != planned_total_steps:
+        log.info(
+            "Extended scheduler horizon for resume: step=%d planned=%d total=%d",
+            step,
+            planned_total_steps,
+            total_steps,
+        )
+
     start_time = time.time()
     model.train()
+    dry_run_count = 0
 
     for epoch in range(args.epochs):
         for batch in loader:
             ids = batch.ids.to(device)
             attn_mask = batch.attn_mask.to(device)
             prefix_len = batch.prefix_len.to(device)
+            desc_embed = None
+            if args.desc_embed and batch.desc_embed is not None:
+                desc_embed = batch.desc_embed.to(device)
 
             inputs = ids[:, :-1].contiguous()
             labels = ids[:, 1:].contiguous()
@@ -322,13 +580,20 @@ def main() -> None:
                 mask = range_idx < mask_len[:, None]
                 labels = labels.masked_fill(mask, pad_id)
 
-            logits = model(inputs, attn_mask=attn_mask)
+            logits = model(inputs, attn_mask=attn_mask, desc_embed=desc_embed)
             loss = F.cross_entropy(
                 logits.reshape(-1, logits.size(-1)),
                 labels.reshape(-1),
                 ignore_index=pad_id,
                 label_smoothing=args.label_smoothing,
+                weight=loss_weight_tensor,
             )
+
+            if args.lr_decay or args.warmup_steps > 0:
+                lr = _get_lr(step, args.warmup_steps, args.lr,
+                             total_steps if args.lr_decay else 0)
+                for param_group in optimizer.param_groups:
+                    param_group["lr"] = lr
 
             optimizer.zero_grad(set_to_none=True)
             loss.backward()
@@ -338,25 +603,39 @@ def main() -> None:
 
             if step % args.log_every == 0:
                 elapsed = time.time() - start_time
-                print(
-                    f"epoch {epoch} step {step} loss {loss.item():.4f} "
-                    f"elapsed {elapsed:.1f}s"
+                log.info(
+                    "epoch %d  step %d  loss %.4f  elapsed %.1fs",
+                    epoch, step, loss.item(), elapsed,
                 )
 
             if args.save_every > 0 and step > 0 and step % args.save_every == 0:
                 path = _save_checkpoint(
-                    output_dir, step, model, optimizer, config, vocab_path
+                    output_dir, step, model, optimizer, config, vocab_path, args
                 )
-                print(f"Saved checkpoint to {path}")
+                log.info("Saved checkpoint: %s", path)
+
+            if val_loader is not None and args.val_every > 0 and step > 0 and step % args.val_every == 0:
+                val_loss = _compute_val_loss(
+                    model, val_loader, device, pad_id, args.label_smoothing,
+                    loss_weights=loss_weight_tensor,
+                    mask_prefix=args.mask_prefix_loss,
+                )
+                log.info("step %d  val_loss %.4f", step, val_loss)
 
             step += 1
+            dry_run_count += 1
+
+            if args.dry_run_batches > 0 and dry_run_count >= args.dry_run_batches:
+                log.info("Dry-run complete after %d batches.", dry_run_count)
+                return
+
             if args.max_steps and step >= args.max_steps:
                 break
         if args.max_steps and step >= args.max_steps:
             break
 
-    path = _save_checkpoint(output_dir, step, model, optimizer, config, vocab_path)
-    print(f"Saved final checkpoint to {path}")
+    path = _save_checkpoint(output_dir, step, model, optimizer, config, vocab_path, args)
+    log.info("Saved final checkpoint: %s", path)
 
 
 if __name__ == "__main__":

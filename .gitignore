@@ -1,13 +1,27 @@
 # data corpora and generated outputs
 /data/tobis_xml/
 /data/processed/
+/data/processed_rebuilt
+/data/processed_rebuilt_bad_piece_ids
+/data/overfit_20_chorales/
 /data/imslp_pdfs/
 /data/imslp_musicxml/
+/data/instrumental_v5/*/emi_fragments.jsonl
+/data/instrumental_v5/*/events.parquet
+/data/instrumental_v5/*/metadata.json
+/data/instrumental_v5/*/vocab.json
+/data/instrumental_v5/*/train_emi_fragments.jsonl
+/data/instrumental_v5/*/val_emi_fragments.jsonl
+/data/instrumental_v5/*/tokenized/
+/data/instrumental_v6/
+/data/musicxml_cleaned/
 *.omr
+
+# local research/reference data
+/docs/cope-data/
 
 # legacy local data files at repo root
 tobis_xml
-processed
 cleanup_tobis_dirs.py
 complete-works.html
 link_files.py
@@ -47,6 +61,16 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+
+# task runner: temp and state files (state file is intentionally tracked if you want resume)
+.task_runner_state.tsv.bak.*
+.runner/implement_active_prompt.txt
+.runner/review_active_prompt.txt
+finished.md
+review.md
+
+# model checkpoints and training outputs
+/out/
 
 # frontend build artifacts
 /frontend/node_modules/

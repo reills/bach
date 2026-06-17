@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "overrides": [
+    {
+      "path": "instrumental-works/keyboard-works/BWV 772-786 Inventions/BWV_0782/BWV_0782.xml",
+      "movement_index": 0,
+      "time_signature": "4/4",
+      "start_measure": 0,
+      "end_measure": null,
+      "source": "https://www.mutopiaproject.org/ftp/BachJS/BWV782/bach-invention-11/bach-invention-11-a4.pdf",
+      "note": "The engraved score uses common time throughout; the source XML incorrectly uses 8/8."
+    },
+    {
+      "path": "instrumental-works/keyboard-works/BWV 772-786 Inventions/BWV_0785/BWV_0785.xml",
+      "movement_index": 0,
+      "time_signature": "4/4",
+      "start_measure": 0,
+      "end_measure": null,
+      "source": "https://www.mutopiaproject.org/ftp/BachJS/BWV785/bach-invention-14/bach-invention-14-a4.pdf",
+      "note": "The engraved score uses common time throughout; the source XML incorrectly uses 8/8."
+    }
+  ]
+}

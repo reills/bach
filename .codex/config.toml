@@ -1,0 +1,8 @@
+model = "gpt-5.3-codex"
+model_reasoning_effort = "high"
+
+# Safer default; loop script overrides to workspace-write
+sandbox_mode = "read-only"
+
+# Cached search by default; enable live per-run with --search
+web_search = "cached"

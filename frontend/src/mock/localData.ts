@@ -1,4 +1,9 @@
-import type { MeasureMap } from '../state/types';
+import type {
+  InstrumentMode,
+  MeasureMap,
+  RenderView,
+  ScoreDocumentBundle,
+} from '../state/types';
 
 export interface LocalManifest {
   baseScore: string;
@@ -50,6 +55,45 @@ export const buildMeasureMap = (doc: Document): MeasureMap => {
   });
 
   return map;
+};
+
+export const createStandardNotationXml = (xml: string): string =>
+  xml
+    .replace(/<staff-details\b[\s\S]*?<\/staff-details>/gi, '')
+    .replace(/<string\b[^>]*>[\s\S]*?<\/string>/gi, '')
+    .replace(/<fret\b[^>]*>[\s\S]*?<\/fret>/gi, '')
+    .replace(/<technical>\s*<\/technical>/gi, '')
+    .replace(/<notations>\s*<\/notations>/gi, '');
+
+const buildRenderViewFromDocument = (doc: Document): RenderView => ({
+  xml: new XMLSerializer().serializeToString(doc),
+  measureMap: buildMeasureMap(doc),
+});
+
+export const buildDocumentBundle = (
+  xml: string,
+  instrumentMode: InstrumentMode,
+): ScoreDocumentBundle => {
+  const sourceDoc = ensureScoreDocument(xml);
+
+  if (instrumentMode === 'piano') {
+    return {
+      instrumentMode,
+      views: {
+        score: buildRenderViewFromDocument(sourceDoc),
+      },
+    };
+  }
+
+  const scoreDoc = ensureScoreDocument(createStandardNotationXml(xml));
+
+  return {
+    instrumentMode,
+    views: {
+      score: buildRenderViewFromDocument(scoreDoc),
+      tab: buildRenderViewFromDocument(sourceDoc),
+    },
+  };
 };
 
 export const replaceMeasureAtIndex = (

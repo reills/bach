@@ -1,0 +1,25 @@
+{
+  "dataset": "data/instrumental_v4/keyboard_overture_cnorm_outer2_v4.json",
+  "format": "v4",
+  "fragment_count": 312,
+  "hop_slices": 4,
+  "length_slices": 8,
+  "min_notes": 2,
+  "piece_count": 2,
+  "reused_contours": 105,
+  "role_counts": {
+    "ANSWER_ENTRY": 4,
+    "CADENCE": 18,
+    "CADENTIAL_PREPARATION": 28,
+    "CLOSING": 16,
+    "EPISODE": 218,
+    "OPENING": 24,
+    "SEQUENCE": 2,
+    "SUBJECT_ENTRY": 2
+  },
+  "top_pieces": {
+    "BWV_0772": 156,
+    "BWV_0772a": 156
+  },
+  "unique_contours": 114
+}

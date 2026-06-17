@@ -1,0 +1,1937 @@
+{
+  "source_dirs": [
+    "data/tobis_xml/instrumental-works/keyboard-works",
+    "data/tobis_xml/instrumental-works/Overtures sinfonias",
+    "data/tobis_xml/instrumental-works/organ-works"
+  ],
+  "piece_count": 313,
+  "normalize_key": true,
+  "skipped": [
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1066_01/BWV_1066_01.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.4365234375
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1066_02/BWV_1066_02.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.44047619047619047
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1066_03_04/BWV_1066_03_04.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.5859375
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1066_05/BWV_1066_05.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.40625
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1066_06_07/BWV_1066_06_07.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.4673202614379085
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1066_08_09/BWV_1066_08_09.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.3463541666666667
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1066_10_11/BWV_1066_10_11.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.4361111111111111
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1067_01/BWV_1067_01.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.2607421875
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1067_02/BWV_1067_02.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.3942307692307692
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1067_03/BWV_1067_03.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.23958333333333334
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1067_04_05/BWV_1067_04_05.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.5868055555555556
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1067_06_07/BWV_1067_06_07.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.10256410256410256
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1067_08/BWV_1067_08.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.4652777777777778
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1067_09/BWV_1067_09.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.44375
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1068_01/BWV_1068_01.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.51171875
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1068_02/BWV_1068_02.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.5460526315789473
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1068_02_2/BWV_1068_02_2.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.27631578947368424
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1068_03_04/BWV_1068_03_04.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.4418103448275862
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1068_05/BWV_1068_05.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.46875
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1068_06/BWV_1068_06.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.3463541666666667
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1069_01/BWV_1069_01.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.359375
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1069_02_03/BWV_1069_02_03.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.43509615384615385
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1069_04/BWV_1069_04.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.51875
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1069_05_06/BWV_1069_05_06.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.47413793103448276
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1069_07/BWV_1069_07.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.5815972222222222
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1070_1/BWV_1070_1.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.5244140625
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1070_2/BWV_1070_2.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.34375
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1070_3/BWV_1070_3.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.443359375
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1070_4/BWV_1070_4.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.3399122807017544
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1070_5/BWV_1070_5.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.5338541666666666
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1070_6/BWV_1070_6.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.42578125
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1071_01/BWV_1071_01.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.439453125
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1071_02/BWV_1071_02.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.3247863247863248
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1071_03/BWV_1071_03.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.25961538461538464
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1071_04/BWV_1071_04.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.4722222222222222
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/Overtures sinfonias/BWV_1071_05/BWV_1071_05.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.328125
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/keyboard-works/BWV 832-845 Suites and Suite Movements/BWV_0837/BWV_0837.xml",
+      "reason": "too_short",
+      "slices": 112
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/keyboard-works/BWV 910-923 Toccatas Fantasias and Preludes/BWV_0923a/BWV_0923a.musicxml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.1346153846153846
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/keyboard-works/BWV 971-987 Concertos/BWV_0973_Orig/BWV_0973_Orig.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.390625
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/keyboard-works/BWV 971-987 Concertos/BWV_0979/BWV_0979.xml",
+      "reason": "empty_rate",
+      "empty_rate": 0.11588541666666667
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/keyboard-works/BWV 988-994 Variations Capriccios and Miscellaneous/BWV_0991/BWV_0991.xml",
+      "reason": "empty_rate",
+      "empty_rate": 0.08888888888888889
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 525-530 Trio Sonatas/BWV_0525_1_1/BWV_0525_1_1.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.5075431034482759
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 525-530 Trio Sonatas/BWV_0525_1_2/BWV_0525_1_2.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.5075431034482759
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 525-530 Trio Sonatas/BWV_0525_2_1/BWV_0525_2_1.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.36904761904761907
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 525-530 Trio Sonatas/BWV_0525_2_2/BWV_0525_2_2.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.35714285714285715
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 525-530 Trio Sonatas/BWV_0525_3_1/BWV_0525_3_1.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.4856770833333333
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 525-530 Trio Sonatas/BWV_0525_3_2/BWV_0525_3_2.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.4895833333333333
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 525-530 Trio Sonatas/BWV_0525a_01/BWV_0525a_01.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.1648706896551724
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 525-530 Trio Sonatas/BWV_0525a_02/BWV_0525a_02.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.7473958333333334
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 525-530 Trio Sonatas/BWV_0525a_03/BWV_0525a_03.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.5260416666666666
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 525-530 Trio Sonatas/BWV_0526_1/BWV_0526_1.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.4482421875
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 525-530 Trio Sonatas/BWV_0526_2/BWV_0526_2.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.5364583333333334
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 525-530 Trio Sonatas/BWV_0526_3/BWV_0526_3.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.466796875
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 525-530 Trio Sonatas/BWV_0527_1/BWV_0527_1.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.365234375
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 525-530 Trio Sonatas/BWV_0527_2/BWV_0527_2.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.3235294117647059
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 525-530 Trio Sonatas/BWV_0527_3/BWV_0527_3.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.3802083333333333
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 525-530 Trio Sonatas/BWV_0528_1/BWV_0528_1.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.4411764705882353
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 525-530 Trio Sonatas/BWV_0528_2/BWV_0528_2.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.45694444444444443
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 525-530 Trio Sonatas/BWV_0528_3/BWV_0528_3.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.3098958333333333
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 525-530 Trio Sonatas/BWV_0528a/BWV_0528a.musicxml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.3372093023255814
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 525-530 Trio Sonatas/BWV_0529_1/BWV_0529_1.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.5247395833333334
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 525-530 Trio Sonatas/BWV_0529_2/BWV_0529_2.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.2777777777777778
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 525-530 Trio Sonatas/BWV_0529_3/BWV_0529_3.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.259765625
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 525-530 Trio Sonatas/BWV_0530_1/BWV_0530_1.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.37109375
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 525-530 Trio Sonatas/BWV_0530_2/BWV_0530_2.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.4007936507936508
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 525-530 Trio Sonatas/BWV_0530_3/BWV_0530_3.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.3935546875
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 531-552 Preludes and Fugues/BWV_0531/BWV_0531.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.2890625
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 531-552 Preludes and Fugues/BWV_0532/BWV_0532.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.33984375
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 531-552 Preludes and Fugues/BWV_0532a/BWV_0532a.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.3466796875
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 531-552 Preludes and Fugues/BWV_0533/BWV_0533.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.283203125
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 531-552 Preludes and Fugues/BWV_0534/BWV_0534.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.5833333333333334
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 531-552 Preludes and Fugues/BWV_0535/BWV_0535.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.3759765625
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 531-552 Preludes and Fugues/BWV_0535a/BWV_0535a.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.244140625
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 531-552 Preludes and Fugues/BWV_0536/BWV_0536.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.3076171875
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 531-552 Preludes and Fugues/BWV_0536a/BWV_0536a.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.322265625
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 531-552 Preludes and Fugues/BWV_0537/BWV_0537.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.48828125
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 531-552 Preludes and Fugues/BWV_0538/BWV_0538.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.44140625
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 531-552 Preludes and Fugues/BWV_0539/BWV_0539.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.4287109375
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 531-552 Preludes and Fugues/BWV_0540/BWV_0540.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.2994791666666667
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 531-552 Preludes and Fugues/BWV_0541/BWV_0541.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.3854166666666667
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 531-552 Preludes and Fugues/BWV_0542/BWV_0542.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.375
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 531-552 Preludes and Fugues/BWV_0543/BWV_0543.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.5078125
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 531-552 Preludes and Fugues/BWV_0543a/BWV_0543a.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.27906976744186046
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 531-552 Preludes and Fugues/BWV_0544/BWV_0544.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.41015625
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 531-552 Preludes and Fugues/BWV_0545/BWV_0545.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.435546875
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 531-552 Preludes and Fugues/BWV_0545a/BWV_0545a.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.548828125
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 531-552 Preludes and Fugues/BWV_0545b/BWV 545b.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.2890625
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 531-552 Preludes and Fugues/BWV_0546/BWV_0546.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.3515625
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 531-552 Preludes and Fugues/BWV_0547/BWV_0547.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.5112847222222222
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 531-552 Preludes and Fugues/BWV_0548/BWV_0548.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.3684895833333333
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 531-552 Preludes and Fugues/BWV_0549/BWV_0549.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.4033203125
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 531-552 Preludes and Fugues/BWV_0549a/BWV_0549a.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.1640625
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 531-552 Preludes and Fugues/BWV_0550/BWV_0550.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.20052083333333334
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 531-552 Preludes and Fugues/BWV_0551/BWV_0551.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.470703125
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 531-552 Preludes and Fugues/BWV_0552/BWV_0552.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.2568359375
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 553-560 Eight Short Preludes and Fugues/BWV_0553/BWV_0553.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.23325892857142858
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 553-560 Eight Short Preludes and Fugues/BWV_0554/BWV_0554.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.45389344262295084
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 553-560 Eight Short Preludes and Fugues/BWV_0555/BWV_0555.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.38671875
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 553-560 Eight Short Preludes and Fugues/BWV_0556/BWV_0556.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.2864583333333333
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 553-560 Eight Short Preludes and Fugues/BWV_0557/BWV_0557.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.3885416666666667
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 553-560 Eight Short Preludes and Fugues/BWV_0558/BWV_0558.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.41796875
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 553-560 Eight Short Preludes and Fugues/BWV_0559/BWV_0559.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.36853448275862066
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 553-560 Eight Short Preludes and Fugues/BWV_0560/BWV_0560.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.4140625
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 561-563 Fantasias and Fugues/BWV_0561/BWV_0561.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.240234375
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 561-563 Fantasias and Fugues/BWV_0562/BWV_0562.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.19921875
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 561-563 Fantasias and Fugues/BWV_0563/BWV_0563.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.4228515625
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 564-566 Toccatas and Fugues/BWV_0564/BWV_0564.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.23046875
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 564-566 Toccatas and Fugues/BWV_0565/BWV_0565.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.2861328125
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 564-566 Toccatas and Fugues/BWV_0566/BWV_0566.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.31640625
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 564-566 Toccatas and Fugues/BWV_0566a/BWV_0566a.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.3720703125
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 567-569 Preludes/BWV_0567/BWV_0567.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.5245098039215687
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 567-569 Preludes/BWV_0568/BWV_0568.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.25877192982456143
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 567-569 Preludes/BWV_0569/BWV_0569.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.1640625
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 570-573 Fantasias/BWV_0570/BWV_0570.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.5148809523809523
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 570-573 Fantasias/BWV_0571/BWV_0571.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.3544921875
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 570-573 Fantasias/BWV_0572/BWV_0572.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.15234375
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 570-573 Fantasias/BWV_0572_I/BWV_0572_I.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.29296875
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 570-573 Fantasias/BWV_0573/BWV_0573.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.5432692307692307
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 570-573 Fantasias/BWV_0573_bl/BWV_0573_bl.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.3923611111111111
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 574-581 Fugues/BWV_0131a/BWV_0131a.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.3625
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 574-581 Fugues/BWV_0574/BWV_0574.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.392578125
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 574-581 Fugues/BWV_0574a/BWV_0574a.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.3427734375
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 574-581 Fugues/BWV_0574b/BWV_0574b.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.5576171875
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 574-581 Fugues/BWV_0575/BWV_0575.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.3408203125
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 574-581 Fugues/BWV_0576/BWV_0576.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.375
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 574-581 Fugues/BWV_0577/BWV_0577.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.35546875
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 574-581 Fugues/BWV_0578/BWV_0578.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.396484375
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 574-581 Fugues/BWV_0579/BWV_0579.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.25
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 574-581 Fugues/BWV_0581/BWV_0581.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.49166666666666664
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 582 Passacaglia and Fugue/BWV_0582/BWV_0582.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.3072916666666667
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 583-586 Trios/BWV_0583/BWV_0583.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.4410377358490566
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 583-586 Trios/BWV_0584/BWV_0584.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.4895833333333333
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 583-586 Trios/BWV_0585/BWV_0585.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.359375
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 583-586 Trios/BWV_0586/BWV_0586.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.169921875
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 583-586 Trios/BWV_1027a/BWV_1027a.musicxml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.255859375
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 587-591 Miscellaneous/BWV_0587/BWV_0587.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.4166666666666667
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 587-591 Miscellaneous/BWV_0587_1/BWV_0587_1.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.3932291666666667
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 587-591 Miscellaneous/BWV_0588/BWV_0588.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.451171875
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 587-591 Miscellaneous/BWV_0589/BWV_0589.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.65234375
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 587-591 Miscellaneous/BWV_0590/BWV_0590.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.4375
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 592-597 Concertos After Other Composers/BWV_0592/BWV_0592.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.521484375
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 592-597 Concertos After Other Composers/BWV_0593/BWV_0593.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.298828125
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 592-597 Concertos After Other Composers/BWV_0594/BWV_0594.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.314453125
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 592-597 Concertos After Other Composers/BWV_0595/BWV_0595.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.4287109375
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 592-597 Concertos After Other Composers/BWV_0596/BWV_0596.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.2942708333333333
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 592-597 Concertos After Other Composers/BWV_0597/BWV_0597.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.4404296875
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 598 Pedal-Exercitium/BWV_0598/BWV_0598.xml",
+      "reason": "parse_error",
+      "error": "expected exactly 2 active voices in data/tobis_xml/instrumental-works/organ-works/BWV 598 Pedal-Exercitium/BWV_0598/BWV_0598.xml, got 1"
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 599-644 The Little Organ Book (Orgelb\u00fcchlein)/BWV_0599/BWV_0599.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.3
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 599-644 The Little Organ Book (Orgelb\u00fcchlein)/BWV_0600/BWV_0600.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.4551282051282051
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 599-644 The Little Organ Book (Orgelb\u00fcchlein)/BWV_0601/BWV_0601.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.6736111111111112
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 599-644 The Little Organ Book (Orgelb\u00fcchlein)/BWV_0602/BWV_0602.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.3263888888888889
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 599-644 The Little Organ Book (Orgelb\u00fcchlein)/BWV_0603/BWV_0603.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.3284313725490196
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 599-644 The Little Organ Book (Orgelb\u00fcchlein)/BWV_0604/BWV_0604.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.4375
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 599-644 The Little Organ Book (Orgelb\u00fcchlein)/BWV_0605/BWV_0605.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.4192708333333333
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 599-644 The Little Organ Book (Orgelb\u00fcchlein)/BWV_0606/BWV_0606.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.25
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 599-644 The Little Organ Book (Orgelb\u00fcchlein)/BWV_0607/BWV_0607.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.6820175438596491
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 599-644 The Little Organ Book (Orgelb\u00fcchlein)/BWV_0608/BWV_0608.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.4786036036036036
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 599-644 The Little Organ Book (Orgelb\u00fcchlein)/BWV_0609/BWV_0609.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.6375
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 599-644 The Little Organ Book (Orgelb\u00fcchlein)/BWV_0610/BWV_0610.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.5756578947368421
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 599-644 The Little Organ Book (Orgelb\u00fcchlein)/BWV_0611/BWV_0611.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.525
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 599-644 The Little Organ Book (Orgelb\u00fcchlein)/BWV_0612/BWV_0612.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.6145833333333334
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 599-644 The Little Organ Book (Orgelb\u00fcchlein)/BWV_0613/BWV_0613.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.16176470588235295
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 599-644 The Little Organ Book (Orgelb\u00fcchlein)/BWV_0614/BWV_0614.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.5729166666666666
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 599-644 The Little Organ Book (Orgelb\u00fcchlein)/BWV_0615/BWV_0615.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.4021164021164021
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 599-644 The Little Organ Book (Orgelb\u00fcchlein)/BWV_0615a/BWV_0615a.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.5
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 599-644 The Little Organ Book (Orgelb\u00fcchlein)/BWV_0616/BWV_0616.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.6291666666666667
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 599-644 The Little Organ Book (Orgelb\u00fcchlein)/BWV_0617/BWV_0617.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.546875
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 599-644 The Little Organ Book (Orgelb\u00fcchlein)/BWV_0618/BWV_0618.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.4523809523809524
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 599-644 The Little Organ Book (Orgelb\u00fcchlein)/BWV_0619/BWV_0619.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.4166666666666667
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 599-644 The Little Organ Book (Orgelb\u00fcchlein)/BWV_0620/BWV_0620.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.37
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 599-644 The Little Organ Book (Orgelb\u00fcchlein)/BWV_0620a/BWV_0620a.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.7275
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 599-644 The Little Organ Book (Orgelb\u00fcchlein)/BWV_0621/BWV_0621.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.9488636363636364
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 599-644 The Little Organ Book (Orgelb\u00fcchlein)/BWV_0622/BWV_0622.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.7578125
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 599-644 The Little Organ Book (Orgelb\u00fcchlein)/BWV_0622a/BWV_0622a.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.369140625
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 599-644 The Little Organ Book (Orgelb\u00fcchlein)/BWV_0623/BWV_0623.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.2777777777777778
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 599-644 The Little Organ Book (Orgelb\u00fcchlein)/BWV_0624/BWV_0624.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.47794117647058826
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 599-644 The Little Organ Book (Orgelb\u00fcchlein)/BWV_0625/BWV_0625.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.40865384615384615
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 599-644 The Little Organ Book (Orgelb\u00fcchlein)/BWV_0626/BWV_0626.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.37037037037037035
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 599-644 The Little Organ Book (Orgelb\u00fcchlein)/BWV_0627/BWV_0627.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.49798387096774194
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 599-644 The Little Organ Book (Orgelb\u00fcchlein)/BWV_0630/BWV_0630.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.5
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 599-644 The Little Organ Book (Orgelb\u00fcchlein)/BWV_0631/BWV_0631.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.515625
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 599-644 The Little Organ Book (Orgelb\u00fcchlein)/BWV_0631a/BWV_0631a.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.515625
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 599-644 The Little Organ Book (Orgelb\u00fcchlein)/BWV_0632/BWV_0632.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.7083333333333334
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 599-644 The Little Organ Book (Orgelb\u00fcchlein)/BWV_0633/BWV_0633.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.3333333333333333
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 599-644 The Little Organ Book (Orgelb\u00fcchlein)/BWV_0635/BWV_0635.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.23214285714285715
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 599-644 The Little Organ Book (Orgelb\u00fcchlein)/BWV_0636/BWV_0636.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.7135416666666666
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 599-644 The Little Organ Book (Orgelb\u00fcchlein)/BWV_0637/BWV_0637.musicxml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.5803571428571429
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 599-644 The Little Organ Book (Orgelb\u00fcchlein)/BWV_0638/BWV_0638.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.7727272727272727
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 599-644 The Little Organ Book (Orgelb\u00fcchlein)/BWV_0639/BWV_0639.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.4444444444444444
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 599-644 The Little Organ Book (Orgelb\u00fcchlein)/BWV_0640/BWV_0640.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.2840909090909091
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 599-644 The Little Organ Book (Orgelb\u00fcchlein)/BWV_0641/BWV_0641.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.5277777777777778
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 599-644 The Little Organ Book (Orgelb\u00fcchlein)/BWV_0642/BWV_0642.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.13636363636363635
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 599-644 The Little Organ Book (Orgelb\u00fcchlein)/BWV_0643/BWV_0643.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.5625
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 599-644 The Little Organ Book (Orgelb\u00fcchlein)/BWV_0644/BWV_0644.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.5875
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 599-644 The Little Organ Book (Orgelb\u00fcchlein)/BWV_Anh_075/BWV_Anh_075.xml",
+      "reason": "empty_rate",
+      "empty_rate": 0.10416666666666667
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 645-650 Sch\u00fcbler Chorales/BWV_0645/BWV_0645.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.45703125
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 645-650 Sch\u00fcbler Chorales/BWV_0645_2/BWV_0645_2.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.3404017857142857
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 645-650 Sch\u00fcbler Chorales/BWV_0646/BWV_0646.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.36742424242424243
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 645-650 Sch\u00fcbler Chorales/BWV_0647/BWV_0647.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.485
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 645-650 Sch\u00fcbler Chorales/BWV_0648/BWV_0648.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.26666666666666666
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 645-650 Sch\u00fcbler Chorales/BWV_0649/BWV_0649.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.297554347826087
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 645-650 Sch\u00fcbler Chorales/BWV_0650/BWV_0650.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.375
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 651-668 Leipzig Chorale Preludes/BWV_0651/BWV_0651.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.435546875
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 651-668 Leipzig Chorale Preludes/BWV_0651a/BWV_0651a.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.453125
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 651-668 Leipzig Chorale Preludes/BWV_0652/BWV_0652.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.3541666666666667
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 651-668 Leipzig Chorale Preludes/BWV_0652a/BWV_0652a.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.3046875
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 651-668 Leipzig Chorale Preludes/BWV_0653/BWV_0653.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.3736979166666667
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 651-668 Leipzig Chorale Preludes/BWV_0653a/BWV_0653a.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.5078125
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 651-668 Leipzig Chorale Preludes/BWV_0653b/BWV_0653b.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.4947916666666667
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 651-668 Leipzig Chorale Preludes/BWV_0654/BWV_0654.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.48828125
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 651-668 Leipzig Chorale Preludes/BWV_0655/BWV_0655.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.431640625
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 651-668 Leipzig Chorale Preludes/BWV_0655_1/BWV_0655_1.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.375
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 651-668 Leipzig Chorale Preludes/BWV_0655_2/BWV_0655_2.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.35096153846153844
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 651-668 Leipzig Chorale Preludes/BWV_0655_3/BWV_0655_3.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.34375
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 651-668 Leipzig Chorale Preludes/BWV_0655_4/BWV_0655_4.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.42948717948717946
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 651-668 Leipzig Chorale Preludes/BWV_0655a/BWV_0655a.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.47413793103448276
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 651-668 Leipzig Chorale Preludes/BWV_0655b/BWV_0655b.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.4331896551724138
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 651-668 Leipzig Chorale Preludes/BWV_0655c/BWV_0655c.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.375
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 651-668 Leipzig Chorale Preludes/BWV_0656/BWV_0656.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.6953125
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 651-668 Leipzig Chorale Preludes/BWV_0656a/BWV_0656a.xml",
+      "reason": "parse_error",
+      "error": "invalid literal for int() with base 10: '3/2'"
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 651-668 Leipzig Chorale Preludes/BWV_0657/BWV_0657.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.6030092592592593
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 651-668 Leipzig Chorale Preludes/BWV_0658/BWV_0658.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.4395833333333333
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 651-668 Leipzig Chorale Preludes/BWV_0658a/BWV_0658a.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.3577586206896552
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 651-668 Leipzig Chorale Preludes/BWV_0659/BWV_0659.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.4264705882352941
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 651-668 Leipzig Chorale Preludes/BWV_0659a/BWV_0659a.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.6268382352941176
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 651-668 Leipzig Chorale Preludes/BWV_0660/BWV_0660.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.25
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 651-668 Leipzig Chorale Preludes/BWV_0660a/BWV_0660a.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.29464285714285715
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 651-668 Leipzig Chorale Preludes/BWV_0660b/BWV_0660b.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.43452380952380953
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 651-668 Leipzig Chorale Preludes/BWV_0661/BWV_0661.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.583984375
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 651-668 Leipzig Chorale Preludes/BWV_0661a/BWV_0661a.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.40896739130434784
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 651-668 Leipzig Chorale Preludes/BWV_0662/BWV_0662.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.38461538461538464
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 651-668 Leipzig Chorale Preludes/BWV_0663/BWV_0663.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.2526041666666667
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 651-668 Leipzig Chorale Preludes/BWV_0663a/BWV_0663a.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.6686197916666666
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 651-668 Leipzig Chorale Preludes/BWV_0664/BWV_0664.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.3701171875
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 651-668 Leipzig Chorale Preludes/BWV_0664a/BWV_0664a.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.4365234375
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 651-668 Leipzig Chorale Preludes/BWV_0664b/BWV_0664b.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.42578125
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 651-668 Leipzig Chorale Preludes/BWV_0664c/BWV_0664c.musicxml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.30377906976744184
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 651-668 Leipzig Chorale Preludes/BWV_0665a/BWV_0665a.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.34975961538461536
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 651-668 Leipzig Chorale Preludes/BWV_0667/BWV_0667.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.42948717948717946
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 651-668 Leipzig Chorale Preludes/BWV_0667a/BWV_0667a.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.44551282051282054
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 651-668 Leipzig Chorale Preludes/BWV_0667b/BWV_0667b.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.3974358974358974
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 651-668 Leipzig Chorale Preludes/BWV_0668/BWV_0668.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.3918269230769231
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 651-668 Leipzig Chorale Preludes/BWV_0668a/BWV_0668a.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.3819444444444444
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 669-689 Chorale Preludes  German Organ Mass/BWV_0669/BWV_0669.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.5833333333333334
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 669-689 Chorale Preludes  German Organ Mass/BWV_0670/BWV_0670.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.5235655737704918
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 669-689 Chorale Preludes  German Organ Mass/BWV_0671/BWV_0671.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.41354166666666664
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 669-689 Chorale Preludes  German Organ Mass/BWV_0676/BWV_0676.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.2760416666666667
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 669-689 Chorale Preludes  German Organ Mass/BWV_0676a/BWV_0676a.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.40714285714285714
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 669-689 Chorale Preludes  German Organ Mass/BWV_0678/BWV_0678.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.45416666666666666
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 669-689 Chorale Preludes  German Organ Mass/BWV_0680/BWV_0680.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.423828125
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 669-689 Chorale Preludes  German Organ Mass/BWV_0681/BWV_0681.xml",
+      "reason": "empty_rate",
+      "empty_rate": 0.0875
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 669-689 Chorale Preludes  German Organ Mass/BWV_0682/BWV_0682.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.3645833333333333
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 669-689 Chorale Preludes  German Organ Mass/BWV_0684/BWV_0684.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.580078125
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 669-689 Chorale Preludes  German Organ Mass/BWV_0684a/BWV_0684a.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.375
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 669-689 Chorale Preludes  German Organ Mass/BWV_0686/BWV_0686.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.49776785714285715
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 669-689 Chorale Preludes  German Organ Mass/BWV_0688/BWV_0688.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.4010416666666667
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 690-713 Organ Chorales from the Kirnberger Collection/BWV_0691/BWV_0691.xml",
+      "reason": "empty_rate",
+      "empty_rate": 0.09722222222222222
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 690-713 Organ Chorales from the Kirnberger Collection/BWV_0693/BWV_0693.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.2544642857142857
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 690-713 Organ Chorales from the Kirnberger Collection/BWV_0694/BWV_0694.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.17317708333333334
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 690-713 Organ Chorales from the Kirnberger Collection/BWV_0700/BWV_0700.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.49137931034482757
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 690-713 Organ Chorales from the Kirnberger Collection/BWV_0702/BWV_0702.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.20923913043478262
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 690-713 Organ Chorales from the Kirnberger Collection/BWV_0705/BWV_0705.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.4296875
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 690-713 Organ Chorales from the Kirnberger Collection/BWV_0707/BWV_0707.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.31640625
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 690-713 Organ Chorales from the Kirnberger Collection/BWV_0708/BWV_0708.xml",
+      "reason": "empty_rate",
+      "empty_rate": 0.08695652173913043
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 690-713 Organ Chorales from the Kirnberger Collection/BWV_0709/BWV_0709.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.47619047619047616
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 690-713 Organ Chorales from the Kirnberger Collection/BWV_0710/BWV_0710.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.17037037037037037
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 714-740 Miscellaneous Chorale Preludes/BWV_0714/BWV_0714.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.2708333333333333
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 714-740 Miscellaneous Chorale Preludes/BWV_0716/BWV_0716.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.546875
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 714-740 Miscellaneous Chorale Preludes/BWV_0720/BWV_0720.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.23684210526315788
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 714-740 Miscellaneous Chorale Preludes/BWV_0721/BWV_0721.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.13970588235294118
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 714-740 Miscellaneous Chorale Preludes/BWV_0723/BWV_0723.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.4583333333333333
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 714-740 Miscellaneous Chorale Preludes/BWV_0724/BWV_0724.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.4880952380952381
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 714-740 Miscellaneous Chorale Preludes/BWV_0725/BWV_0725.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.48828125
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 714-740 Miscellaneous Chorale Preludes/BWV_0726/BWV_0726.xml",
+      "reason": "empty_rate",
+      "empty_rate": 0.08333333333333333
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 714-740 Miscellaneous Chorale Preludes/BWV_0727/BWV_0727.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.3506944444444444
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 714-740 Miscellaneous Chorale Preludes/BWV_0730/BWV_0730.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.6079545454545454
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 714-740 Miscellaneous Chorale Preludes/BWV_0731/BWV_0731.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.39204545454545453
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 714-740 Miscellaneous Chorale Preludes/BWV_0732/BWV_0732.xml",
+      "reason": "empty_rate",
+      "empty_rate": 0.09926470588235294
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 714-740 Miscellaneous Chorale Preludes/BWV_0733/BWV_0733.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.5078125
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 714-740 Miscellaneous Chorale Preludes/BWV_0734/BWV_0734.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.65125
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 714-740 Miscellaneous Chorale Preludes/BWV_0735/BWV_0735.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.2275390625
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 714-740 Miscellaneous Chorale Preludes/BWV_0736/BWV_0736.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.28720238095238093
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 714-740 Miscellaneous Chorale Preludes/BWV_0737/BWV_0737.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.5846774193548387
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 714-740 Miscellaneous Chorale Preludes/BWV_0738/BWV_0738.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.2791666666666667
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 714-740 Miscellaneous Chorale Preludes/BWV_0738a/BWV_0738a.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.64
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 714-740 Miscellaneous Chorale Preludes/BWV_0739/BWV_0739.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.5087890625
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 714-740 Miscellaneous Chorale Preludes/BWV_0740/BWV_0740.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.3875
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 741-765 Other Chorale Preludes/BWV_0741/BWV_0741.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.4552083333333333
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 741-765 Other Chorale Preludes/BWV_0743/BWV_0743.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.38953488372093026
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 741-765 Other Chorale Preludes/BWV_0744/BWV_0744.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.4632352941176471
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 741-765 Other Chorale Preludes/BWV_0745/BWV_0745.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.5378787878787878
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 741-765 Other Chorale Preludes/BWV_0746/BWV_0746.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.37735849056603776
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 741-765 Other Chorale Preludes/BWV_0747/BWV_0747.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.4364406779661017
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 741-765 Other Chorale Preludes/BWV_0748/BWV_0748.musicxml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.5433673469387755
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 741-765 Other Chorale Preludes/BWV_0748a/BWV_0748a.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.4580078125
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 741-765 Other Chorale Preludes/BWV_0749/BWV_0749.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.6458333333333334
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 741-765 Other Chorale Preludes/BWV_0752/BWV_0752.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.45588235294117646
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 741-765 Other Chorale Preludes/BWV_0754/BWV_0754.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.4325
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 741-765 Other Chorale Preludes/BWV_0756/BWV_0756.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.19375
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 741-765 Other Chorale Preludes/BWV_0757/BWV_0757.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.3763440860215054
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 741-765 Other Chorale Preludes/BWV_0758/BWV_0758.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.427734375
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 741-765 Other Chorale Preludes/BWV_0759/BWV_0759.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.5130208333333334
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 741-765 Other Chorale Preludes/BWV_0761/BWV_0761.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.447265625
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 741-765 Other Chorale Preludes/BWV_0762/BWV_0762.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.4353448275862069
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 741-765 Other Chorale Preludes/BWV_0763/BWV_0763.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.7132352941176471
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 741-765 Other Chorale Preludes/BWV_0764/BWV_0764.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.4429347826086957
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 766-771 Partitas and Variations on Chorales/BWV_0766/BWV_0766.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.43359375
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 766-771 Partitas and Variations on Chorales/BWV_0768/BWV_0768.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.306640625
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 766-771 Partitas and Variations on Chorales/BWV_0769/BWV_0769.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.35546875
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 766-771 Partitas and Variations on Chorales/BWV_0769a/BWV_0769a.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.46875
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/BWV 766-771 Partitas and Variations on Chorales/BWV_0771/BWV_0771.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.4537760416666667
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/Chorale preludes edited by A. Frowein/chri-lag/chri-lag.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.36160714285714285
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/Chorale preludes edited by A. Frowein/freu-dich/freu-dich.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.34134615384615385
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/Chorale preludes edited by A. Frowein/herr-chr/herr-chr.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.45913461538461536
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/Chorale preludes edited by A. Frowein/herrjesu/herrjesu.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.2630208333333333
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/Chorale preludes edited by A. Frowein/ich-dein/ich-dein.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.36
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/Chorale preludes edited by A. Frowein/jesu-mei/jesu-mei.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.34765625
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/Chorale preludes edited by A. Frowein/ndrpause/ndrpause.xml",
+      "reason": "too_short",
+      "slices": 32
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/Chorale preludes edited by A. Frowein/wer_nur_/wer_nur_.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.375
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/Chorale preludes edited by A. Frowein/wo_gott_/wo_gott_.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.3680555555555556
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/Chorale preludes edited by A. Frowein/wohlmi1a/wohlmi1a.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.5498084291187739
+    },
+    {
+      "path": "data/tobis_xml/instrumental-works/organ-works/Chorale preludes edited by A. Frowein/wohlmi2a/wohlmi2a.xml",
+      "reason": "crossing_rate",
+      "crossing_rate": 0.4482758620689655
+    }
+  ],
+  "target": "Bach two-part inventions, instrumental_v3 continuation-first",
+  "pieces": [
+    "BWV_0772",
+    "BWV_0772a",
+    "BWV_0773",
+    "BWV_0774",
+    "BWV_0775",
+    "BWV_0776",
+    "BWV_0777",
+    "BWV_0778",
+    "BWV_0779",
+    "BWV_0780",
+    "BWV_0781",
+    "BWV_0782",
+    "BWV_0783",
+    "BWV_0784",
+    "BWV_0785",
+    "BWV_0786",
+    "BWV_0787",
+    "BWV_0788",
+    "BWV_0789",
+    "BWV_0790",
+    "BWV_0791",
+    "BWV_0792",
+    "BWV_0793",
+    "BWV_0794",
+    "BWV_0795",
+    "BWV_0796",
+    "BWV_0797",
+    "BWV_0798",
+    "BWV_0799",
+    "BWV_0800",
+    "BWV_0801",
+    "BWV_0802",
+    "BWV_0803",
+    "BWV_0804",
+    "BWV_0805",
+    "BWV_0806",
+    "BWV_0807",
+    "BWV_0808",
+    "BWV_0809",
+    "BWV_0810",
+    "BWV_0811",
+    "BWV_0812",
+    "BWV_0813",
+    "BWV_0813a",
+    "BWV_0814",
+    "BWV_0815",
+    "BWV_0815a",
+    "BWV_0815v",
+    "BWV_0816",
+    "BWV_0817",
+    "BWV_0818",
+    "BWV_0818a",
+    "BWV_0819",
+    "BWV_0819a",
+    "BWV_0820",
+    "BWV_0821",
+    "BWV_0822",
+    "BWV_0823",
+    "BWV_0824",
+    "BWV_0825",
+    "BWV_0826",
+    "BWV_0827",
+    "BWV_0828",
+    "BWV_0829",
+    "BWV_0830",
+    "BWV_0831",
+    "BWV_0832",
+    "BWV_0833",
+    "BWV_0834",
+    "BWV_0835",
+    "BWV_0836",
+    "BWV_0838",
+    "BWV_0839",
+    "BWV_0840",
+    "BWV_0841",
+    "BWV_0842",
+    "BWV_0843",
+    "BWV_0844",
+    "BWV_0844a",
+    "BWV_0845",
+    "BWV_0846",
+    "BWV_0846a",
+    "BWV_0847",
+    "BWV_0847a",
+    "BWV_0848",
+    "BWV_0849",
+    "BWV_0850",
+    "BWV_0850a",
+    "BWV_0851",
+    "BWV_0851a",
+    "BWV_0852",
+    "BWV_0853",
+    "BWV_0854",
+    "BWV_0855",
+    "BWV_0855a",
+    "BWV_0856",
+    "BWV_0857",
+    "BWV_0858",
+    "BWV_0859",
+    "BWV_0860",
+    "BWV_0861",
+    "BWV_0862",
+    "BWV_0863",
+    "BWV_0864",
+    "BWV_0865",
+    "BWV_0866",
+    "BWV_0867",
+    "BWV_0868",
+    "BWV_0869",
+    "BWV_0870",
+    "BWV_0870a",
+    "BWV_0870b",
+    "BWV_0871",
+    "BWV_0872",
+    "BWV_0872a",
+    "BWV_0873",
+    "BWV_0874",
+    "BWV_0875",
+    "BWV_0875a",
+    "BWV_0876",
+    "BWV_0877",
+    "BWV_0878",
+    "BWV_0878_org",
+    "BWV_0879",
+    "BWV_0880",
+    "BWV_0881",
+    "BWV_0882",
+    "BWV_0883",
+    "BWV_0884",
+    "BWV_0885",
+    "BWV_0886",
+    "BWV_0887",
+    "BWV_0888",
+    "BWV_0889",
+    "BWV_0890",
+    "BWV_0891",
+    "BWV_0892",
+    "BWV_0893",
+    "BWV_0894",
+    "BWV_0895",
+    "BWV_0896",
+    "BWV_0897",
+    "BWV_0898",
+    "BWV_0899",
+    "BWV_0900",
+    "BWV_0901",
+    "BWV_0902",
+    "BWV_0902a",
+    "BWV_0903",
+    "BWV_0903a",
+    "BWV_0904",
+    "BWV_0905",
+    "BWV_0906",
+    "BWV_0907",
+    "BWV_0908",
+    "BWV_0909",
+    "BWV_0910",
+    "BWV_0911",
+    "BWV_0912",
+    "BWV_0912a",
+    "BWV_0913",
+    "BWV_0914",
+    "BWV_0915",
+    "BWV_0916",
+    "BWV_0917",
+    "BWV_0918",
+    "BWV_0919",
+    "BWV_0920",
+    "BWV_0921",
+    "BWV_0922",
+    "BWV_0923",
+    "BWV_0924",
+    "BWV_0924a",
+    "BWV_0925",
+    "BWV_0926",
+    "BWV_0927",
+    "BWV_0928",
+    "BWV_0929",
+    "BWV_0930",
+    "BWV_0931",
+    "BWV_0932",
+    "BWV_0933",
+    "BWV_0934",
+    "BWV_0935",
+    "BWV_0936",
+    "BWV_0937",
+    "BWV_0938",
+    "BWV_0939",
+    "BWV_0940",
+    "BWV_0941",
+    "BWV_0942",
+    "BWV_0943",
+    "BWV_0944",
+    "BWV_0945",
+    "BWV_0946",
+    "BWV_0947",
+    "BWV_0948",
+    "BWV_0949",
+    "BWV_0950",
+    "BWV_0951",
+    "BWV_0951a",
+    "BWV_0952",
+    "BWV_0953",
+    "BWV_0954",
+    "BWV_0955",
+    "BWV_0956",
+    "BWV_0957",
+    "BWV_0958",
+    "BWV_0959",
+    "BWV_0960",
+    "BWV_0961",
+    "BWV_0962",
+    "BWV_0963",
+    "BWV_0964",
+    "BWV_0965",
+    "BWV_0966",
+    "BWV_0967",
+    "BWV_0968",
+    "BWV_0969",
+    "BWV_0970",
+    "BWV_0971",
+    "BWV_0972",
+    "BWV_0973",
+    "BWV_0974",
+    "BWV_0975",
+    "BWV_0976",
+    "BWV_0977",
+    "BWV_0978",
+    "BWV_0980",
+    "BWV_0981",
+    "BWV_0982",
+    "BWV_0983",
+    "BWV_0984",
+    "BWV_0985",
+    "BWV_0986",
+    "BWV_0987",
+    "BWV_0988",
+    "BWV_0989",
+    "BWV_0990",
+    "BWV_0992",
+    "BWV_0993",
+    "BWV_0994",
+    "BWV_0533a",
+    "BWV_0580",
+    "BWV_0581_alt",
+    "BWV_0591",
+    "BWV_0592a",
+    "BWV_0601_Neumeister",
+    "BWV_0628",
+    "BWV_0629",
+    "BWV_0630a",
+    "BWV_0634",
+    "BWV_0639_Neumeister",
+    "BWV_0665",
+    "BWV_0666",
+    "BWV_0666a",
+    "BWV_0672",
+    "BWV_0673",
+    "BWV_0674",
+    "BWV_0675",
+    "BWV_0677",
+    "BWV_0679",
+    "BWV_0683",
+    "BWV_0683a",
+    "BWV_0685",
+    "BWV_0687",
+    "BWV_0689",
+    "BWV_0690",
+    "BWV_0691a",
+    "BWV_0692",
+    "BWV_0692a",
+    "BWV_0695",
+    "BWV_0695a",
+    "BWV_0696",
+    "BWV_0697",
+    "BWV_0698",
+    "BWV_0699",
+    "BWV_0699_a",
+    "BWV_0701",
+    "BWV_0703",
+    "BWV_0704",
+    "BWV_0706",
+    "BWV_0708a",
+    "BWV_0711",
+    "BWV_0712",
+    "BWV_0713",
+    "BWV_0713a",
+    "BWV_Anh_076",
+    "BWV_0714_Neumeister",
+    "BWV_0715",
+    "BWV_0717",
+    "BWV_0718",
+    "BWV_0719",
+    "BWV_0722",
+    "BWV_0722a",
+    "BWV_0728",
+    "BWV_0729",
+    "BWV_0729a",
+    "BWV_0732a",
+    "BWV_0734a",
+    "BWV_0735a",
+    "BWV_0737_Neumeister",
+    "BWV_0742",
+    "BWV_0744_2",
+    "BWV_0750",
+    "BWV_0751",
+    "BWV_0753",
+    "BWV_0755",
+    "BWV_0760",
+    "BWV_0765",
+    "BWV_0767",
+    "BWV_0770",
+    "dufriede"
+  ]
+}
