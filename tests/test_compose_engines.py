@@ -367,3 +367,4 @@ def test_hybrid_debug_fallback_to_emi_is_explicit_and_labeled(monkeypatch) -> No
     assert result.diagnostics["engine"] == "emi"
     assert result.diagnostics["requestedEngine"] == "hybrid"
     assert result.diagnostics["hybridFallbackReason"] == "transformer_exception_debug_only"
+

@@ -247,7 +247,7 @@ def create_router(
     score_repository = repository or InMemoryScoreRepository[CanonicalScore]()
 
     @router.post("/compose", response_model=ComposeResponse)
-    async def compose(request: ComposeRequest) -> ComposeResponse:
+    def compose(request: ComposeRequest) -> ComposeResponse:
         if compose_service is None:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

@@ -8,6 +8,7 @@ import random
 import sys
 from dataclasses import replace
 from pathlib import Path
+from typing import Sequence
 
 import torch
 
@@ -17,8 +18,10 @@ sys.path.insert(0, str(ROOT))
 from src.api.canonical import CanonicalScore
 from src.api.render.midi import canonical_score_to_midi
 from src.api.render.musicxml import canonical_score_to_musicxml
+from src.emi.fragments import Fragment, FragmentQuery, fragment_from_jsonl, rank_fragments
 from src.instrumental_v6.data import load_dataset
 from src.instrumental_v6.decoding import PitchOption, select_counterpoint_pitches, voice_range
+from src.instrumental_v6.global_coherence import evaluate_global_coherence
 from src.instrumental_v6.metrics import evaluate_piece_rows, source_overlap_report
 from src.instrumental_v6.model import build_generator, config_from_checkpoint
 from src.instrumental_v6.representation import (
@@ -79,6 +82,23 @@ def parse_args() -> argparse.Namespace:
         default=0.35,
         help="Blend a corpus-derived form/voice-count duration prior into duration sampling.",
     )
+    parser.add_argument(
+        "--emi-fragments",
+        default=None,
+        help="Optional v6 EMI fragment JSONL used as signature memory during decoding.",
+    )
+    parser.add_argument(
+        "--emi-bias-strength",
+        type=float,
+        default=0.8,
+        help="Soft score bonus for pitches implied by compatible EMI signatures.",
+    )
+    parser.add_argument(
+        "--emi-fragment-limit",
+        type=int,
+        default=4,
+        help="Number of compatible EMI signatures to consult per voice/onset.",
+    )
     parser.add_argument("--tempo", type=int, default=88)
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--seed", type=int, default=2604)
@@ -105,6 +125,7 @@ def main() -> None:
     model.eval()
 
     pieces, _ = load_dataset(Path(args.data_dir) / "pieces.json")
+    emi_fragments = _load_emi_fragments(Path(args.emi_fragments)) if args.emi_fragments else []
     requested_form = None if args.form == "auto" else args.form.upper()
     template = _select_template(
         pieces,
@@ -161,6 +182,10 @@ def main() -> None:
             beam_size=args.beam_size,
             duration_log_prior=duration_log_prior,
             duration_prior_strength=max(0.0, args.duration_prior_strength),
+            emi_fragments=emi_fragments,
+            emi_bias_strength=max(0.0, args.emi_bias_strength),
+            emi_fragment_limit=max(1, args.emi_fragment_limit),
+            emi_avoid_piece_id=template.piece_id,
         )
         piece = rows_to_piece(
             global_rows=generated[0],
@@ -187,17 +212,26 @@ def main() -> None:
             subject=subject,
             voice_count=args.voices,
         )
+        global_structure = evaluate_global_coherence(
+            piece.global_rows,
+            piece.voice_rows,
+            voice_count=args.voices,
+            steps_per_bar=template.steps_per_bar,
+            subject=subject,
+        )
         score = _candidate_score(
             report,
             overlap,
             source_baseline=source_baseline,
             motif_report=motif,
+            global_report=global_structure,
         )
         diagnostics = {
             "candidate_index": candidate_index,
             "score": score,
             "counterpoint": report,
             "motif": motif,
+            "global_structure": global_structure,
             "source_overlap": overlap,
         }
         candidates.append((score, piece, diagnostics))
@@ -226,6 +260,10 @@ def main() -> None:
         "generated_rows": args.max_new_rows,
         "duration_temperature": args.duration_temperature,
         "duration_prior_strength": max(0.0, args.duration_prior_strength),
+        "emi_fragments": args.emi_fragments,
+        "emi_fragment_count": len(emi_fragments),
+        "emi_bias_strength": max(0.0, args.emi_bias_strength),
+        "emi_fragment_limit": max(1, args.emi_fragment_limit),
         "source_baseline": source_baseline,
         "midi": str(midi_path),
         "musicxml": str(xml_path),
@@ -297,6 +335,18 @@ def _duration_log_prior(
     return torch.log(counts / counts.sum().clamp_min(1.0))
 
 
+def _load_emi_fragments(path: Path) -> list[Fragment]:
+    if not path.exists():
+        raise SystemExit(f"EMI fragment file not found: {path}")
+    fragments: list[Fragment] = []
+    with path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            stripped = line.strip()
+            if stripped:
+                fragments.append(fragment_from_jsonl(stripped))
+    return fragments
+
+
 def generate_rows(
     model: torch.nn.Module,
     *,
@@ -317,6 +367,10 @@ def generate_rows(
     duration_temperature: float | None = None,
     duration_log_prior: torch.Tensor | None = None,
     duration_prior_strength: float = 0.0,
+    emi_fragments: Sequence[Fragment] = (),
+    emi_bias_strength: float = 0.0,
+    emi_fragment_limit: int = 4,
+    emi_avoid_piece_id: str | None = None,
 ) -> tuple[list[list[int]], list[list[list[int]]], list[list[list[list[int]]]]]:
     prompt_length = len(prompt[0])
     total_rows = prompt_length + max_new_rows
@@ -391,6 +445,10 @@ def generate_rows(
                 beam_size=beam_size,
                 duration_log_prior=duration_log_prior,
                 duration_prior_strength=duration_prior_strength,
+                emi_fragments=emi_fragments,
+                emi_bias_strength=emi_bias_strength,
+                emi_fragment_limit=emi_fragment_limit,
+                emi_avoid_piece_id=emi_avoid_piece_id,
             )
         pair_row = recompute_pair_rows(
             voice_row,
@@ -446,6 +504,10 @@ def _decode_voice_row(
     beam_size: int,
     duration_log_prior: torch.Tensor | None,
     duration_prior_strength: float,
+    emi_fragments: Sequence[Fragment],
+    emi_bias_strength: float,
+    emi_fragment_limit: int,
+    emi_avoid_piece_id: str | None,
 ) -> list[list[int]]:
     previous = previous_rows[-1]
     state_col = VOICE_FIELD_NAMES.index("state")
@@ -521,6 +583,10 @@ def _decode_voice_row(
                     steps_per_bar=template.steps_per_bar,
                     mode=template.mode,
                     top_k=top_k,
+                    emi_fragments=emi_fragments,
+                    emi_bias_strength=emi_bias_strength,
+                    emi_fragment_limit=emi_fragment_limit,
+                    emi_avoid_piece_id=emi_avoid_piece_id,
                 )
             )
     pitches, _ = select_counterpoint_pitches(
@@ -710,6 +776,10 @@ def _pitch_options(
     steps_per_bar: int,
     mode: int,
     top_k: int,
+    emi_fragments: Sequence[Fragment] = (),
+    emi_bias_strength: float = 0.0,
+    emi_fragment_limit: int = 4,
+    emi_avoid_piece_id: str | None = None,
 ) -> list[PitchOption]:
     pitch_log_probs = torch.log_softmax(logits["pitch"][0, -1, voice], dim=-1)
     mel_log_probs = torch.log_softmax(logits["mel"][0, -1, voice], dim=-1)
@@ -749,6 +819,23 @@ def _pitch_options(
             pitch = previous_note + delta
             if low <= pitch <= high and _fits_tonal_context(pitch, global_row, mode=mode):
                 scores.setdefault(pitch, -5.5 - abs(delta) * 0.08)
+    if emi_fragments and emi_bias_strength > 0.0:
+        _apply_emi_pitch_bias(
+            scores,
+            emi_fragments,
+            voice=voice,
+            voice_count=voice_count,
+            previous_rows=previous_rows,
+            global_row=global_row,
+            previous_note=previous_note,
+            low=low,
+            high=high,
+            mode=mode,
+            steps_per_bar=steps_per_bar,
+            limit=emi_fragment_limit,
+            strength=emi_bias_strength,
+            avoid_piece_id=emi_avoid_piece_id,
+        )
     if global_row[GLOBAL_FIELD_NAMES.index("cadence_zone")]:
         local_key = global_row[GLOBAL_FIELD_NAMES.index("local_key_pc")]
         if local_key < 12:
@@ -791,6 +878,100 @@ def _pitch_options(
         PitchOption(pitch, score)
         for pitch, score in sorted(scores.items(), key=lambda item: item[1], reverse=True)[:24]
     ]
+
+
+def _apply_emi_pitch_bias(
+    scores: dict[int, float],
+    fragments: Sequence[Fragment],
+    *,
+    voice: int,
+    voice_count: int,
+    previous_rows: list[list[list[int]]],
+    global_row: list[int],
+    previous_note: int | None,
+    low: int,
+    high: int,
+    mode: int,
+    steps_per_bar: int,
+    limit: int,
+    strength: float,
+    avoid_piece_id: str | None,
+) -> None:
+    del voice_count
+    key_pc = global_row[GLOBAL_FIELD_NAMES.index("key_pc")]
+    local_key_pc = global_row[GLOBAL_FIELD_NAMES.index("local_key_pc")]
+    previous_degree = None if previous_note is None else scale_degree(previous_note, key_pc, mode)
+    matches = rank_fragments(
+        FragmentQuery(
+            voice=voice,
+            phrase_role=_role_name(global_row[GLOBAL_FIELD_NAMES.index("section_role")]),
+            key_pc=key_pc,
+            mode=mode,
+            previous_end_pitch=previous_note,
+            previous_end_degree=previous_degree,
+            local_key_pc=local_key_pc,
+            avoid_piece_id=avoid_piece_id,
+        ),
+        fragments,
+        limit=max(1, limit),
+    )
+    if not matches:
+        return
+    note_index = _note_index_in_bar(previous_rows, voice, steps_per_bar=steps_per_bar)
+    inversion = global_row[GLOBAL_FIELD_NAMES.index("development")] == DEVELOPMENT_TO_ID["INVERSION"]
+    for rank, match in enumerate(matches):
+        fragment = match.fragment
+        rank_strength = strength / (rank + 1)
+        if previous_note is not None and fragment.melodic_intervals:
+            interval = fragment.melodic_intervals[note_index % len(fragment.melodic_intervals)]
+            if inversion:
+                interval = -interval
+            pitch = previous_note + interval
+        elif fragment.start_pitch is not None:
+            pitch = _nearest_pitch_with_class(
+                low,
+                high,
+                fragment.start_pitch % 12,
+                center=(low + high) // 2,
+            )
+            interval = 0 if previous_note is None else pitch - previous_note
+        else:
+            continue
+        if not low <= pitch <= high:
+            continue
+        if not _fits_tonal_context(pitch, global_row, mode=mode):
+            continue
+        continuity = 0.0 if previous_note is None else max(-0.8, 0.6 - abs(interval) * 0.08)
+        base = scores.get(pitch, -4.0 - abs(interval) * 0.06)
+        scores[pitch] = base + rank_strength + continuity
+
+
+def _note_index_in_bar(
+    rows: list[list[list[int]]],
+    voice: int,
+    *,
+    steps_per_bar: int,
+) -> int:
+    current_bar = len(rows) // max(1, steps_per_bar)
+    return sum(
+        row[voice][VOICE_FIELD_NAMES.index("state")] == STATE_NOTE
+        for index, row in enumerate(rows)
+        if index // max(1, steps_per_bar) == current_bar
+    )
+
+
+def _nearest_pitch_with_class(low: int, high: int, pitch_class: int, *, center: int) -> int:
+    pitches = _pitches_with_class(low, high, pitch_class)
+    if not pitches:
+        return center
+    return min(pitches, key=lambda pitch: abs(pitch - center))
+
+
+def _role_name(role_id: int) -> str:
+    for name, value in ROLE_TO_ID.items():
+        if value == role_id:
+            return name
+    return "UNKNOWN"
 
 
 def _development_interval(
@@ -978,6 +1159,7 @@ def _candidate_score(
     *,
     source_baseline: dict[str, object] | None = None,
     motif_report: dict[str, object] | None = None,
+    global_report: dict[str, object] | None = None,
 ) -> float:
     note_rates = [float(value) for value in report["voice_note_rates"]]
     active_rates = [float(value) for value in report["voice_active_rates"]]
@@ -1069,6 +1251,17 @@ def _candidate_score(
             score += 6.0 if int(section_hits.get("opening", 0)) > 0 else -4.0
             score += 10.0 if int(section_hits.get("middle", 0)) > 0 else -10.0
             score += 18.0 if int(section_hits.get("closing", 0)) > 0 else -24.0
+    if global_report:
+        coherence = float(global_report.get("coherence_score", 0.0)) / 100.0
+        subject_coverage = float(global_report.get("subject_coverage_score", 0.0))
+        cadence_count = float(global_report.get("cadence_count_score", 0.0))
+        cadence_spacing = float(global_report.get("cadence_spacing_score", 0.0))
+        development = float(global_report.get("development_score", 0.0))
+        score += 26.0 * coherence
+        score -= 18.0 * max(0.0, 0.67 - subject_coverage)
+        score -= 12.0 * max(0.0, 0.5 - cadence_count)
+        score -= 8.0 * max(0.0, 0.5 - cadence_spacing)
+        score += 8.0 * development
     score += 24.0 if bool(report.get("final_tonic_sonority")) else -80.0
     score += 30.0 if bool(report.get("authentic_cadence_proxy")) else -40.0
     return score

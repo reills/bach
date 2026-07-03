@@ -123,6 +123,38 @@ def test_convert_piano_score_to_guitar_prefers_compact_voicing_over_position_bia
     assert arrangement.diagnostics.hand_position_compromises == []
 
 
+def test_convert_piano_score_to_guitar_revoices_bass_before_moving_top_melody() -> None:
+    score = _score(
+        [
+            Event(id="bass-g", start_tick=0, dur_tick=24, voice_id=0, pitch_midi=43),
+            Event(id="melody-d", start_tick=0, dur_tick=24, voice_id=1, pitch_midi=74),
+        ]
+    )
+
+    arrangement = convert_piano_score_to_guitar(
+        score,
+        settings=GuitarArrangementSettings(difficulty="medium", max_fret=12),
+    )
+
+    events = {
+        event.id: event
+        for event in arrangement.score.parts[0].events
+    }
+    bass = events["gtr-bass-g"]
+    melody = events["gtr-melody-d"]
+    assert bass.fingering is not None
+    assert melody.fingering is not None
+    assert bass.pitch_midi == 55
+    assert (bass.fingering.string_index, bass.fingering.fret) == (3, 0)
+    assert melody.pitch_midi == 74
+    assert (melody.fingering.string_index, melody.fingering.fret) == (5, 10)
+    assert arrangement.diagnostics.dropped_notes == []
+    assert arrangement.diagnostics.hand_position_compromises == []
+    assert arrangement.diagnostics.octave_shifted_notes[0].source_event_id == "bass-g"
+    assert arrangement.source_map.notes[0].semitone_shift == 12
+    assert arrangement.source_map.notes[1].semitone_shift == 0
+
+
 def test_convert_piano_score_to_guitar_uses_difficulty_density() -> None:
     score = _score(
         [

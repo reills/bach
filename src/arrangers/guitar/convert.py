@@ -84,6 +84,8 @@ def convert_piano_score_to_guitar(
         settings=resolved_settings,
         tonic_pc=tonic_pc,
         dropped_notes=dropped_notes,
+        octave_shifts=octave_shifts,
+        range_changes=range_changes,
         impossible_chords=impossible_chords,
         source_maps_by_id=source_maps_by_id,
     )
@@ -101,6 +103,8 @@ def convert_piano_score_to_guitar(
                 settings=resolved_settings,
                 tonic_pc=tonic_pc,
                 dropped_notes=dropped_notes,
+                octave_shifts=octave_shifts,
+                range_changes=range_changes,
                 impossible_chords=impossible_chords,
                 source_maps_by_id=source_maps_by_id,
                 force_drop_until_tabbed=True,
@@ -360,6 +364,8 @@ def _fit_onset_voicings(
     settings: GuitarArrangementSettings,
     tonic_pc: int,
     dropped_notes: list[DroppedNoteDiagnostic],
+    octave_shifts: list[OctaveShiftDiagnostic],
+    range_changes: list[RangeChangeDiagnostic],
     impossible_chords: list[ImpossibleChordDiagnostic],
     source_maps_by_id: dict[str, PianoToGuitarNoteMap],
     force_drop_until_tabbed: bool = False,
@@ -398,25 +404,42 @@ def _fit_onset_voicings(
                 settings=settings,
             )
             if fingerings is not None:
-                span = _fret_span(fingerings.values())
-                if _should_thin_for_hand_span(playable, span, settings=settings):
-                    dropped = _least_important_note(playable, settings=settings, tonic_pc=tonic_pc)
-                    playable.remove(dropped)
-                    _record_dropped_note(
-                        dropped,
-                        reason="voicing was thinned to avoid an impractical fret span",
-                        dropped_notes=dropped_notes,
-                        source_maps_by_id=source_maps_by_id,
-                    )
-                    continue
                 break
+
+            wide_fingerings = _choose_onset_fingerings(
+                playable,
+                previous_by_voice=previous_by_voice,
+                previous_position=previous_position,
+                settings=settings,
+                enforce_hand_span=False,
+            )
+            rewritten = _try_octave_rewrite_for_hand_span(
+                playable,
+                wide_fingerings=wide_fingerings,
+                previous_by_voice=previous_by_voice,
+                previous_position=previous_position,
+                settings=settings,
+            )
+            if rewritten is not None:
+                _record_octave_rewrites(
+                    playable,
+                    rewritten,
+                    octave_shifts=octave_shifts,
+                    range_changes=range_changes,
+                )
+                playable = rewritten
+                continue
+
             if not settings.allow_drop_notes:
-                raise ValueError(f"no playable guitar voicing at onset {onset_tick}: duplicate string use required")
+                raise ValueError(
+                    f"no playable guitar voicing at onset {onset_tick}: "
+                    "duplicate string use or impractical hand span required"
+                )
             dropped = _least_important_note(playable, settings=settings, tonic_pc=tonic_pc)
             playable.remove(dropped)
             _record_dropped_note(
                 dropped,
-                reason="voicing required duplicate string use or an unreachable fret shape",
+                reason="voicing required duplicate string use or an impractical fret span",
                 dropped_notes=dropped_notes,
                 source_maps_by_id=source_maps_by_id,
             )
@@ -516,12 +539,235 @@ def _least_important_note(
     return min(notes, key=drop_priority)
 
 
+def _try_octave_rewrite_for_hand_span(
+    playable: Sequence[_PreparedEvent],
+    *,
+    wide_fingerings: dict[str, GuitarFingering] | None,
+    previous_by_voice: dict[int, GuitarFingering],
+    previous_position: int | None,
+    settings: GuitarArrangementSettings,
+) -> list[_PreparedEvent] | None:
+    if wide_fingerings is None or settings.octave_shift_policy == "none":
+        return None
+
+    attempts = _octave_rewrite_attempts(playable, wide_fingerings, settings=settings)
+    for prepared, semitone_delta in attempts:
+        rewritten_event = _rewrite_prepared_pitch(
+            prepared,
+            semitone_delta=semitone_delta,
+            settings=settings,
+        )
+        if rewritten_event is None:
+            continue
+
+        rewritten = [
+            rewritten_event if candidate.target_event.id == prepared.target_event.id else candidate
+            for candidate in playable
+        ]
+        if not _preserves_source_pitch_order(rewritten):
+            continue
+        if _choose_onset_fingerings(
+            rewritten,
+            previous_by_voice=previous_by_voice,
+            previous_position=previous_position,
+            settings=settings,
+        ) is None:
+            continue
+        return rewritten
+
+    return None
+
+
+def _octave_rewrite_attempts(
+    playable: Sequence[_PreparedEvent],
+    wide_fingerings: dict[str, GuitarFingering],
+    *,
+    settings: GuitarArrangementSettings,
+) -> list[tuple[_PreparedEvent, int]]:
+    fretted = [
+        (prepared, wide_fingerings[prepared.target_event.id])
+        for prepared in playable
+        if prepared.target_event.id in wide_fingerings
+        and wide_fingerings[prepared.target_event.id].fret > 0
+    ]
+    if not fretted:
+        return []
+
+    max_fret = max(fingering.fret for _, fingering in fretted)
+    min_fret = min(fingering.fret for _, fingering in fretted)
+    attempts: list[tuple[_PreparedEvent, int]] = []
+    seen: set[tuple[str, int]] = set()
+    source_pitches = [
+        prepared.source_event.pitch_midi
+        for prepared in playable
+        if prepared.source_event.pitch_midi is not None
+    ]
+    highest_source_pitch = max(source_pitches) if source_pitches else None
+
+    def add(prepared: _PreparedEvent, semitone_delta: int) -> None:
+        key = (prepared.target_event.id, semitone_delta)
+        if key in seen:
+            return
+        seen.add(key)
+        attempts.append((prepared, semitone_delta))
+
+    if settings.preserve_melody:
+        for prepared, fingering in sorted(
+            fretted,
+            key=lambda item: item[0].source_event.pitch_midi or 128,
+        ):
+            if fingering.fret == min_fret and prepared.source_event.pitch_midi != highest_source_pitch:
+                add(prepared, 12)
+
+    for prepared, fingering in sorted(
+        fretted,
+        key=lambda item: item[0].source_event.pitch_midi or -1,
+        reverse=True,
+    ):
+        if fingering.fret == max_fret and prepared.source_event.pitch_midi != highest_source_pitch:
+            add(prepared, -12)
+
+    for prepared, fingering in sorted(
+        fretted,
+        key=lambda item: item[0].source_event.pitch_midi or 128,
+    ):
+        if fingering.fret == min_fret:
+            add(prepared, 12)
+
+    for prepared in sorted(
+        playable,
+        key=lambda item: item.source_event.pitch_midi or -1,
+        reverse=True,
+    ):
+        add(prepared, -12)
+
+    return attempts
+
+
+def _rewrite_prepared_pitch(
+    prepared: _PreparedEvent,
+    *,
+    semitone_delta: int,
+    settings: GuitarArrangementSettings,
+) -> _PreparedEvent | None:
+    source_pitch = prepared.source_event.pitch_midi
+    target_pitch = prepared.target_event.pitch_midi
+    if source_pitch is None or target_pitch is None:
+        return None
+
+    rewritten_pitch = target_pitch + semitone_delta
+    if not 0 <= rewritten_pitch <= 127:
+        return None
+    if not _has_fingering_candidate(rewritten_pitch, settings=settings):
+        return None
+
+    return replace(
+        prepared,
+        target_event=replace(prepared.target_event, pitch_midi=rewritten_pitch, fingering=None),
+        semitone_shift=rewritten_pitch - source_pitch,
+    )
+
+
+def _preserves_source_pitch_order(prepared_events: Sequence[_PreparedEvent]) -> bool:
+    pitched = [
+        prepared
+        for prepared in prepared_events
+        if prepared.source_event.pitch_midi is not None
+        and prepared.target_event.pitch_midi is not None
+    ]
+    for left_index, left in enumerate(pitched):
+        for right in pitched[left_index + 1 :]:
+            left_source = left.source_event.pitch_midi
+            right_source = right.source_event.pitch_midi
+            left_target = left.target_event.pitch_midi
+            right_target = right.target_event.pitch_midi
+            if left_source is None or right_source is None or left_target is None or right_target is None:
+                continue
+            if left_source < right_source and left_target > right_target:
+                return False
+            if left_source > right_source and left_target < right_target:
+                return False
+    return True
+
+
+def _record_octave_rewrites(
+    before_events: Sequence[_PreparedEvent],
+    after_events: Sequence[_PreparedEvent],
+    *,
+    octave_shifts: list[OctaveShiftDiagnostic],
+    range_changes: list[RangeChangeDiagnostic],
+) -> None:
+    before_by_id = {
+        prepared.target_event.id: prepared
+        for prepared in before_events
+    }
+    for after in after_events:
+        before = before_by_id.get(after.target_event.id)
+        if before is None:
+            continue
+        if before.target_event.pitch_midi == after.target_event.pitch_midi:
+            continue
+        _replace_octave_shift_diagnostic(
+            after,
+            octave_shifts=octave_shifts,
+            range_changes=range_changes,
+            reason="octave-shifted to keep the guitar fingering within hand span",
+        )
+
+
+def _replace_octave_shift_diagnostic(
+    prepared: _PreparedEvent,
+    *,
+    octave_shifts: list[OctaveShiftDiagnostic],
+    range_changes: list[RangeChangeDiagnostic],
+    reason: str,
+) -> None:
+    source_pitch = prepared.source_event.pitch_midi
+    target_pitch = prepared.target_event.pitch_midi
+    if source_pitch is None or target_pitch is None:
+        return
+
+    octave_shifts[:] = [
+        diagnostic
+        for diagnostic in octave_shifts
+        if diagnostic.source_event_id != prepared.source_event.id
+    ]
+    range_changes[:] = [
+        diagnostic
+        for diagnostic in range_changes
+        if diagnostic.source_event_id != prepared.source_event.id
+    ]
+    if target_pitch == source_pitch:
+        return
+
+    octave_shifts.append(
+        OctaveShiftDiagnostic(
+            source_event_id=prepared.source_event.id,
+            start_tick=prepared.source_event.start_tick,
+            voice_id=prepared.source_event.voice_id,
+            original_pitch_midi=source_pitch,
+            arranged_pitch_midi=target_pitch,
+            semitone_shift=target_pitch - source_pitch,
+        )
+    )
+    range_changes.append(
+        RangeChangeDiagnostic(
+            source_event_id=prepared.source_event.id,
+            start_tick=prepared.source_event.start_tick,
+            original_pitch_midi=source_pitch,
+            arranged_pitch_midi=target_pitch,
+            reason=reason,
+        )
+    )
+
+
 def _choose_onset_fingerings(
     prepared_events: Sequence[_PreparedEvent],
     *,
     previous_by_voice: dict[int, GuitarFingering],
     previous_position: int | None,
     settings: GuitarArrangementSettings,
+    enforce_hand_span: bool = True,
 ) -> dict[str, GuitarFingering] | None:
     if not prepared_events:
         return {}
@@ -552,6 +798,8 @@ def _choose_onset_fingerings(
     for combo in combo_iter:
         strings = {fingering.string_index for fingering in combo}
         if len(strings) != len(combo):
+            continue
+        if enforce_hand_span and _fret_span(combo) > settings.resolved_max_hand_span_frets:
             continue
         cost = _combo_fingering_cost(
             prepared_events,
@@ -706,21 +954,6 @@ def _position_from_fingerings(fingerings: Sequence[GuitarFingering]) -> int:
     if not fretted:
         return 0
     return round(sum(fretted) / len(fretted))
-
-
-def _should_thin_for_hand_span(
-    playable: Sequence[_PreparedEvent],
-    span: int,
-    *,
-    settings: GuitarArrangementSettings,
-) -> bool:
-    if span <= settings.resolved_max_hand_span_frets:
-        return False
-    if not settings.allow_drop_notes or len(playable) <= 2:
-        return False
-    if settings.difficulty == "hard" and len(playable) <= settings.resolved_max_notes_per_onset:
-        return False
-    return True
 
 
 def _note_importance(
@@ -900,7 +1133,7 @@ def _build_warnings(
     if dropped_notes:
         warnings.append(f"dropped {len(dropped_notes)} note(s) while thinning piano material for guitar")
     if octave_shifts:
-        warnings.append(f"octave-shifted {len(octave_shifts)} note(s) into guitar range")
+        warnings.append(f"octave-shifted {len(octave_shifts)} note(s) for guitar range or playability")
     if impossible_chords:
         warnings.append(f"rewrote {len(impossible_chords)} onset(s) that were not directly playable")
     if hand_position_compromises:

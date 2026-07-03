@@ -161,6 +161,9 @@ Useful backend environment variables:
 - `BACH_GEN_V6_CHECKPOINT`
 - `BACH_GEN_V6_DATA_DIR`
 - `BACH_GEN_V6_CANDIDATES`
+- `BACH_GEN_V6_EMI_FRAGMENTS`
+- `BACH_GEN_V6_EMI_BIAS_STRENGTH`
+- `BACH_GEN_V6_EMI_FRAGMENT_LIMIT`
 - `BACH_GEN_USE_GRAMMAR_MASK`
 - `BACH_GEN_QUALITY_PASSES`
 
@@ -173,6 +176,11 @@ BACH_GEN_V6_CHECKPOINT=out/instrumental_v6_voice_aware_v2/checkpoint_best.pt \
 BACH_GEN_V6_DATA_DIR=data/instrumental_v6/clean_bach_large_v1 \
 uvicorn src.api.compose_app:app --port 8001
 ```
+
+To add EMI-style signature retrieval to v6, first build
+`data/instrumental_v6/clean_bach_long_v1/emi_v6_fragments.jsonl` with
+`scripts/build_emi_v6_fragments.py`, then set `BACH_GEN_V6_EMI_FRAGMENTS` to that
+JSONL path.
 
 ## Frontend
 

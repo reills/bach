@@ -57,6 +57,9 @@ class ComposeRuntimeConfig:
     v6_top_k: int = 12
     v6_beam_size: int = 96
     v6_tempo: int = 88
+    v6_emi_fragment_path: Optional[Path] = None
+    v6_emi_bias_strength: float = 0.8
+    v6_emi_fragment_limit: int = 4
     hybrid_allow_emi_debug_fallback: bool = False
     device: str = "cpu"
     max_length: int = 512
@@ -78,6 +81,7 @@ class _LoadedV6Runtime:
     model: Any
     model_config: Any
     pieces: list[Any]
+    emi_fragments: list[Any]
     device: torch.device
     checkpoint_step: int | None
 
@@ -316,6 +320,12 @@ def _runtime_config_from_env() -> ComposeRuntimeConfig:
         v6_top_k=_env_int("BACH_GEN_V6_TOP_K", 12),
         v6_beam_size=_env_int("BACH_GEN_V6_BEAM_SIZE", 96),
         v6_tempo=_env_int("BACH_GEN_V6_TEMPO", 88),
+        v6_emi_fragment_path=(
+            _env_optional_path("BACH_GEN_V6_EMI_FRAGMENTS")
+            or fragment_path
+        ),
+        v6_emi_bias_strength=_env_float("BACH_GEN_V6_EMI_BIAS_STRENGTH", 0.8),
+        v6_emi_fragment_limit=_env_int("BACH_GEN_V6_EMI_FRAGMENT_LIMIT", 4),
         hybrid_allow_emi_debug_fallback=_env_bool("BACH_GEN_HYBRID_EMI_DEBUG_FALLBACK", False),
         device=device,
         max_length=_env_int("BACH_GEN_MAX_LENGTH", 512),
@@ -339,6 +349,7 @@ def _load_v6_runtime(config: ComposeRuntimeConfig) -> _LoadedV6Runtime:
     if config.v6_checkpoint_path is None or config.v6_data_dir is None:
         raise ValueError("instrumental_v6 requires BACH_GEN_V6_CHECKPOINT and BACH_GEN_V6_DATA_DIR")
 
+    from src.emi.fragments import fragment_from_jsonl
     from src.instrumental_v6.data import load_dataset
     from src.instrumental_v6.model import build_generator, config_from_checkpoint
 
@@ -356,10 +367,20 @@ def _load_v6_runtime(config: ComposeRuntimeConfig) -> _LoadedV6Runtime:
     pieces, _ = load_dataset(config.v6_data_dir / "pieces.json")
     if not pieces:
         raise ValueError("instrumental_v6 dataset contains no pieces")
+    emi_fragments = []
+    if config.v6_emi_fragment_path is not None:
+        if not config.v6_emi_fragment_path.exists():
+            raise ValueError(f"v6 EMI fragment file not found: {config.v6_emi_fragment_path}")
+        with config.v6_emi_fragment_path.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                stripped = line.strip()
+                if stripped:
+                    emi_fragments.append(fragment_from_jsonl(stripped))
     return _LoadedV6Runtime(
         model=model,
         model_config=model_config,
         pieces=pieces,
+        emi_fragments=emi_fragments,
         device=device,
         checkpoint_step=checkpoint.get("step"),
     )
@@ -383,6 +404,7 @@ def _compose_v6_result(
         _with_tempo,
         generate_rows,
     )
+    from src.instrumental_v6.global_coherence import evaluate_global_coherence
     from src.instrumental_v6.metrics import evaluate_piece_rows, source_overlap_report
     from src.instrumental_v6.representation import piece_to_canonical_score, rows_to_piece
 
@@ -516,6 +538,10 @@ def _compose_v6_result(
             beam_size=beam_size,
             duration_log_prior=duration_log_prior,
             duration_prior_strength=duration_prior_strength,
+            emi_fragments=runtime.emi_fragments,
+            emi_bias_strength=max(0.0, config.v6_emi_bias_strength),
+            emi_fragment_limit=max(1, config.v6_emi_fragment_limit),
+            emi_avoid_piece_id=template.piece_id,
         )
         generated_piece = rows_to_piece(
             global_rows=generated[0],
@@ -542,11 +568,19 @@ def _compose_v6_result(
             subject=subject,
             voice_count=voice_count,
         )
+        global_structure = evaluate_global_coherence(
+            generated_piece.global_rows,
+            generated_piece.voice_rows,
+            voice_count=voice_count,
+            steps_per_bar=template.steps_per_bar,
+            subject=subject,
+        )
         score_value = _candidate_score(
             report,
             overlap,
             source_baseline=source_baseline,
             motif_report=motif,
+            global_report=global_structure,
         )
         candidates.append(
             (
@@ -557,6 +591,7 @@ def _compose_v6_result(
                     "score": score_value,
                     "counterpoint": report,
                     "motif": motif,
+                    "global_structure": global_structure,
                     "source_overlap": overlap,
                 },
             )
@@ -586,6 +621,10 @@ def _compose_v6_result(
         "temperature": temperature,
         "durationTemperature": duration_temperature,
         "durationPriorStrength": duration_prior_strength,
+        "emiFragments": str(config.v6_emi_fragment_path) if config.v6_emi_fragment_path else None,
+        "emiFragmentCount": len(runtime.emi_fragments),
+        "emiBiasStrength": max(0.0, config.v6_emi_bias_strength),
+        "emiFragmentLimit": max(1, config.v6_emi_fragment_limit),
         "tempo": tempo,
         "seed": seed,
         "sourceBaseline": source_baseline,

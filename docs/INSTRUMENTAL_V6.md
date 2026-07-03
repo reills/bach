@@ -84,10 +84,63 @@ CONDA_NO_PLUGINS=true conda run --no-capture-output -n bach python -u \
   --device cuda
 ```
 
+## EMI Signature Memory
+
+Build a v6 EMI-style fragment database from the same dataset used by the
+checkpoint:
+
+```bash
+CONDA_NO_PLUGINS=true conda run --no-capture-output -n bach python -u \
+  scripts/build_emi_v6_fragments.py \
+  --data-dir data/instrumental_v6/clean_bach_long_v1 \
+  --output data/instrumental_v6/clean_bach_long_v1/emi_v6_fragments.jsonl \
+  --length-slices 8 \
+  --hop-slices 4
+```
+
+Generate with transformer logits softly biased by compatible EMI signatures:
+
+```bash
+CONDA_NO_PLUGINS=true conda run --no-capture-output -n bach python -u \
+  scripts/generate_instrumental_v6.py \
+  --checkpoint out/instrumental_v6_voice_aware_384_long_v1/checkpoint_best.pt \
+  --data-dir data/instrumental_v6/clean_bach_long_v1 \
+  --out-dir out/instrumental_v6_voice_aware_384_long_v1/generated_emi \
+  --voices 2 \
+  --form invention \
+  --prompt-rows 64 \
+  --max-new-rows 192 \
+  --candidates 8 \
+  --temperature 0.4 \
+  --duration-temperature 0.8 \
+  --duration-prior-strength 0.1 \
+  --emi-fragments data/instrumental_v6/clean_bach_long_v1/emi_v6_fragments.jsonl \
+  --emi-bias-strength 0.8 \
+  --device cuda
+```
+
+Use the same memory from the frontend/backend:
+
+```bash
+BACH_GEN_ENGINE=instrumental_v6 \
+BACH_GEN_DEVICE=cuda \
+BACH_GEN_V6_CHECKPOINT=out/instrumental_v6_voice_aware_384_long_v1/checkpoint_best.pt \
+BACH_GEN_V6_DATA_DIR=data/instrumental_v6/clean_bach_long_v1 \
+BACH_GEN_V6_EMI_FRAGMENTS=data/instrumental_v6/clean_bach_long_v1/emi_v6_fragments.jsonl \
+BACH_GEN_V6_EMI_BIAS_STRENGTH=0.8 \
+BACH_GEN_V6_EMI_FRAGMENT_LIMIT=4 \
+uvicorn src.api.compose_app:app --port 8001
+```
+
 Generation uses a dynamic all-pair beam. Crossings and parallel perfect intervals
 remain hard constraints for every active voice pair; candidate reranking also reports
 activity, repeated sonorities, strong-beat dissonance, source overlap, and the matching
-source-window baseline. It also reports tonal outliers and transposition-invariant
-subject-head recurrence. The duration prior is learned from pieces with the requested
+source-window baseline. It also reports tonal outliers, transposition-invariant
+subject-head recurrence, and a global coherence report covering subject recurrence
+across opening/middle/closing sections, cadence placement, development-role
+coverage, local-key arc, and phrase-role balance. If an EMI fragment database is
+supplied, compatible short interval/rhythm signatures are retrieved by voice,
+role, key, and local continuity, then applied as a soft pitch bias inside the
+transformer decoder. The duration prior is learned from pieces with the requested
 form and voice count; duration temperature is separate from pitch temperature so
 rhythmic variety does not require randomizing pitch.

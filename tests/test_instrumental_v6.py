@@ -6,6 +6,7 @@ import pytest
 import torch
 
 from scripts.generate_instrumental_v6 import (
+    _apply_emi_pitch_bias,
     _cadence_target_pitches,
     _candidate_score,
     _development_interval,
@@ -17,6 +18,7 @@ from scripts.generate_instrumental_v6 import (
     _sample_duration,
     _select_template,
 )
+from src.emi.fragments import Fragment
 from src.instrumental_v6.decoding import (
     PitchOption,
     creates_parallel_perfect,
@@ -28,6 +30,7 @@ from src.instrumental_v6.representation import (
     DEVELOPMENT_TO_ID,
     GLOBAL_FIELD_NAMES,
     PAIR_FIELD_NAMES,
+    ROLE_TO_ID,
     VOICE_FIELD_NAMES,
     _select_movement_indices,
     build_development_plan,
@@ -295,6 +298,75 @@ def test_tonal_context_accepts_global_or_planned_local_scale() -> None:
     assert _fits_tonal_context(60, row, mode=0)
     assert _fits_tonal_context(66, row, mode=0)
     assert not _fits_tonal_context(61, row, mode=0)
+
+
+def test_emi_pitch_bias_promotes_compatible_signature_interval() -> None:
+    row = [0] * len(GLOBAL_FIELD_NAMES)
+    row[GLOBAL_FIELD_NAMES.index("key_pc")] = 0
+    row[GLOBAL_FIELD_NAMES.index("local_key_pc")] = 0
+    row[GLOBAL_FIELD_NAMES.index("section_role")] = ROLE_TO_ID["SUBJECT_ENTRY"]
+    previous_rows = [
+        [[2, 60, 0, 1, 0, 1], [2, 72, 0, 1, 0, 5]]
+        for _ in range(4)
+    ]
+    fragment = Fragment(
+        id="sig",
+        piece_id="source",
+        source_path="source.musicxml",
+        voice=0,
+        start_slice=0,
+        length_slices=8,
+        start_bar=0,
+        start_pos=0,
+        beats=2.0,
+        phrase_role="SUBJECT_ENTRY",
+        key="C",
+        key_pc=0,
+        mode=0,
+        start_pitch=60,
+        end_pitch=62,
+        start_degree=1,
+        end_degree=2,
+        melodic_intervals=[4, -2],
+        rhythm_steps=[1, 1, 1],
+        vertical_intervals=[12],
+        state_pattern=[2, 2, 2],
+        contour_hash="contour",
+        fingerprint="fingerprint",
+        speac_label="S",
+        cmmc_function="S1",
+        cadence_type="NONE",
+        contour_bucket="MIXED",
+        rhythm_bucket="EVEN_16THS",
+        local_key_pc=0,
+        harmonic_function="TONIC",
+        entry_degree=1,
+        exit_degree=2,
+        min_pitch=60,
+        max_pitch=64,
+        copy_hash="copy",
+        transposition_hash="transposition",
+    )
+    scores = {62: 0.0, 64: -1.0}
+
+    _apply_emi_pitch_bias(
+        scores,
+        [fragment],
+        voice=0,
+        voice_count=2,
+        previous_rows=previous_rows,
+        global_row=row,
+        previous_note=60,
+        low=40,
+        high=84,
+        mode=0,
+        steps_per_bar=4,
+        limit=1,
+        strength=3.0,
+        avoid_piece_id="other",
+    )
+
+    assert scores[64] > scores[62]
 
 
 def test_stretto_without_planned_entry_rotates_subject_voice() -> None:
